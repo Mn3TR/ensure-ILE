@@ -1,3 +1,16 @@
+> **DHDL — DeepSeek Harness Desktop in Learning**
+>
+> 从 DSH Desktop 分出来的学习项目。底座是同一套 DeepSeek Harness 和插件系统，目标换成了另一件事：
+> 让它带着一个学生，把他手里那道题**自己解出来**——而不是把答案讲给他听。
+>
+> - 与上游的关系：本地 fork。`deepseek-harness/` 是固定的上游子模块，**不修改**。
+> - 现在的产品形态：一个可选的 agent preset，叫 **HRL 引导**。见 [`dsh-plugin-hrll/](dsh-plugin-hrll/)。
+> - 开工前读 [`AGENTS.md`](AGENTS.md)。
+>
+> 下面是上游 README，保留作为底座说明。
+
+---
+
 <p align="center">
   <a href="https://dshdesktop.cn"><img src="assets/desktop-hero-zh.png" alt="DSH Desktop：基于 DeepSeek Harness 构建的开源桌面客户端" width="100%"></a>
 </p>
@@ -162,7 +175,7 @@ DSH Desktop 是基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek
 
 ## 开发
 
-稳定版与 Beta 桌面包分别位于 `dsh-plugin-desktop/` 和 `dsh-plugin-desktop-beta/`。外层仓库使用 Yarn，固定的 `deepseek-harness/` 子模块继续使用自己的 pnpm workspace。从仓库根目录执行：
+桌面包位于 `dsh-plugin-desktop/`。外层仓库使用 Yarn，固定的 `deepseek-harness/` 子模块继续使用自己的 pnpm workspace。从仓库根目录执行：
 
 ```sh
 git submodule update --init --recursive

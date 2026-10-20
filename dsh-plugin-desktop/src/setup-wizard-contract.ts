@@ -8,6 +8,19 @@ export type DesktopSetupWizardWindowsMaterial = 'off'
 export type DesktopSetupWizardNetworkExposure = 'loopback' | 'lan'
 export type DesktopSetupWizardMarket = 'disabled' | 'community-market' | 'dsh-market' | 'official-market'
 
+/** Every Setup screen, in the order the full Wizard presents them. */
+export const DESKTOP_SETUP_WIZARD_STEP_IDS = Object.freeze([
+  'welcome',
+  'mode',
+  'material',
+  'market',
+  'aa',
+  'notifications',
+  'browser',
+  'success',
+] as const)
+export type DesktopSetupWizardStep = (typeof DESKTOP_SETUP_WIZARD_STEP_IDS)[number]
+
 export interface DesktopSetupWizardNotifications {
   readonly enabled: boolean
   readonly notifyOnTurnCompletion: boolean
@@ -154,6 +167,28 @@ export function isDesktopSetupWizardInput(value: unknown): value is DesktopSetup
     && !/[. ]$/u.test(value.profileName)
     && !/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?$/iu.test(value.profileName)
     && isPlatform(value.platform)
+}
+
+/**
+ * Accept only an ordered subset of the canonical screens that starts at Welcome.
+ *
+ * A plan is what the owner shows, not what the Wizard can show: a learner build
+ * may present the welcome screen alone and apply fixed defaults from `input`,
+ * while `full` restores every screen. Order and uniqueness come from the
+ * canonical sequence, so a plan can never reorder or repeat a step.
+ */
+export function normalizeDesktopSetupWizardSteps(
+  value: readonly unknown[],
+): readonly DesktopSetupWizardStep[] | undefined {
+  if (value.length === 0
+    || !value.every(step => (DESKTOP_SETUP_WIZARD_STEP_IDS as readonly string[]).includes(step as string))) {
+    return undefined
+  }
+  const requested = new Set(value)
+  const ordered = DESKTOP_SETUP_WIZARD_STEP_IDS.filter(step => requested.has(step))
+  return ordered.length === value.length && ordered[0] === 'welcome'
+    ? Object.freeze(ordered)
+    : undefined
 }
 
 /** Reject selections the current platform cannot actually present. */

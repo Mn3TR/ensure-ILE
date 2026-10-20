@@ -12,8 +12,8 @@ import * as desktopOffice from './desktop-office.ts'
 import { desktopPrimaryRuntime, resolveDesktopOfficeConfig } from './desktop-office.ts'
 import { app, crashReporter, safeStorage, session, shell } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { existsSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   boot,
@@ -171,7 +171,14 @@ import {
   readDesktopSetupWizardSettings,
   updateDesktopSetupWizardSettings,
 } from './setup-wizard-settings.ts'
-import { isDesktopSetupWizardInput, desktopSetupWizardSelectionIsAvailable } from './setup-wizard-contract.ts'
+import {
+  DESKTOP_SETUP_WIZARD_STEP_IDS,
+  desktopSetupWizardSelectionIsAvailable,
+  isDesktopSetupWizardInput,
+  normalizeDesktopSetupWizardSteps,
+  type DesktopSetupWizardInput,
+  type DesktopSetupWizardStep,
+} from './setup-wizard-contract.ts'
 import { ProfileCreateWindow } from './profile-create-window.ts'
 import { DesktopProfileSelectionWindow } from './profile-selection-window.ts'
 import { showDesktopDialog } from './desktop-dialog-window.ts'
@@ -817,6 +824,13 @@ async function start(): Promise<void> {
     let homeDir: string
     if (safeModePaths !== undefined) {
       homeDir = safeModePaths.homeDir
+    } else if (process.env.DHDL_HOME !== undefined && process.env.DHDL_HOME.trim().length > 0) {
+      // DHDL: this build always runs out of the data root beside its own sources.
+      // Both the release-channel home and the Desktop data-directory selection are
+      // bypassed on purpose: an installed copy lives in ~/.dsh, and sharing that
+      // directory means a development launch would read and rewrite the profile the
+      // learner actually uses.
+      homeDir = resolve(process.env.DHDL_HOME)
     } else {
       dataDirectoryLocation = resolveDesktopDataDirectory(
         desktopUserDataDir,
@@ -825,6 +839,7 @@ async function start(): Promise<void> {
       )
       homeDir = dataDirectoryLocation.homeDir
     }
+    electronLogger.info(`[dhdl] home resolution: env=${process.env.DSH_HOME ?? '<unset>'} status=${channelHomeResolution.status} fallback=${fallbackHome} resolved=${homeDir}`)
     process.env.DSH_HOME = homeDir
     const desktopLaunchEnvironment = withDesktopDshHome(environment, homeDir)
     // Before anything can send a request. `installProxyFromEnvironment` also writes the resolved
@@ -1442,7 +1457,11 @@ async function start(): Promise<void> {
       && (desktopSetupWizardPending(marketUserDataDir, prepared.profile.dir)
         || !hasDesktopProfileUsageHistory(releaseUserDataLocations, prepared.profile.dir, activeProfileName))
     if (setupPending) await beginDesktopSetupWizard(marketUserDataDir, prepared.profile.dir)
-    const setupInput = { ...readDesktopSetupWizardSettings(prepared.settingsDocument), appVersion,
+    // DHDL: one welcome screen and a fixed desktop profile. Full upstream Setup
+    // stays available behind DHDL_SETUP=full for development and future screens.
+    const dhdlSetup = dhdlSetupActive()
+    const setupSteps = dhdlSetup ? dhdlSetupSteps() : DESKTOP_SETUP_WIZARD_STEP_IDS
+    const setupInputBase: DesktopSetupWizardInput = { ...readDesktopSetupWizardSettings(prepared.settingsDocument), appVersion,
       profileName: activeProfileName, platform: runtime.platform,
       market: marketSelection.requested !== 'disabled'
         ? marketSelection.requested
@@ -1450,12 +1469,16 @@ async function start(): Promise<void> {
           ? ('official-market' as const)
           : ('disabled' as const),
       aaEnabled: profilePreferences?.aaEnabled === true }
+    const setupInput = dhdlSetup ? dhdlSetupInput(setupInputBase) : setupInputBase
     let setupSaving = false
     let setupRestartPending = false
     runtime.setupOnboarding = {
       read: async () => ({ required: setupPending, edition: 'desktop', profile: activeProfileName,
         restartPending: setupRestartPending,
-        accountPending: safeModePaths === undefined && !setupPending && desktopSetupAccountPending(marketUserDataDir, prepared.profile.dir),
+        steps: setupSteps,
+        // DHDL learners sign in later, on their own terms; Setup never blocks on it.
+        accountPending: safeModePaths === undefined && !setupPending && !dhdlSetup
+          && desktopSetupAccountPending(marketUserDataDir, prepared.profile.dir),
         input: setupInput }),
       dismissAccount: async profile => {
         if (setupPending || profile !== activeProfileName || safeModePaths !== undefined) throw new Error('Desktop account setup is unavailable')
@@ -1502,6 +1525,9 @@ async function start(): Promise<void> {
           // Keep the existing per-Profile marker; a failed save must remain resumable.
           await completeOrSkipDesktopSetupWizard(marketUserDataDir, prepared.profile.dir,
             selection === undefined ? 'skipped' : 'completed', setupWizardVersions)
+          // DHDL: Setup never hands the learner to the official account step, so the
+          // continuation marker would otherwise block the restart the toast offers.
+          if (dhdlSetup) dismissDesktopSetupAccount(marketUserDataDir, prepared.profile.dir)
           setupPending = false
           // Keep the current renderer/Host alive for official login and onboarding.
           // Preferences are applied on the next launch, requested explicitly afterwards.
@@ -1970,8 +1996,113 @@ async function start(): Promise<void> {
   }
 }
 
+/**
+ * DHDL owns every file it writes: the harness home, the shared agents root and
+ * Electron's userData all default under one data root — the checkout in
+ * development, the executable's directory in a packaged build. `DHDL_DATA_ROOT`
+ * overrides it; `DSH_HOME`, `DSH_AGENTS_HOME` and `DSH_DESKTOP_USER_DATA` still
+ * win individually when a caller sets them deliberately.
+ */
+/** The workspace root in development, the executable's directory when packaged. */
+function resolveProjectRoot(): string {
+  if (app.isPackaged) return dirname(process.execPath)
+  let base = resolve(app.getAppPath())
+  while (dirname(base) !== base) {
+    const manifest = join(base, 'package.json')
+    if (existsSync(manifest)) {
+      try {
+        const parsed = JSON.parse(readFileSync(manifest, 'utf8')) as { name?: string }
+        if (parsed.name === 'dhdl') return base
+      } catch {
+        // A manifest we cannot read is simply not the root; keep walking up.
+      }
+    }
+    base = dirname(base)
+  }
+  return resolve(app.getAppPath())
+}
+
+/**
+ * Seed the harness profile from the repository definition on first launch. An
+ * existing profile is never overwritten, so settings a learner changes through
+ * the UI survive restarts; delete the profile directory to pick up new defaults.
+ */
+function seedProfile(dataRoot: string, projectRoot: string): void {
+  const template = join(projectRoot, 'profiles', 'dhdl')
+  if (!existsSync(template)) return
+  const target = join(dataRoot, 'home', 'profiles', 'desktop')
+  mkdirSync(target, { recursive: true })
+  for (const file of ['package.json', 'cordis.patch.yml']) {
+    const source = join(template, file)
+    const destination = join(target, file)
+    if (existsSync(source) && !existsSync(destination)) copyFileSync(source, destination)
+  }
+}
+
+function resolveDataRoot(): string {
+  const configured = process.env.DHDL_DATA_ROOT
+  if (configured !== undefined && configured.trim().length > 0) return resolve(configured)
+  return join(resolveProjectRoot(), '.dhdl')
+}
+
+/** True for a DHDL launch: run() tags its own data root before start(). */
+function dhdlSetupActive(): boolean {
+  return process.env.DHDL_HOME !== undefined && process.env.DHDL_HOME.trim().length > 0
+}
+
+/**
+ * DHDL shows the welcome screen and nothing else: a learner should start asking
+ * questions instead of choosing a shell mode, a plugin market or notifications.
+ * The hidden screens' answers arrive as fixed `input` values, so the one visible
+ * screen still persists a complete and valid selection. `DHDL_SETUP=full`
+ * restores the upstream eight-screen Wizard for development and future screens.
+ */
+function dhdlSetupSteps(): readonly DesktopSetupWizardStep[] {
+  return process.env.DHDL_SETUP === 'full'
+    ? DESKTOP_SETUP_WIZARD_STEP_IDS
+    : normalizeDesktopSetupWizardSteps(['welcome']) ?? DESKTOP_SETUP_WIZARD_STEP_IDS
+}
+
+/** The desktop profile a learner gets without visiting any Setup screen. */
+function dhdlSetupInput(input: DesktopSetupWizardInput): DesktopSetupWizardInput {
+  return Object.freeze({
+    ...input,
+    mode: input.platform === 'linux' ? 'compatibility' : 'advanced',
+    macosMaterial: 'off',
+    windowsMaterial: 'off',
+    openBrowser: false,
+    networkExposure: 'loopback',
+    market: 'disabled',
+    aaEnabled: false,
+    notifications: Object.freeze({
+      enabled: false,
+      notifyOnTurnCompletion: false,
+      notifyOnTurnFailure: false,
+      notifyOnJobCompletion: false,
+      notifyOnJobFailure: false,
+      notifyOnScheduleCompletion: false,
+      notifyOnScheduleFailure: false,
+    }),
+  })
+}
+
 async function run(): Promise<void> {
   app.setName(PRODUCT_NAME)
+  // DHDL: keep the entire instance inside its own directory so a development
+  // build never reads or writes the installed copy's data. The environment is
+  // assigned before start(), which is where the Host child inherits it.
+  const dataRoot = resolveDataRoot()
+  seedProfile(dataRoot, resolveProjectRoot())
+  process.env.DSH_HOME ??= join(dataRoot, 'home')
+  // DHDL: start() reads this and refuses to fall back to a shared ~/.dsh. It is a
+  // separate variable from DSH_HOME because DSH_HOME is also the name the installed
+  // build uses; keeping ours distinct means an inherited DSH_HOME can never smuggle
+  // this launch back into the installed copy's data.
+  process.env.DHDL_HOME ??= join(dataRoot, 'home')
+  process.env.DSH_AGENTS_HOME = join(dataRoot, 'agents')
+  // DHDL: an installed copy and this build would otherwise share one userData
+  // and fight over the single-instance lock requested in start().
+  app.setPath('userData', process.env.DSH_DESKTOP_USER_DATA ?? join(dataRoot, 'appdata'))
   if (process.argv.includes('--export-diagnostics')) {
     try {
       await app.whenReady()

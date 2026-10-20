@@ -1,0 +1,33 @@
+{
+  "unit": {
+    "name": "memory_project_a4c4ci",
+    "version": 1
+  },
+  "global": null,
+  "tables": {
+    "blocks": {
+      "ecd7fded-ca75-41a7-800d-7d7f1a80b2ce": {
+        "namespace": "project",
+        "status": "approved",
+        "injected": false,
+        "source": "agent",
+        "content": "DHDL 的 OOBE（DSH Desktop 首启 Setup Wizard）已裁剪为「只欢迎一屏」，实现落在 stable 包 dsh-plugin-desktop（beta/next 未动）：\n- 主进程 main.ts 用 `setupOnboarding.read()` 返回 `steps`（新增可选字段）给 renderer；默认 `['welcome']`，环境变量 `DHDL_SETUP=full` 恢复上游 8 屏（用于以后加自定义步骤）。\n- 固定默认值在 `dhdlSetupInput()`：advanced（linux→compatibility）/材质 off/market disabled/aa false/openBrowser false/loopback/通知 7 项 false；账号登录步用 `dismissDesktopSetupAccount()` 去掉（必须在 completeOrSkipDesktopSetupWizard 之后调用，否则 applyPending「立即重启」会因 account marker 残留而抛错）。\n- 契约 setup-wizard-contract.ts 新增 DESKTOP_SETUP_WIZARD_STEP_IDS 与 normalizeDesktopSetupWizardSteps（只接受从 welcome 开始的有序子集）；App.tsx 改成注册表按步骤计划渲染，进度条只在 steps.length>1 时显示。\n- 关键坑：`.dhdl/appdata/profile-setup/<hash>/state.json.pending` 必须是精确的 `pending\\n`（8 字节），手写空文件会让主进程进恢复页报 `invalid pending marker`。想重看引导：删 state.json 和 state.json.account，写 pending marker。\n- 验证方式：`corepack yarn workspace dsh-plugin-desktop build` 后 `Start-Process dsh-plugin-desktop\\node_modules\\electron\\dist\\electron.exe dsh-plugin-desktop\\lib\\main.js`；会话预设显示「HRL 引导」即成功。",
+        "keywords": [
+          "oobe",
+          "setup wizard",
+          "dhdl_setup",
+          "welcome",
+          "setup-wizard-contract",
+          "steps",
+          "pending marker",
+          "dismissdesktopsetupaccount",
+          "dhdlsetupinput",
+          "首次引导",
+          "引导裁剪"
+        ],
+        "createdAt": 1792427596318,
+        "updatedAt": 1792427596318
+      }
+    }
+  }
+}

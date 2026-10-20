@@ -140,7 +140,13 @@ export function apply(ctx: ClientContext): void {
   const desktopSettings = applyDesktopSettings(ctx, environment)
   registerPluginControls(ctx)
   registerDesktopOnboarding(ctx, (snapshot, locale, finish, renderNavigation) => createElement<{ embedded?: EmbeddedSetupWizard }>(SetupWizardApp, {
-    embedded: { input: snapshot.input, locale, renderNavigation, finish: selection => finish(snapshot.profile, selection) },
+    embedded: {
+      input: snapshot.input,
+      ...(snapshot.steps === undefined ? {} : { steps: snapshot.steps }),
+      locale,
+      renderNavigation,
+      finish: selection => finish(snapshot.profile, selection),
+    },
   }))
   // Every mode shares the footer seat: upstream's row flex would otherwise let
   // two launchers crush each other, and compatibility mode installs no frame styles.

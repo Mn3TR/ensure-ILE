@@ -1,0 +1,16 @@
+{
+  "name": "dsh-profile-desktop",
+  "private": true,
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "@max-null/dsh-memory"
+      ]
+    }
+  },
+  "dependencies": {
+    "@max-null/dsh-memory": "0.15.1"
+  }
+}

@@ -7,6 +7,7 @@ import {
   SkipForward,
 } from 'lucide-react'
 import {
+  DESKTOP_SETUP_WIZARD_STEP_IDS,
   desktopSetupWizardRequiresLanAcknowledgement,
   isDesktopSetupWizardInput,
   type DesktopSetupWizardInput,
@@ -42,40 +43,35 @@ const MAX_STATE_CHARACTERS = 32 * 1024
 
 type Locale = 'en' | 'zh'
 
-export type DesktopSetupWizardStep =
-  | 'welcome'
-  | 'mode'
-  | 'material'
-  | 'aa'
-  | 'market'
-  | 'notifications'
-  | 'browser'
-  | 'success'
+/** The canonical, ordered list of screens; a Profile may present a subset. */
+export type DesktopSetupWizardStep = (typeof DESKTOP_SETUP_WIZARD_STEP_IDS)[number]
+export const DESKTOP_SETUP_WIZARD_STEPS: readonly DesktopSetupWizardStep[] = DESKTOP_SETUP_WIZARD_STEP_IDS
 
-export const DESKTOP_SETUP_WIZARD_STEPS = Object.freeze([
-  'welcome',
-  'mode',
-  'material',
-  'market',
-  'aa',
-  'notifications',
-  'browser',
-  'success',
-] as const satisfies readonly DesktopSetupWizardStep[])
+/** Keep only known screens, in canonical order; a plan always starts at Welcome. */
+function resolveDesktopSetupWizardSteps(
+  value: readonly DesktopSetupWizardStep[] | undefined,
+): readonly DesktopSetupWizardStep[] {
+  if (value === undefined || value.length === 0) return DESKTOP_SETUP_WIZARD_STEPS
+  const requested = new Set(value)
+  const ordered = DESKTOP_SETUP_WIZARD_STEPS.filter(step => requested.has(step))
+  return ordered.length > 0 && ordered[0] === 'welcome' ? ordered : DESKTOP_SETUP_WIZARD_STEPS
+}
 
 export function previousDesktopSetupWizardStep(
   step: DesktopSetupWizardStep,
+  steps: readonly DesktopSetupWizardStep[] = DESKTOP_SETUP_WIZARD_STEPS,
 ): DesktopSetupWizardStep | undefined {
-  const index = DESKTOP_SETUP_WIZARD_STEPS.indexOf(step)
-  return index > 0 ? DESKTOP_SETUP_WIZARD_STEPS[index - 1] : undefined
+  const index = steps.indexOf(step)
+  return index > 0 ? steps[index - 1] : undefined
 }
 
 export function nextDesktopSetupWizardStep(
   step: DesktopSetupWizardStep,
+  steps: readonly DesktopSetupWizardStep[] = DESKTOP_SETUP_WIZARD_STEPS,
 ): DesktopSetupWizardStep | undefined {
-  const index = DESKTOP_SETUP_WIZARD_STEPS.indexOf(step)
-  return index >= 0 && index < DESKTOP_SETUP_WIZARD_STEPS.length - 1
-    ? DESKTOP_SETUP_WIZARD_STEPS[index + 1]
+  const index = steps.indexOf(step)
+  return index >= 0 && index < steps.length - 1
+    ? steps[index + 1]
     : undefined
 }
 
@@ -557,12 +553,14 @@ export function SetupWizardWelcome({
 export function SetupWizardNavigation({
   copy,
   step,
+  steps = DESKTOP_SETUP_WIZARD_STEPS,
   onBack,
   onNext,
   onSkip,
 }: {
   readonly copy: DesktopSetupWizardCopy
   readonly step: DesktopSetupWizardStep
+  readonly steps?: readonly DesktopSetupWizardStep[]
   readonly onBack: () => void
   readonly onNext: () => void
   readonly onSkip: () => void
@@ -571,7 +569,7 @@ export function SetupWizardNavigation({
   return <footer className="flex shrink-0 items-center justify-between gap-3 border-t pt-4">
     <SetupWizardSkipDialog copy={copy} onSkip={onSkip} />
     <div className="flex items-center gap-2">
-      <Button aria-label={copy.back} disabled={previousDesktopSetupWizardStep(step) === undefined} onClick={onBack} size="icon" title={copy.back} type="button" variant="outline"><ArrowLeft /></Button>
+      <Button aria-label={copy.back} disabled={previousDesktopSetupWizardStep(step, steps) === undefined} onClick={onBack} size="icon" title={copy.back} type="button" variant="outline"><ArrowLeft /></Button>
       <Button aria-label={copy.next} onClick={onNext} size="icon" title={copy.next} type="button"><ArrowRight /></Button>
     </div>
   </footer>
@@ -690,6 +688,8 @@ export function desktopSetupWizardSkipRequiresLanAcknowledgement(
 export interface EmbeddedSetupWizard {
   readonly input: DesktopSetupWizardInput
   readonly locale: Locale
+  /** The screens this Profile presents; absent means the full Wizard. */
+  readonly steps?: readonly DesktopSetupWizardStep[]
   renderNavigation(options: { busy: boolean; onBack?: (() => void) | undefined; onSkip(): void }): ReactNode
   finish(selection?: DesktopSetupWizardSelection): Promise<void>
 }
@@ -698,6 +698,7 @@ export function SetupWizardApp({ embedded }: { embedded?: EmbeddedSetupWizard } 
   const locale = embedded?.locale ?? localLocale(window.location.search)
   const copy = desktopSetupWizardCopy(locale)
   const input = embedded?.input ?? decodeDesktopSetupWizardInput(window.location.search)
+  const steps = resolveDesktopSetupWizardSteps(embedded?.steps)
   const [selection, setSelection] = useState<DesktopSetupWizardSelection | undefined>(() => input === undefined ? undefined : normalizedSelection(input))
   const [step, setStep] = useState<DesktopSetupWizardStep>('welcome')
   const [lanAcknowledged, setLanAcknowledged] = useState(false)
@@ -765,8 +766,13 @@ export function SetupWizardApp({ embedded }: { embedded?: EmbeddedSetupWizard } 
   }
 
   const advance = (): void => {
-    const next = nextDesktopSetupWizardStep(step)
-    if (next === undefined) return
+    const next = nextDesktopSetupWizardStep(step, steps)
+    // The last presented screen applies the selection; a plan may end before
+    // the canonical `success` screen, so advancing must not be a dead end.
+    if (next === undefined) {
+      startUsing()
+      return
+    }
     if (step === 'browser' && desktopSetupWizardRequiresLanAcknowledgement(
       selection.networkExposure,
       selection.networkExposure,
@@ -791,14 +797,14 @@ export function SetupWizardApp({ embedded }: { embedded?: EmbeddedSetupWizard } 
   }
 
   const back = (): void => {
-    const previous = previousDesktopSetupWizardStep(step)
+    const previous = previousDesktopSetupWizardStep(step, steps)
     if (previous !== undefined) setStep(previous)
   }
-  const stepIndex = DESKTOP_SETUP_WIZARD_STEPS.indexOf(step)
+  const stepIndex = steps.indexOf(step)
   return <>{embedded ? null : <DesktopFrame />}<div ref={wizard} className={embedded ? 'dshSetupWizard' : undefined} lang={locale}>
-  {embedded && <header className="dshSetupProgress">
-    <ol aria-label={locale === 'zh' ? '引导进度' : 'Setup progress'}>{DESKTOP_SETUP_WIZARD_STEPS.map((item, index) => <li key={item} aria-current={item === step ? 'step' : undefined}><span className="sr-only">{index + 1}</span></li>)}</ol>
-    <span>{stepIndex + 1} / {DESKTOP_SETUP_WIZARD_STEPS.length}</span>
+  {embedded && steps.length > 1 && <header className="dshSetupProgress">
+    <ol aria-label={locale === 'zh' ? '引导进度' : 'Setup progress'}>{steps.map((item, index) => <li key={item} aria-current={item === step ? 'step' : undefined}><span className="sr-only">{index + 1}</span></li>)}</ol>
+    <span>{stepIndex + 1} / {steps.length}</span>
   </header>}
   <main className={`dshNativeContent ${embedded ? 'dshSetupMain' : 'h-screen overflow-hidden p-5 sm:p-6'}`} aria-busy={busy}><fieldset disabled={busy} className={embedded ? 'dshSetupFieldset' : 'mx-auto flex h-full w-full max-w-3xl flex-col border-0 p-0'}>
     {failure && <Alert variant="destructive"><AlertDescription>{failure}</AlertDescription></Alert>}
@@ -809,7 +815,11 @@ export function SetupWizardApp({ embedded }: { embedded?: EmbeddedSetupWizard } 
           embedded={Boolean(embedded)}
           copy={copy}
           onSkip={skip}
-          onStart={() => { setStep('mode') }}
+          onStart={() => {
+            const next = nextDesktopSetupWizardStep('welcome', steps)
+            if (next === undefined) startUsing()
+            else setStep(next)
+          }}
           profileName={input.profileName}
         />
         : step === 'success'
@@ -820,12 +830,13 @@ export function SetupWizardApp({ embedded }: { embedded?: EmbeddedSetupWizard } 
     {!embedded && <SetupWizardNavigation
       copy={copy}
       onBack={() => {
-        const previous = previousDesktopSetupWizardStep(step)
+        const previous = previousDesktopSetupWizardStep(step, steps)
         if (previous !== undefined) setStep(previous)
       }}
       onNext={advance}
       onSkip={skip}
       step={step}
+      steps={steps}
     />}
   </fieldset></main>
   {embedded && <nav className="dshSetupNavigation" aria-label={locale === 'zh' ? '引导导航' : 'Setup navigation'}>
@@ -842,7 +853,11 @@ export function SetupWizardApp({ embedded }: { embedded?: EmbeddedSetupWizard } 
       setSelection(next)
       setLanAcknowledged(true)
       setConfirmLan(undefined)
-      if (reason === 'advance') setStep('success')
+      if (reason === 'advance') {
+        const following = nextDesktopSetupWizardStep(step, steps)
+        if (following === undefined) submit(next)
+        else setStep(following)
+      }
       if (reason === 'start') submit(next)
       if (reason === 'skip') submit()
     }}

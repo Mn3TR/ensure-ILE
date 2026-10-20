@@ -25,13 +25,13 @@ function fixture(t, desktopVersion = version) {
     change(data)
     write(path, data)
   }
-  const runtimePeers = Object.fromEntries(AA_PEERS.map(name => [name, '0.1.5-rc.2 || 0.1.6-alpha.2']))
+  const runtimePeers = Object.fromEntries(AA_PEERS.map(name => [name, '0.1.5-rc.2']))
   write('package.json', { resolutions: { [AA_PACKAGE]: aaConnectorResolution(artifact) } })
-  for (const [index, workspace] of AA_WORKSPACES.entries()) {
+  for (const workspace of AA_WORKSPACES) {
     write(`${workspace}/package.json`, {
       dependencies: {
         [AA_PACKAGE]: `file:../vendor/agents-anywhere/${artifact}`,
-        ...Object.fromEntries(AA_PEERS.map(name => [name, index === 0 ? '0.1.5-rc.2' : '0.1.6-alpha.2'])),
+        ...Object.fromEntries(AA_PEERS.map(name => [name, '0.1.5-rc.2'])),
       },
     })
     write(`${workspace}/node_modules/${AA_PACKAGE}/package.json`, { version: desktopVersion, peerDependencies: runtimePeers })
@@ -44,7 +44,7 @@ function fixture(t, desktopVersion = version) {
   return { root, patch }
 }
 
-test('accepts the latest AA across Stable, Beta and Next runtime peers', t => {
+test('accepts the latest AA for the Desktop package', t => {
   const { root } = fixture(t)
   assert.equal(assertPreparedAaRelease(root, commit).commit, commit)
 })
@@ -104,12 +104,6 @@ test('rejects the former stable-old/beta-new split even if the tarball is valid'
   assert.throws(() => assertPreparedAaRelease(root, commit), /dsh-plugin-desktop references a different AA artifact/)
 })
 
-test('rejects a Next install left on the old AA artifact', t => {
-  const { root, patch } = fixture(t)
-  patch('dsh-desktop-next/package.json', data => { data.dependencies[AA_PACKAGE] = 'file:../vendor/agents-anywhere/old.tgz' })
-  assert.throws(() => assertPreparedAaRelease(root, commit), /dsh-desktop-next references a different AA artifact/)
-})
-
 test('rejects a prepared artifact after AA main advances', t => {
   const { root } = fixture(t)
   assert.throws(() => assertPreparedAaRelease(root, 'b'.repeat(40)), /not from the latest AA main commit/)
@@ -123,7 +117,7 @@ test('rejects stale installed code despite updated manifests and provenance', t 
 
 test('requires rebuilding the AA peer patch after a Desktop runtime update', t => {
   const { root, patch } = fixture(t)
-  patch('dsh-plugin-desktop-beta/package.json', data => { data.dependencies[AA_PEERS[0]] = '0.1.6-alpha.3' })
+  patch('dsh-plugin-desktop/package.json', data => { data.dependencies[AA_PEERS[0]] = '0.1.6-alpha.3' })
   assert.throws(() => assertPreparedAaRelease(root, commit), /runtime peers have changed/)
 })
 

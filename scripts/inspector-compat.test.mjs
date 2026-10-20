@@ -10,7 +10,7 @@ import { runInNewContext } from 'node:vm'
 // Without an install there is neither TypeScript nor the inspector package to read, so skip there.
 function loadTypeScript() {
   try {
-    return createRequire(resolve('dsh-plugin-desktop-beta/package.json'))('typescript')
+    return createRequire(resolve('dsh-plugin-desktop/package.json'))('typescript')
   } catch (error) {
     if (error?.code === 'MODULE_NOT_FOUND' && String(error.message).includes("'typescript'")) return undefined
     throw error
@@ -29,7 +29,7 @@ function nodes(file, predicate) {
   return matches
 }
 
-for (const workspace of ['dsh-plugin-desktop', 'dsh-plugin-desktop-beta', 'dsh-desktop-next']) {
+for (const workspace of ['dsh-plugin-desktop']) {
   test(`${workspace}: official Reload DevTools completes through the hosted embedder callback`, { skip }, () => {
     const require = createRequire(resolve(workspace, 'package.json'))
     const manifest = require.resolve('@deepseek-ai/dsh-experimental-inspector/package.json')

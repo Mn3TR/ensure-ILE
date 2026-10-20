@@ -11,7 +11,7 @@ On first launch, the application prepares the default profile and starts the off
 Besides choosing a directory inside the interface, you can name a folder when the application starts. The folder is registered as a workspace and opened. A folder that is already a workspace is simply opened again; nothing is duplicated.
 
 - **Windows drag and drop**: drop the folder onto the **DSH Desktop** desktop shortcut or its Start menu entry. A stopped application starts first; a running one comes to the front and opens the workspace.
-- **Command line**: stable uses `dsh-desktop <folder>` and Beta uses `dsh-desktop-beta <folder>`. Relative paths resolve against the current directory. The installed EXE accepts one folder argument as well.
+- **Command line**: run `dsh-desktop <folder>`. Relative paths resolve against the current directory. The installed EXE accepts one folder argument as well.
 
 When the path does not exist, names a file, or lives on unsupported storage such as exFAT, FAT32, or a network drive, the application shows a native message and registers nothing. Launching with a folder is one-shot: a later restart triggered from settings does not reopen it.
 
@@ -91,7 +91,7 @@ Desktop confirmations, warnings, and operation results open as separate shadcn-b
   & "$env:LOCALAPPDATA\Programs\DSH Desktop\DSH Desktop.exe" --export-diagnostics
   ```
 
-  For npm installs, stable uses `dsh-desktop --export-diagnostics` and Beta uses `dsh-desktop-beta --export-diagnostics`. This command does not start Host, profiles, plugins, or a window. It prints the absolute diagnostics ZIP path when complete.
+  For npm installs, run `dsh-desktop --export-diagnostics`. This command does not start Host, profiles, plugins, or a window. It prints the absolute diagnostics ZIP path when complete.
 - **Diagnostic archive contents**: recent application logs, local Crashpad `.dmp` files, the active-run marker, and `system-info.txt`. System information records Desktop, Electron, Node, platform, and architecture versions. Recognized credentials are masked in logs, but local paths, workspace IDs, session IDs, and crash-time memory fragments may remain. Review the archive before public upload and send sensitive dumps only through a trusted channel.
 - **The window disappeared**: check the system tray; closing the window is not quitting.
 - **A plugin is missing**: confirm the command targeted the intended profile and restart the application.

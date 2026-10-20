@@ -11,7 +11,7 @@
 除了在界面里选择目录，还可以在启动时直接指定一个文件夹。该文件夹会被注册为工作区并自动打开；如果它已经是工作区，则直接打开，不会重复创建。
 
 - **Windows 拖放**：把文件夹拖到桌面快捷方式或开始菜单里的 **DSH Desktop** 图标上。应用没运行时会先启动，已经在运行时会抬到前台并打开这个工作区。
-- **命令行**：稳定版运行 `dsh-desktop <文件夹>`，Beta 运行 `dsh-desktop-beta <文件夹>`。相对路径按当前目录解析。安装后的 EXE 同样接受一个文件夹参数。
+- **命令行**：运行 `dsh-desktop <文件夹>`。相对路径按当前目录解析。安装后的 EXE 同样接受一个文件夹参数。
 
 路径不存在、指向的是文件，或者位于 exFAT、FAT32、网络盘等不受支持的存储上时，应用会弹出原生提示并且不注册该工作区。用文件夹启动是一次性的：之后由设置触发的重启不会再次打开它。
 
@@ -91,7 +91,7 @@ Desktop 的确认、警告与操作结果会打开独立、基于 shadcn 的桌�
   & "$env:LOCALAPPDATA\Programs\DSH Desktop\DSH Desktop.exe" --export-diagnostics
   ```
 
-  通过 npm 安装时，稳定版可运行 `dsh-desktop --export-diagnostics`，Beta 可运行 `dsh-desktop-beta --export-diagnostics`。这个命令不会启动 Host、profile、插件或窗口；完成后会在终端输出诊断 ZIP 的绝对路径。
+  通过 npm 安装时，可运行 `dsh-desktop --export-diagnostics`。这个命令不会启动 Host、profile、插件或窗口；完成后会在终端输出诊断 ZIP 的绝对路径。
 - **诊断包内容**：包含最近的应用日志、本地 Crashpad `.dmp`、当前运行标记和 `system-info.txt`。系统信息会记录 Desktop、Electron、Node、平台和架构版本。日志会对可识别的认证凭据脱敏，但本地路径、工作区 ID、会话 ID 和崩溃时的内存片段仍可能存在。公开上传前必须检查；不适合公开的 dump 应通过可信渠道提供。
 - **窗口消失了**：先检查系统托盘，关闭窗口不是退出。
 - **插件没有出现**：确认命令作用于目标 profile，并重启应用。

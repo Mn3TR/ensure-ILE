@@ -78,21 +78,18 @@ const workspaceManifest = JSON.parse(readFileSync(new URL('package.json', worksp
 const ciWorkflow = readFileSync(new URL('.github/workflows/ci.yml', workspaceRoot), 'utf8')
 const main = readFileSync(new URL('src/main.ts', packageRoot), 'utf8')
 const runtimeVersion = String(manifest.dependencies?.['@deepseek-ai/dsh'])
-const betaRuntimeVersion = (JSON.parse(readFileSync(
-  new URL('dsh-plugin-desktop-beta/package.json', workspaceRoot), 'utf8',
-)) as { dependencies: Record<string, string> }).dependencies['@deepseek-ai/dsh']
 const dshResolution = (name: string): unknown =>
   workspaceManifest.resolutions?.[`${name}@npm:${runtimeVersion}`]
 
 describe('published package surface', () => {
-  it('runs all desktop editions and community market typechecks from the root command', () => {
+  it('runs the desktop and community market typechecks from the root command', () => {
     expect(workspaceManifest.scripts?.typecheck)
-      .toBe('yarn workspace dsh-plugin-desktop typecheck && yarn workspace dsh-plugin-desktop-beta typecheck && yarn workspace dsh-community-market typecheck && yarn workspace dsh-desktop-next typecheck')
+      .toBe('yarn workspace dsh-plugin-desktop typecheck && yarn workspace dsh-community-market typecheck')
   })
 
-  it('runs all desktop editions and community market tests from the root command', () => {
+  it('runs the desktop and community market tests from the root command', () => {
     expect(workspaceManifest.scripts?.test)
-      .toBe('yarn workspace dsh-plugin-desktop test && yarn workspace dsh-plugin-desktop-beta test && yarn workspace dsh-community-market test && yarn workspace dsh-desktop-next test')
+      .toBe('yarn workspace dsh-plugin-desktop test && yarn workspace dsh-community-market test')
   })
 
   it('registers both npm launcher names', () => {
@@ -303,29 +300,14 @@ describe('published package surface', () => {
     )
   })
 
-  it('resolves both release channels through their recorded runtime families', () => {
+  it('resolves the released runtime family through its recorded resolutions', () => {
     const dshResolutions = Object.entries(workspaceManifest.resolutions ?? {})
       .filter(([selector]) => /^@deepseek-ai\/dsh(?:@|-)/u.test(selector))
-    const stableResolutions = dshResolutions.filter(([selector]) =>
-      selector.endsWith(`@npm:${runtimeVersion}`)
-      || selector.endsWith(`@npm:^${runtimeVersion}`))
-    const betaResolutions = dshResolutions.filter(([selector]) =>
-      selector.endsWith(`@npm:${betaRuntimeVersion}`)
-      || selector.endsWith(`@npm:^${betaRuntimeVersion}`))
 
-    expect(stableResolutions.length).toBeGreaterThan(0)
-    expect(betaResolutions.length).toBeGreaterThan(0)
-    expect(new Set([...stableResolutions, ...betaResolutions].map(([selector]) => selector)).size)
-      .toBe(dshResolutions.length)
-    for (const [selector, resolution] of stableResolutions) {
+    expect(dshResolutions.length).toBeGreaterThan(0)
+    for (const [selector, resolution] of dshResolutions) {
       expect([runtimeVersion, `^${runtimeVersion}`]).toContain(selector.split('@npm:')[1])
       expect(String(resolution)).toContain(runtimeVersion)
-    }
-    // Derived from the beta manifest, not hardcoded: a channel bump moves this
-    // assertion with the pin instead of failing a release that is already correct.
-    for (const [selector, resolution] of betaResolutions) {
-      expect([betaRuntimeVersion, `^${betaRuntimeVersion}`]).toContain(selector.split('@npm:')[1])
-      expect(String(resolution)).toContain(betaRuntimeVersion)
     }
   })
 
@@ -1024,7 +1006,7 @@ describe('published package surface', () => {
       ciWorkflow.indexOf('  upstream-command-windows:'),
     )
 
-    const matrixSelector = "workspace: ${{ github.event_name == 'pull_request' && fromJSON('[\"dsh-plugin-desktop-beta\"]') || fromJSON('[\"dsh-plugin-desktop\", \"dsh-plugin-desktop-beta\"]') }}"
+    const matrixSelector = "workspace: ['dsh-plugin-desktop']"
     expect(windowsJob).not.toContain('- run: yarn check')
     expect(windowsJob).toContain(matrixSelector)
     expect(windowsJob).toContain('- run: yarn workspace ${{ matrix.workspace }} check:win-package:platform')

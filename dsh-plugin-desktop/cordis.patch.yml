@@ -5,6 +5,17 @@
   # user patch can still disable the Browser explicitly.
   disabled: false
 
+# DHDL: this build is a learning environment, so the new-session picker only
+# offers the standard preset and the HRL guide preset. The upstream PTC, minimal
+# and creator presets stay untouched in the pinned submodule; disabling them
+# here keeps the picker focused without editing upstream files.
+- id: preset-ptc
+  disabled: true
+- id: preset-minimal
+  disabled: true
+- id: preset-cordis
+  disabled: true
+
 - insert:
     - id: desktop-shell
       name: dsh-plugin-desktop
@@ -23,6 +34,18 @@
       name: dsh-plugin-desktop/profiles
     - id: desktop-updates
       name: dsh-plugin-desktop/updates
+    # DHDL: a selectable agent preset that replaces the system prompt with the
+    # guide document. Rows mounted inside a preset run in the agent scope, which
+    # is the only scope where a persona may shadow the deployment persona.
+    - id: hrll-guide-preset
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: hrll-guide
+        name: HRL 引导
+        description: 引导学生用自己的思路把题解出来，不给答案
+        order: 40
+        plugins:
+          - name: dsh-plugin-hrll
 
 # A desktop launch has no terminal operator waiting for the Web readiness line.
 - id: web-runtime

@@ -1,5 +1,9 @@
 /** Native persistence adapter consumed by the official onboarding continuation. */
-import type { DesktopSetupWizardInput, DesktopSetupWizardSelection } from './setup-wizard-contract.ts'
+import type {
+  DesktopSetupWizardInput,
+  DesktopSetupWizardSelection,
+  DesktopSetupWizardStep,
+} from './setup-wizard-contract.ts'
 import type { DesktopSetupWizardSettings } from './setup-wizard-settings.ts'
 export const SETUP_ONBOARDING_CHANNEL = 'dsh-desktop:setup-onboarding'
 export interface DesktopOnboardingSnapshot {
@@ -10,6 +14,8 @@ export interface DesktopOnboardingSnapshot {
   profile: string
   edition: 'desktop' | 'next'
   input: DesktopSetupWizardInput
+  /** The screens this Profile's Setup presents; absent means the full Wizard. */
+  steps?: readonly DesktopSetupWizardStep[]
   computerUse?: boolean
 }
 export interface DesktopOnboardingBridge {
