@@ -10,8 +10,10 @@
         "namespace": "project",
         "status": "approved",
         "injected": false,
+        "quarantined": false,
+        "hitCount": 1,
         "source": "agent",
-        "content": "DHDL 的 OOBE（DSH Desktop 首启 Setup Wizard）已裁剪为「只欢迎一屏」，实现落在 stable 包 dsh-plugin-desktop（beta/next 未动）：\n- 主进程 main.ts 用 `setupOnboarding.read()` 返回 `steps`（新增可选字段）给 renderer；默认 `['welcome']`，环境变量 `DHDL_SETUP=full` 恢复上游 8 屏（用于以后加自定义步骤）。\n- 固定默认值在 `dhdlSetupInput()`：advanced（linux→compatibility）/材质 off/market disabled/aa false/openBrowser false/loopback/通知 7 项 false；账号登录步用 `dismissDesktopSetupAccount()` 去掉（必须在 completeOrSkipDesktopSetupWizard 之后调用，否则 applyPending「立即重启」会因 account marker 残留而抛错）。\n- 契约 setup-wizard-contract.ts 新增 DESKTOP_SETUP_WIZARD_STEP_IDS 与 normalizeDesktopSetupWizardSteps（只接受从 welcome 开始的有序子集）；App.tsx 改成注册表按步骤计划渲染，进度条只在 steps.length>1 时显示。\n- 关键坑：`.dhdl/appdata/profile-setup/<hash>/state.json.pending` 必须是精确的 `pending\\n`（8 字节），手写空文件会让主进程进恢复页报 `invalid pending marker`。想重看引导：删 state.json 和 state.json.account，写 pending marker。\n- 验证方式：`corepack yarn workspace dsh-plugin-desktop build` 后 `Start-Process dsh-plugin-desktop\\node_modules\\electron\\dist\\electron.exe dsh-plugin-desktop\\lib\\main.js`；会话预设显示「HRL 引导」即成功。",
+        "content": "DHDL 的 OOBE（DSH Desktop 首启 Setup Wizard）已裁剪为「只欢迎一屏」，实现落在 stable 包 dsh-plugin-desktop：\n- 主进程 main.ts 用 `setupOnboarding.read()` 返回 `steps`（新增可选字段）给 renderer；默认 `['welcome']`，环境变量 `DHDL_SETUP=full` 恢复上游步骤（现为 7 屏：welcome/mode/material/market/notifications/browser/success；aa 步已在删 Agents-Anywhere 时移除）。\n- 固定默认值在 `dhdlSetupInput()`：advanced（linux→compatibility）/材质 off/market disabled/openBrowser false/loopback/通知 7 项 false；账号登录步用 `dismissDesktopSetupAccount()` 去掉（必须在 completeOrSkipDesktopSetupWizard 之后调用，否则 applyPending「立即重启」会因 account marker 残留而抛错）。\n- 契约 setup-wizard-contract.ts 有 DESKTOP_SETUP_WIZARD_STEP_IDS 与 normalizeDesktopSetupWizardSteps（只接受从 welcome 开始的有序子集）；App.tsx 改成注册表按步骤计划渲染，进度条只在 steps.length>1 时显示。\n- 关键坑：`.dhdl/appdata/profile-setup/<hash>/state.json.pending` 必须是精确的 `pending\\n`（8 字节），手写空文件会让主进程进恢复页报 `invalid pending marker`。想重看引导：删 state.json 和 state.json.account，写 pending marker。\n- 验证方式：`corepack yarn workspace dsh-plugin-desktop build` 后 `Start-Process dsh-plugin-desktop\\node_modules\\electron\\dist\\electron.exe dsh-plugin-desktop\\lib\\main.js`；composer 预设显示「引导模式」即成功（默认预设）。",
         "keywords": [
           "oobe",
           "setup wizard",
@@ -26,12 +28,14 @@
           "引导裁剪"
         ],
         "createdAt": 1792427596318,
-        "updatedAt": 1792427596318
+        "updatedAt": 1792515002816,
+        "lastUsedAt": 1792514997921
       },
       "09d8f398-948a-4a86-ac00-e9b384d162ac": {
         "namespace": "project",
         "status": "approved",
         "injected": false,
+        "hitCount": 1,
         "source": "agent",
         "content": "DHDL 的开发组织名定为 **EnSure Lab**，中文名「因需」。是李（用户）自己起的：EnSure 双关 ensure（保证）与「因需」；他给的解释是「需要原因」——因=原因、需=需要，即每一步都要有理由，学生答完要能说清为什么。不配 tagline。包名继续用 dsh-plugin- 前缀（他明确要求保留前缀，只做分拆）。",
         "keywords": [
@@ -45,14 +49,17 @@
           "ensure"
         ],
         "createdAt": 1792513274087,
-        "updatedAt": 1792513274087
+        "updatedAt": 1792513274087,
+        "lastUsedAt": 1792514997921
       },
       "76cde169-040f-4645-8da1-b185d7989482": {
         "namespace": "project",
         "status": "approved",
         "injected": false,
+        "quarantined": false,
+        "hitCount": 1,
         "source": "agent",
-        "content": "DHDL 的插件按「模式」拆包，三个模式互相独立、各自一个包和一个预设（不用 @ensurelab scope，名字保持干净的 dsh-plugin-*）：\n- `dsh-plugin-guide`（guide 模式，= 现在 `dsh-plugin-hrll` 改名，等子代理完成后做）：学生还没做出来，引导他一步一步做出来；不批改、不打分。\n- `dsh-plugin-hrl`（HRL 模式）：学生已有答案，帮他把答案优化；评价/对比/改，和 guide 对「评价」的态度相反。目前只有占位 README（`dsh-plugin-hrl/README.md`），没有 package.json，未登记 workspace。\n- `dsh-plugin-work`（work 模式，以后）：学生独立做题交答案和思路，判不过再转引导。\n预设 id 预定：guide / hrl / work；Profiles 默认 guide。旧 id `hrll-guide` 会随改名弃用，旧测试会话清 .dhdl 即可。",
+        "content": "DHDL 的插件按「模式」拆包，三个模式互相独立、各自一个包和一个预设（不用 @ensurelab scope，名字保持干净的 dsh-plugin-*）：\n- `dsh-plugin-guide`（guide 模式，已完成改名，2026-10-21）：学生还没做出来，引导他一步一步做出来；不批改、不打分。预设 `guide`（显示名「引导模式」，description「引导学生用自己的思路把题解出来，不给答案」），是 Profile 默认预设。\n- `dsh-plugin-hrl`（HRL 模式）：学生已有答案，帮他把答案优化；评价/对比/改，和 guide 对「评价」的态度相反。目前只有占位 README（`dsh-plugin-hrl/README.md`），没有 package.json，未登记 workspace。\n- `dsh-plugin-work`（work 模式，以后）：学生独立做题交答案和思路，判不过再转引导。\n- 另有 `dsh-plugin-schedule`（课表+进度→预习/复习清单）与 `dsh-plugin-bankmanager`（题库状态机）的占位 README，均未进 workspaces。\n预设 id 预定：guide / hrl / work；Profiles 默认 guide。旧 id `hrll-guide` 已弃用，旧测试会话清 .dhdl 即可。",
         "keywords": [
           "dhdl",
           "插件拆分",
@@ -67,7 +74,8 @@
           "模式"
         ],
         "createdAt": 1792513574991,
-        "updatedAt": 1792513574991
+        "updatedAt": 1792515002804,
+        "lastUsedAt": 1792514997921
       }
     }
   }
