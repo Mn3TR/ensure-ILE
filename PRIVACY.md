@@ -126,13 +126,9 @@ Upstream DSH also maintains an `.anonymous-user-id` that is separate from the De
 
 The default composition also provides DeepSeek `web_search`. When you invoke it, it sends the API key, original search term inside a fixed prompt, model and token/use limits, and standard request metadata to the configured DeepSeek Messages endpoint. The webpage `fetch` tool is disabled by default.
 
-### 6.2 Community Market and package services
+### 6.2 Plugin market and package services
 
-Community Market does not require a remote source to be selected by default. After you select and use a source, the Host sends requests to it. Current built-in optional sources include:
-
-- DSH 1024Store: `deepseek1024.com`;
-- dshfind: `api.dshfind.com`; and
-- a standard catalog source that you configure and confirm.
+The built-in `dshmarket` plugin market is turned off by default. After you enable it, the Host requests its index from the source selected for your region, either `cdn.jsdelivr.net` (China CDN) or `realguan.github.io` (GitHub Pages). You can instead enable the official plugin market and configure standard catalog sources yourself.
 
 These sources receive the IP address, time, a fixed Market User-Agent, and the requested catalog resource. Depending on the capabilities of the selected source, a request can also include search terms, categories, sort order, language, page numbers, or cursors. Desktop's Host may fetch plugin images from the catalog source, GitHub, or an allowed image host, allowing the recipient to infer which plugin or publisher you are viewing.
 

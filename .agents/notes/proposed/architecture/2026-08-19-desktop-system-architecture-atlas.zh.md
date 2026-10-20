@@ -40,19 +40,17 @@ flowchart LR
 ```mermaid
 flowchart TB
   Root[根 Yarn workspace] --> DesktopPkg[dsh-plugin-desktop]
-  Root --> Market[dsh-community-market]
   Root --> Fabric[dsh-community-fabric]
   Root --> Upstream[deepseek-harness submodule]
   DesktopPkg --> Main[Electron bootstrap / Host services]
   DesktopPkg --> Client[Desktop Client face / native shell]
   DesktopPkg --> Packaging[packaging / release gates]
-  Market --> Catalog[目录、安装意图、receipt ledger]
   Fabric --> RFC[互操作 RFC scaffold]
   Upstream --> Official[官方 Host / Client / Web carrier]
   Root -. root scripts enter pnpm workspace .-> Upstream
 ```
 
-`dsh-plugin-desktop` 拥有桌面产品；`dsh-community-market` 拥有社区目录和用户驱动的插件操作；Fabric 和 Market 在运行时实现完成前不声明可加载入口；上游保留独立的 pnpm workspace。
+`dsh-plugin-desktop` 拥有桌面产品；Fabric 在运行时实现完成前不声明可加载入口；上游保留独立的 pnpm workspace。
 
 ## 3. 进程与运行拓扑
 
@@ -112,8 +110,6 @@ flowchart TB
   Boot --> Host[Host plugin graph]
   Host --> Public[DesktopRuntime / DesktopProfiles / DesktopPnpm interfaces]
   Public --> Impl[Electron + profile + package implementations]
-  Host --> Market[Community Market Host face]
-  Market --> Consumer[consumer-owned capability interfaces]
   Consumer -. structural compatibility .-> Public
   Host --> Carrier[upstream Web carrier]
   Carrier --> Client[upstream Client loader]
@@ -211,10 +207,9 @@ flowchart LR
   Evidence[userData/lifecycle-events/startup.jsonl] -->|LifecycleRecorder| Diagnostics[Diagnostics export]
   Logs[userData/logs] -->|LogFileSink / Cordis exporter| Diagnostics
   Crash[userData/crash-evidence + crashDumps] -->|Crash evidence / Crashpad| Diagnostics
-  Receipts[settings: dsh-community-market.installReceipts] -->|MarketInstallService| Market[Market]
 ```
 
-SoC 边界：Desktop WAL 记录可恢复的文件状态，Market receipt 记录安装操作的所有权。两者通过 `receiptId` 关联，各自独立提交。
+SoC 边界：Desktop WAL 记录可恢复的文件状态，插件操作各自记录 receipt。两者通过 `receiptId` 关联，各自独立提交。
 
 ## 8. 插件装配与扩展点
 
@@ -222,7 +217,6 @@ SoC 边界：Desktop WAL 记录可恢复的文件状态，Market receipt 记录�
 flowchart TB
   Base[官方 Web bundle] --> Patch[cordis.patch.yml]
   Patch --> Shell[desktop-shell]
-  Patch --> Market[community-market]
   Patch --> Terminal[desktop-terminal]
   Patch --> Diagnostics[desktop-diagnostics]
   Patch --> Notifications[desktop-notifications]
@@ -304,6 +298,4 @@ Headless gate 证明构建、类型、逻辑、Loader 和 packaged closure；真
 - `dsh-plugin-desktop/src/startup-generation.ts`
 - `dsh-plugin-desktop/src/runtime.ts`
 - `dsh-plugin-desktop/cordis.patch.yml`
-- `dsh-community-market/src/install/service.ts`
-- `dsh-community-market/src/host/routes.ts`
 - `.agents/notes/implemented/architecture/`

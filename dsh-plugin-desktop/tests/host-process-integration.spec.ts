@@ -14,7 +14,7 @@ import type { DesktopRuntime, DesktopShellSpec } from '../src/runtime.ts'
 
 const SESSION_ID = 'ws-1-session-realhost-probe'
 
-it.each([false, true])('boots a separate Web Host with client plugins (AA enabled: %s)', async aaEnabled => {
+it('boots a separate Web Host with client plugins', async () => {
   const home = mkdtempSync(join(tmpdir(), 'dsh-isolated-host-'))
   const token = Buffer.alloc(32, 7).toString('base64url')
   let child: ReturnType<typeof fork> | undefined
@@ -24,9 +24,8 @@ it.each([false, true])('boots a separate Web Host with client plugins (AA enable
   let stderr = ''
   try {
     writeFileSync(join(home, 'settings.yaml'), 'dsh-desktop:\n  mode: advanced\nagent-presets:\n  default: minimal\n')
-    const prepared = prepareDesktopProfile('1', home, 'win32', undefined, undefined, undefined, { aaEnabled })
+    const prepared = prepareDesktopProfile('1', home, 'win32')
     prepared.overlays = []
-    if (aaEnabled) prepared.overlays.push({ id: 'agents-anywhere-bridge-next', config: { dshHome: home, stateRoot: join(home, 'aa-state') } })
     prepared.port = 0
     const plugin = join(prepared.profile.dir, 'node_modules', 'isolated-client-fixture')
     mkdirSync(plugin, { recursive: true })
@@ -35,7 +34,7 @@ it.each([false, true])('boots a separate Web Host with client plugins (AA enable
     writeFileSync(join(plugin, 'index.js'), 'export function apply() {}\n')
     writeFileSync(join(plugin, 'client.js'), 'export function apply(ctx) { ctx.provide("isolatedClientFixture", true) }\n')
     prepared.overlays.push({ insert: [{ id: 'isolated-client-fixture', name: 'isolated-client-fixture' }] })
-    if (!aaEnabled) {
+    {
       // A real server-side plugin. Its `apply` runs inside the Host's plugin
       // tree, so this emit takes the same route agent-loop's failure report does
       // — which is the part no in-process test can stand in for.
@@ -107,9 +106,9 @@ export function apply(ctx) {
     rpc.handle('certificate', () => ({ failureCode: 'test-disabled' }))
     rpc.handle('quit', () => {})
     const logDirectory = join(home, 'logs')
-    const result = await rpc.call<{ pid: number; services: { aaRuntime: boolean; aaOnboarding: boolean } }>('boot', [{
+    const result = await rpc.call<{ pid: number }>('boot', [{
       prepared, profilePreferences: { mode: 'advanced', openBrowser: false, networkExposure: 'loopback',
-        macosMaterial: 'auto', windowsMaterial: 'auto', market: 'disabled', notifications: { enabled: false }, aaEnabled },
+        macosMaterial: 'auto', windowsMaterial: 'auto', market: 'disabled', notifications: { enabled: false } },
       homeDir: home, activeProfileName: prepared.profile.name, pluginManagementStatePath: join(home, 'plugins.json'),
       selectionStatePath: join(home, 'selection.json'), marketUserDataDir: join(home, 'userdata'),
       releaseUserDataLocations: desktopReleaseUserDataLocations(home, join(home, 'userdata')),
@@ -147,12 +146,12 @@ export function apply(ctx) {
     expect(bundle.status).toBe(200)
     expect(await bundle.text()).toContain('isolatedClientFixture')
     expect(html).toContain('dsh-plugin-desktop')
-    await expect.poll(async () => (await rpc!.call<{ services: { aaRuntime: boolean; aaOnboarding: boolean } }>('status')).services, { timeout: 3000 })
-      .toEqual({ aaRuntime: aaEnabled, aaOnboarding: aaEnabled })
+    await expect.poll(async () => (await rpc!.call<{ pid: number }>('status')).pid, { timeout: 3000 })
+      .toBe(child.pid)
     // A settings import is an ordinary restart; recovery is reserved for a Host that
     // failed to compose, and this one did not.
     expect(restarts).not.toContain('recovery')
-    if (!aaEnabled) {
+    {
       const readLogs = (suffix: string): string => readdirSync(logDirectory)
         .filter(name => name.endsWith(suffix))
         .map(name => readFileSync(join(logDirectory, name), 'utf8'))

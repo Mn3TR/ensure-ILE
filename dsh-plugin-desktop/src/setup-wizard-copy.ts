@@ -3,15 +3,6 @@
 import type { DesktopLocale } from './runtime.ts'
 
 export interface DesktopSetupWizardCopy {
-  readonly aaTitle: string
-  readonly aaIntro: string
-  readonly aaDisabled: string
-  readonly aaDisabledBody: string
-  readonly aaEnabled: string
-  readonly aaEnabledBody: string
-  readonly aaNextTitle: string
-  readonly aaNextBody: string
-  readonly aaNextDesktop: string
   readonly beta: string
   readonly experimental: string
   readonly title: string
@@ -57,8 +48,6 @@ export interface DesktopSetupWizardCopy {
   readonly marketBody: string
   readonly marketDisabled: string
   readonly marketDisabledBody: string
-  readonly communityMarket: string
-  readonly communityMarketBody: string
   readonly dshMarket: string
   readonly dshMarketBody: string
   readonly officialMarket: string
@@ -87,22 +76,12 @@ export interface DesktopSetupWizardCopy {
 
 const COPY: Record<DesktopLocale, DesktopSetupWizardCopy> = {
   en: {
-    aaTitle: 'Agents-Anywhere',
-    aaIntro: 'Use Agents-Anywhere to access DSH on this computer from your phone or a browser.',
-    aaDisabled: 'Turn off phone connection',
-    aaDisabledBody: 'Do not use Agents-Anywhere to access this computer from a phone or browser.',
-    aaEnabled: 'Turn on phone connection',
-    aaEnabledBody: 'After enabling, open Phone connection in the sidebar to finish setup.',
-    aaNextTitle: 'Connect a device',
-    aaNextBody: 'After setup, open Phone connection in the sidebar to continue connecting your device.',
-    aaNextDesktop: 'If the Agents-Anywhere desktop app is installed on this computer, manage the connection directly in that app.',
-
     beta: 'Beta',
     experimental: 'Experimental',
     title: 'Set up DSH Desktop',
     profile: 'Profile',
     welcomeTitle: 'Welcome to DSH Desktop',
-    welcomeBody: 'Set up window appearance, phone connection, and notifications for the current Profile.',
+    welcomeBody: 'Set up window appearance and notifications for the current Profile.',
     firstProfileSetup: 'Complete Desktop setup before using this configuration environment (Profile) for the first time.',
     startSetup: 'Start setup',
     presentationTitle: 'Choose a window mode',
@@ -142,10 +121,8 @@ const COPY: Record<DesktopLocale, DesktopSetupWizardCopy> = {
     marketBody: 'Choose a market to browse and install community plugins,\nor configure the custom plugin market.\nYou can also leave it off and decide later in Plugins.',
     marketDisabled: 'Turn off plugin market',
     marketDisabledBody: 'Do not load a plugin market interface.',
-    communityMarket: 'dsh-community-market',
-    communityMarketBody: 'The open market built into DSH Desktop, including custom data sources.',
     dshMarket: 'dsh-market',
-    dshMarketBody: 'The popular community market powered by awesome-dsh-plugin data.',
+    dshMarketBody: 'The popular plugin market powered by awesome-dsh-plugin data.',
     officialMarket: 'Custom plugin markets',
     officialMarketBody: 'Enable the official market with the dsh-market source preconfigured.',
     notificationsTitle: 'Set up Desktop notifications',
@@ -170,22 +147,12 @@ const COPY: Record<DesktopLocale, DesktopSetupWizardCopy> = {
     invalidState: 'Setup information could not be loaded. Close this window and try again.',
   },
   zh: {
-    aaTitle: 'Agents-Anywhere',
-    aaIntro: '通过 Agents-Anywhere，在手机或浏览器中访问这台电脑上的 DSH。',
-    aaDisabled: '关闭手机连接',
-    aaDisabledBody: '不在手机或浏览器中通过 Agents-Anywhere 访问这台电脑。',
-    aaEnabled: '开启手机连接',
-    aaEnabledBody: '开启后，打开侧边栏中的“手机连接”完成设置。',
-    aaNextTitle: '连接设备',
-    aaNextBody: '完成设置后，打开侧边栏中的“手机连接”，继续连接设备。',
-    aaNextDesktop: '如果本机已安装 Agents-Anywhere 桌面端，直接在桌面端管理连接即可。',
-
     beta: 'Beta',
     experimental: '实验性',
     title: '设置 DSH Desktop',
     profile: 'Profile',
     welcomeTitle: '欢迎使用 DSH Desktop',
-    welcomeBody: '为当前 Profile 设置窗口外观、手机连接和桌面通知。',
+    welcomeBody: '为当前 Profile 设置窗口外观和桌面通知。',
     firstProfileSetup: '首次使用此配置环境（Profile），请先完成桌面设置。',
     startSetup: '开始设置',
     presentationTitle: '选择窗口模式',
@@ -225,10 +192,8 @@ const COPY: Record<DesktopLocale, DesktopSetupWizardCopy> = {
     marketBody: '选择一个插件市场，浏览和安装社区插件；\n或配置自定义插件市场。\n也可以暂不开启，以后在插件页面调整。',
     marketDisabled: '关闭插件市场',
     marketDisabledBody: '不加载插件市场界面。',
-    communityMarket: 'dsh-community-market',
-    communityMarketBody: 'DSH Desktop 内置的开放市场，并支持自定义数据源。',
     dshMarket: 'dsh-market',
-    dshMarketBody: '使用 awesome-dsh-plugin 数据的热门社区市场。',
+    dshMarketBody: '使用 awesome-dsh-plugin 数据的热门插件市场。',
     officialMarket: '自定义插件市场',
     officialMarketBody: '开启官方插件市场，并预置 dsh-market 索引源。',
     notificationsTitle: '设置桌面通知',

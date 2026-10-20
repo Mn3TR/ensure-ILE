@@ -15,7 +15,6 @@ const workspace = readJson('package.json')
 const upstream = readJson('upstream.json')
 const stablePlugin = readJson('dsh-plugin-desktop/package.json')
 const fabric = readJson('dsh-community-fabric/package.json')
-const market = readJson('dsh-community-market/package.json')
 const upstreamPackage = readJson('deepseek-harness/package.json')
 
 if (stablePlugin.name !== 'dsh-plugin-desktop') fail('the stable Desktop workspace must retain dsh-plugin-desktop')
@@ -27,22 +26,19 @@ if (workspace.packageManager !== 'yarn@4.18.0') {
   fail('the product workspace must pin yarn@4.18.0')
 }
 if (JSON.stringify(workspace.workspaces) !== JSON.stringify([
-  'dsh-plugin-hrll',
+  'dsh-plugin-guide',
   'dsh-plugin-desktop',
   'dsh-community-fabric',
-  'dsh-community-market',
 ])) {
-  fail('the root Yarn workspace must contain the plugin, desktop, community-fabric, and community-market packages')
+  fail('the root Yarn workspace must contain the plugin, desktop, and community-fabric packages')
 }
 for (const [name, manifest] of [
   ['dsh-plugin-desktop', stablePlugin],
   ['dsh-community-fabric', fabric],
-  ['dsh-community-market', market],
 ]) {
   if (manifest.packageManager !== undefined) fail(`${name} must inherit the root Yarn release`)
 }
 if (fabric.name !== 'dsh-community-fabric') fail('the Fabric workspace must own dsh-community-fabric')
-if (market.name !== 'dsh-community-market') fail('the market workspace must own dsh-community-market')
 const claudePath = resolve(root, 'CLAUDE.md')
 const claudeStat = lstatSync(claudePath)
 // Windows checkouts materialize the symlink as a regular file holding the
@@ -60,8 +56,6 @@ for (const legacyFile of [
   'dsh-plugin-desktop/pnpm-workspace.yaml',
   'dsh-community-fabric/pnpm-lock.yaml',
   'dsh-community-fabric/pnpm-workspace.yaml',
-  'dsh-community-market/pnpm-lock.yaml',
-  'dsh-community-market/pnpm-workspace.yaml',
 ]) {
   if (existsSync(resolve(root, legacyFile))) fail(`${legacyFile} must not exist`)
 }
@@ -79,14 +73,13 @@ for (const [owner, manifest] of [
   ['root', workspace],
   ['stable desktop', stablePlugin],
   ['fabric', fabric],
-  ['market', market],
 ]) {
   for (const field of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies', 'resolutions']) {
     for (const [name, range] of Object.entries(manifest[field] ?? {})) {
       if (typeof range !== 'string') continue
-      // DHDL owns `dsh-plugin-hrll`; it is a local preset plugin, not a published
+      // DHDL owns `dsh-plugin-guide`; it is a local preset plugin, not a published
       // DSH package, so the published-boundary rule does not apply to it alone.
-      if (name === 'dsh-plugin-hrll') continue
+      if (name === 'dsh-plugin-guide') continue
       if (/^(?:workspace|portal|link):/u.test(range)
         || (range.startsWith('file:') && range.includes('deepseek-harness'))) {
         fail(`${owner} ${field}.${name} bypasses the published DSH package boundary`)

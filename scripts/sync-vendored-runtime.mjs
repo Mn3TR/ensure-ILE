@@ -41,16 +41,7 @@ const otherVersion = upstreamDocument.channels?.[otherChannel]?.sourceVersion
 if (typeof otherVersion !== 'string' || !/^[0-9A-Za-z][0-9A-Za-z.-]*$/u.test(otherVersion)) {
   fail(`unsafe ${otherChannel} source version ${JSON.stringify(otherVersion)}`)
 }
-const marketPath = join(root, 'dsh-community-market', 'package.json')
-const pluginPaths = [
-  join(root, upstream.package, 'package.json'),
-  ...(channel === 'beta' ? [marketPath] : []),
-]
-// Stable and Beta both load the market bundle, and dsh 0.2 refuses a bundle
-// whose dsh peers exclude the running runtime, so its peers accept every
-// channel's version while its build dependencies follow Beta.
-const marketPeerRange = [...new Set(['stable', 'beta'].map(name => upstreamDocument.channels?.[name]?.sourceVersion))].join(' || ')
-const expectedRange = (path, field) => path === marketPath && field === 'peerDependencies' ? marketPeerRange : version
+const pluginPaths = [join(root, upstream.package, 'package.json')]
 const version = upstream.sourceVersion
 if (typeof version !== 'string' || !/^[0-9A-Za-z][0-9A-Za-z.-]*$/u.test(version)) {
   fail(`unsafe source version ${JSON.stringify(version)}`)
@@ -149,7 +140,7 @@ function writeVendor() {
     const plugin = readJson(path)
     for (const field of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
       for (const name of Object.keys(plugin[field] ?? {})) {
-        if (isDshPackage(name) && packageNames.has(name)) plugin[field][name] = expectedRange(path, field)
+        if (isDshPackage(name) && packageNames.has(name)) plugin[field][name] = version
       }
     }
     writeJson(path, plugin)
@@ -207,7 +198,7 @@ function checkVendor() {
       for (const [name, range] of Object.entries(plugin[field] ?? {})) {
         if (!isDshPackage(name)) continue
         if (!names.has(name)) fail(`${relative(root, path)} references absent runtime package ${name}`)
-        const expected = expectedRange(path, field)
+        const expected = version
         if (range !== expected) fail(`${relative(root, path)} ${field}.${name} must use ${expected}`)
       }
     }

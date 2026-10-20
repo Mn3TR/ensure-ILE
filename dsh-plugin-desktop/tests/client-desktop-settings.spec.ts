@@ -51,7 +51,6 @@ const BROWSER_AUTH_TOKEN = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 const CA_FINGERPRINT = 'a'.repeat(64)
 
 const VIEW: DesktopSettingsView = {
-  aa: { requested: false, effective: false },
   current: 'desktop',
   profiles: [
     { name: 'desktop', exists: true, webCapable: true, selectable: true, deletable: false },
@@ -385,7 +384,7 @@ describe('Desktop settings API', () => {
     await expect(api.createProfile('work')).resolves.toEqual(VIEW)
     await expect(api.selectProfile('work')).resolves.toEqual({ accepted: true, restartRequired: true })
     await expect(api.deleteProfile('work')).resolves.toEqual(VIEW)
-    await expect(api.selectMarket('community-market')).resolves.toEqual({ accepted: true, restartRequired: true })
+    await expect(api.selectMarket('dsh-market')).resolves.toEqual({ accepted: true, restartRequired: true })
     await expect(api.openTerminal()).resolves.toBeUndefined()
     await expect(api.restart()).resolves.toBeUndefined()
     await expect(api.restartToRecovery()).resolves.toBeUndefined()
@@ -418,7 +417,7 @@ describe('Desktop settings API', () => {
       body: JSON.stringify({ name: 'work' }),
     })
     expect(fetcher.mock.calls[4]?.[1]).toMatchObject({
-      body: JSON.stringify({ provider: 'community-market' }),
+      body: JSON.stringify({ provider: 'dsh-market' }),
     })
     expect(fetcher.mock.calls[5]?.[1]).toMatchObject({
       method: 'POST',
@@ -750,15 +749,7 @@ describe('Desktop settings Slot registration', () => {
     expect(inject).toHaveBeenCalledWith('plugins.bundle.hidden', expect.any(Function))
     expect(register).toHaveBeenNthCalledWith(3, {
       name: 'plugins.bundle.hidden',
-      key: 'dsh-community-market',
-    }, expect.any(Function))
-    expect(register).toHaveBeenNthCalledWith(4, {
-      name: 'plugins.bundle.hidden',
       key: 'dshmarket',
-    }, expect.any(Function))
-    expect(register).toHaveBeenNthCalledWith(5, {
-      name: 'plugins.bundle.hidden',
-      key: '@agents-anywhere/dsh-bridge-next',
     }, expect.any(Function))
     await control.setMode('extended')
     expect(scope.set).toHaveBeenCalledWith('mode', 'extended')

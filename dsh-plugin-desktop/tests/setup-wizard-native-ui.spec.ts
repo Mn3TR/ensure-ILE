@@ -34,8 +34,7 @@ const input: DesktopSetupWizardInput = {
   windowsMaterial: 'off',
   openBrowser: false,
   networkExposure: 'loopback',
-  aaEnabled: false,
-  market: 'community-market',
+  market: 'dsh-market',
   notifications: {
     enabled: true,
     notifyOnTurnCompletion: true,
@@ -53,7 +52,6 @@ const selection: DesktopSetupWizardSelection = {
   windowsMaterial: input.windowsMaterial,
   openBrowser: input.openBrowser,
   networkExposure: input.networkExposure,
-  aaEnabled: false,
   market: input.market,
   notifications: input.notifications,
 }
@@ -104,7 +102,6 @@ describe('Setup Wizard step flow', () => {
       'mode',
       'material',
       'market',
-      'aa',
       'notifications',
       'browser',
       'success',
@@ -118,7 +115,6 @@ describe('Setup Wizard step flow', () => {
       'mode',
       'material',
       'market',
-      'aa',
       'notifications',
       'browser',
     ])
@@ -126,7 +122,6 @@ describe('Setup Wizard step flow', () => {
       'mode',
       'material',
       'market',
-      'aa',
       'notifications',
       'browser',
       'success',
@@ -229,12 +224,11 @@ describe('Setup Wizard setting pages', () => {
     expect(market).not.toContain(copy.openBrowser)
     expect(browser).toContain(copy.browserTitle)
     expect(browser).not.toContain(copy.marketTitle)
-    expect(browser).not.toContain(copy.communityMarket)
     expect(browser).not.toContain(copy.dshMarket)
     expect(browser).not.toContain(copy.officialMarket)
   })
 
-  it('marks Community Market and LAN access as Beta features and Custom Plugin Market as Experimental', () => {
+  it('marks LAN access as a Beta feature and the Custom Plugin Market as Experimental', () => {
     const market = renderStep('market')
     const browser = renderStep('browser')
     const enabledBrowser = renderStep('browser', {
@@ -243,11 +237,8 @@ describe('Setup Wizard setting pages', () => {
       openBrowser: true,
       networkExposure: 'lan',
     })
-    const communityOption = market.indexOf('for="setup-plugin-market-community-market"')
-    const nextMarketOption = market.indexOf('for="setup-plugin-market-dsh-market"')
     const officialMarketOption = market.indexOf('for="setup-plugin-market-official-market"')
     const marketBadge = market.indexOf('data-slot="badge"')
-    const experimentalBadge = market.indexOf('data-slot="badge"', marketBadge + 1)
     const lanOption = browser.indexOf('for="setup-network-exposure-lan"')
     const lanBadge = browser.indexOf('data-slot="badge"')
     const enabledLanOption = enabledBrowser.indexOf('for="setup-network-exposure-lan"')
@@ -256,16 +247,14 @@ describe('Setup Wizard setting pages', () => {
       enabledBrowser.indexOf('</label>', enabledLanOption),
     )
 
-    expect(occurrences(market, 'data-slot="badge"')).toBe(2)
+    expect(occurrences(market, 'data-slot="badge"')).toBe(1)
     expect(occurrences(browser, 'data-slot="badge"')).toBe(1)
-    expect(market).toContain(copy.beta)
+    expect(market).not.toContain(copy.beta)
     expect(market).toContain(copy.experimental)
     expect(market).toContain(copy.officialMarket)
     expect(market).toContain(copy.officialMarketBody)
     expect(browser).toContain(copy.beta)
-    expect(marketBadge).toBeGreaterThan(communityOption)
-    expect(marketBadge).toBeLessThan(nextMarketOption)
-    expect(experimentalBadge).toBeGreaterThan(officialMarketOption)
+    expect(marketBadge).toBeGreaterThan(officialMarketOption)
     expect(lanBadge).toBeGreaterThan(lanOption)
     expect(browser.slice(lanOption)).toContain('disabled=""')
     expect(enabledLanChoice).not.toContain('disabled=""')
@@ -466,10 +455,3 @@ describe('Setup Wizard native UI boundaries', () => {
   })
 })
 
-it('offers AA opt-in with a Beta badge after the market page', () => {
-  const html = renderStep('aa')
-  expect(html).toContain('Agents-Anywhere')
-  expect(html).toContain('Beta')
-  expect(html).toContain('setup-aa-false')
-  expect(html).toContain('setup-aa-true')
-})

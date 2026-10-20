@@ -82,7 +82,7 @@ interface 没有变化。删除 admission module 只会把选择合并、平台�
 
 ## 验证
 
-准入 module 测试覆盖并发 picker 合并、平台拒绝、固定卷允许、可移动卷确认/取消、不支持存储阻止，以及断盘时 fail closed。Desktop package 通过了 typecheck、build 和全量测试（`591 passed`、`11 skipped`）。补建 community-market 前置产物后，Loader、profile、runtime-closure 和 license 检查均通过。
+准入 module 测试覆盖并发 picker 合并、平台拒绝、固定卷允许、可移动卷确认/取消、不支持存储阻止，以及断盘时 fail closed。Desktop package 通过了 typecheck、build 和全量测试（`591 passed`、`11 skipped`）。Loader、profile、runtime-closure 和 license 检查均通过。
 
 ## 后果
 

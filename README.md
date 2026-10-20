@@ -4,7 +4,7 @@
 > 让它带着一个学生，把他手里那道题**自己解出来**——而不是把答案讲给他听。
 >
 > - 与上游的关系：本地 fork。`deepseek-harness/` 是固定的上游子模块，**不修改**。
-> - 现在的产品形态：一个可选的 agent preset，叫 **HRL 引导**。见 [`dsh-plugin-hrll/](dsh-plugin-hrll/)。
+> - 现在的产品形态：一个 agent preset，叫 **引导模式**。见 [`dsh-plugin-guide/](dsh-plugin-guide/)。
 > - 开工前读 [`AGENTS.md`](AGENTS.md)。
 >
 > 下面是上游 README，保留作为底座说明。
@@ -93,7 +93,6 @@ DSH Desktop 将 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harne
 | 编写普通或 Desktop 插件 | [插件开发](docs/plugin-development.md) |
 | 参与统一插件 contract 讨论 | [DSH Community Fabric Draft](dsh-community-fabric/README.zh.md) |
 | 了解统一插件框架为什么这样设计 | [成熟框架与真实插件调研](dsh-community-fabric/docs/research/mature-plugin-frameworks.zh.md) |
-| 查看插件市场的产品与安全设计 | [DSH Community Market](dsh-community-market/README.zh.md) |
 | 了解桌面插件可以使用的能力 | [桌面插件接口说明](dsh-plugin-desktop/docs/plugin-services.zh.md) |
 | 了解桌面应用如何工作 | [架构说明](docs/architecture.md) |
 | 查阅包级构建与发布细节 | [`dsh-plugin-desktop/README.md`](dsh-plugin-desktop/README.md) |
@@ -105,16 +104,6 @@ DSH Desktop 将 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harne
     <td width="50%" valign="top">
       <h3>Desktop</h3>
       <p>把上游 DeepSeek Harness 的本地 Web UI 带到原生桌面。应用自动启动和管理本地 Harness 服务，集成系统托盘与桌面窗口，无需安装 Node.js 或执行命令。</p>
-    </td>
-    <td width="50%" valign="top">
-      <h3><a href="https://www.agents-anywhere.com">手机远程控制</a> <img src="https://img.shields.io/badge/%E5%B7%B2%E5%86%85%E7%BD%AE-2EA44F?style=flat-square" alt="已内置"></h3>
-      <p>通过 iOS 和 Android 远程连接 Desktop，在手机上发起任务、查看 Agent 进度，并在需要时继续跟进。已在2.0.9及以上版本中内置</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3><a href="dsh-community-market/README.zh.md">插件市场</a> <img src="https://img.shields.io/badge/%E5%B7%B2%E5%86%85%E7%BD%AE-2EA44F?style=flat-square" alt="已内置"></h3>
-      <p>DSH Community Market 已完成并内置，提供插件发现、详情、安装与管理。市场以开放方式连接各种插件数据源：任何人都可以提供、接入和使用符合公开 Schema 的来源，已有 API 也可以通过受审 adapter 加入合作数据源。</p>
     </td>
     <td width="50%" valign="top">
       <h3>共建插件生态</h3>
@@ -231,7 +220,6 @@ Discord：[加入 DSH Desktop 社区](https://discord.gg/TJeGqKRNM)
 | dsh-TUI | DeepSeek Harness 全屏交互式终端界面。 | [GitHub](https://github.com/ccch1mneyyy/dsh-TUI) |
 | dsh-tianshu-tui | DSH Web 端交互式终端极简风格 UI 插件，自研 ANSI 渲染核心、极致丝滑流畅；在官方基础上增加了 TDD、证据门、视觉图像模块等工作流。 | [GitHub](https://github.com/huiliyi37/dsh-tianshu-tui) |
 | dsh-context | DSH 上下文洞察面板：Context 仪表盘 + /context 命令 + Context 浏览器，一站式查看 Context 的分类组成、内容详情、演进趋势、压缩/注入事件与统计，覆盖 Context 全生命周期管理。 | [GitHub](https://github.com/bowenliang123/dsh-context) · [NPM](https://www.npmjs.com/package/dsh-context) |
-| Agents-Anywhere | 从手机远程控制电脑上的 Coding Agent。 | [GitHub](https://github.com/anywhere-labs/Agents-Anywhere) |
 | deepseek-harness-remote | 基于 P2P 与 APIProxy 的 DeepSeek Harness 远程控制与多端协同插件。 | [GitHub](https://github.com/liguobao/deepseek-harness-remote) |
 | DSH-better-sidebar | DeepSeek Harness 侧边栏工作台，集成文件、终端、Git 和子代理。 | [GitHub](https://github.com/omdsh-dev/DSH-better-sidebar) |
 | Awesome DeepSeek Harness | DeepSeek Harness 插件、工具与基础设施精选列表。 | [GitHub](https://github.com/0xsline/awesome-deepseek-harness) · [官网](https://deepseekdocs.com/) |

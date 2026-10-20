@@ -82,7 +82,7 @@ This gives callers leverage from two small methods while keeping the policy impl
 
 ## Verification
 
-The admission module tests cover concurrent picker coalescing, platform rejection, fixed-volume allow, removable-volume confirmation/cancellation, unsupported storage blocking, and a disconnected volume failing closed. The Desktop package passed typecheck, build, and the full test suite (`591 passed`, `11 skipped`). After building the community-market prerequisite, Loader, profile, runtime-closure, and license checks passed.
+The admission module tests cover concurrent picker coalescing, platform rejection, fixed-volume allow, removable-volume confirmation/cancellation, unsupported storage blocking, and a disconnected volume failing closed. The Desktop package passed typecheck, build, and the full test suite (`591 passed`, `11 skipped`). Loader, profile, runtime-closure, and license checks passed.
 
 ## Consequences
 

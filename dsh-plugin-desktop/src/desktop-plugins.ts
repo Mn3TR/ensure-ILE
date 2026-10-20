@@ -49,9 +49,7 @@ const IMMUTABLE_BUNDLES = new Set([
   ...(PROFILE_TEMPLATES.web?.bundles ?? []),
   '@deepseek-ai/dsh-desktop-app',
   ...DESKTOP_PACKAGE_NAMES,
-  'dsh-community-market',
   'dshmarket',
-  '@agents-anywhere/dsh-bridge-next',
 ])
 
 /** One direct bundle declared by the active profile. */
@@ -198,8 +196,8 @@ export interface DesktopProfileManifestBundle {
 export interface DesktopRecoveryBundle extends DesktopProfileManifestBundle {
   /**
    * Whether Desktop removed this name from `dsh.profile.bundles`, which is the
-   * only disabled state recovery can undo. A bundle marked disabled by the
-   * community market's provider-gated state file is not deselected.
+   * only disabled state recovery can undo. A bundle disabled through the
+   * plugin-management ledger is not deselected.
    */
   readonly deselected: boolean
 }

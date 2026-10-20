@@ -1321,7 +1321,6 @@ async function start(): Promise<void> {
       ? legacyMarketSelection
       : desktopProfileMarketSnapshot(profilePreferences.market)
     const preparationHooks = {
-      get aaEnabled() { return safeModePaths === undefined && profilePreferences?.aaEnabled === true },
       lanAddresses,
       onSettingsDocumentResolved: (settingsDocument: string) => {
         if (startupRecoveryConfigurationPaths === undefined) return
@@ -1377,7 +1376,6 @@ async function start(): Promise<void> {
           safeModeDefaults.settings,
           safeModeDefaults.settings.notifications,
           safeModeDefaults.market,
-          safeModeDefaults.aaEnabled,
         ),
       )
       prepared = prepareDesktopProfile(
@@ -1467,8 +1465,7 @@ async function start(): Promise<void> {
         ? marketSelection.requested
         : readDesktopOfficialPluginMarketEnabled(prepared.profile.dir)
           ? ('official-market' as const)
-          : ('disabled' as const),
-      aaEnabled: profilePreferences?.aaEnabled === true }
+          : ('disabled' as const) }
     const setupInput = dhdlSetup ? dhdlSetupInput(setupInputBase) : setupInputBase
     let setupSaving = false
     let setupRestartPending = false
@@ -1508,7 +1505,7 @@ async function start(): Promise<void> {
           if (selection !== undefined) {
             const desktopMarket: DesktopMarketProvider = selection.market === 'official-market' ? 'disabled' : selection.market
             profilePreferences = await writeDesktopProfilePreferences(marketUserDataDir, prepared.profile.dir,
-              desktopProfilePreferencesFromSettings(selection, selection.notifications, desktopMarket, selection.aaEnabled === true))
+              desktopProfilePreferencesFromSettings(selection, selection.notifications, desktopMarket))
             await selectDesktopMarketProvider(marketUserDataDir, desktopMarket)
             // A new Profile has no settings document left to import, so save
             // through the live settings scopes the way the mode picker does.
@@ -1600,9 +1597,6 @@ async function start(): Promise<void> {
           : migrationCause instanceof Error ? migrationCause.message : String(migrationCause)
         throw new Error(`${BIN_NAME}: Profile dependency migration failed: ${maskSecrets(detail)}`)
       }
-    }
-    if (prepared.aaFailure !== undefined) {
-      electronLogger.error(`${BIN_NAME}: requested AA bundle was disabled for this generation: ${maskSecrets(prepared.aaFailure)}`)
     }
     if (prepared.marketFailure !== undefined) {
       electronLogger.error(
@@ -1717,17 +1711,14 @@ async function start(): Promise<void> {
       startupStage = 'host-boot'
       lifecycleRecorder.transitionStartupStage(startupStage)
       let effectiveMarket = prepared.market.effective
-      let effectiveAa = prepared.aaEnabled
       const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl)
       const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, {
         onManagedBundlesChanged: state => {
           effectiveMarket = state.effectiveMarket
-          effectiveAa = state.effectiveAa
           void enqueueProfilePreferencesWrite(current => desktopProfilePreferencesFromSettings(
             current,
             current.notifications,
             state.requestedMarket,
-            state.requestedAa,
           )).then(() => selectDesktopMarketProvider(marketUserDataDir, state.requestedMarket))
             .catch(() => {})
         },
@@ -1848,15 +1839,6 @@ async function start(): Promise<void> {
           hostCtx.provide('desktopSettingsController', new DesktopSettingsController({
             profiles: hostCtx.desktopProfiles,
             readMarket,
-            readAa: () => ({ requested: readProfilePreferences().aaEnabled === true, effective: effectiveAa }),
-            selectAa: async enabled => {
-              await enqueueProfilePreferencesWrite(current => desktopProfilePreferencesFromSettings(
-                current,
-                current.notifications,
-                current.market,
-                enabled,
-              ))
-            },
             readWeb: () => {
               const port = hostCtx.webServer.port
               if (port === undefined) {
@@ -1884,7 +1866,6 @@ async function start(): Promise<void> {
                 current,
                 current.notifications,
                 provider,
-                current.aaEnabled === true,
               ))
               return desktopMarketSnapshotWithEffective(
                 await selectDesktopMarketProvider(marketUserDataDir, provider),
@@ -2073,7 +2054,6 @@ function dhdlSetupInput(input: DesktopSetupWizardInput): DesktopSetupWizardInput
     openBrowser: false,
     networkExposure: 'loopback',
     market: 'disabled',
-    aaEnabled: false,
     notifications: Object.freeze({
       enabled: false,
       notifyOnTurnCompletion: false,

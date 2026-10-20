@@ -9,7 +9,7 @@ import { createDesktopSettingsApi } from './desktop-settings-api.ts'
 import { en, zh, type DesktopSettingsLocaleKey } from './desktop-settings-locales.ts'
 import { installDesktopSettingsStyles } from './desktop-settings-styles.ts'
 import type { DesktopClientEnvironment } from './environment.ts'
-import { COMMUNITY_MARKET, DSH_MARKET, REMOTE_CONTROL_BUNDLE } from './market-toggle.ts'
+import { DSH_MARKET } from './market-toggle.ts'
 import { installPluginControlsStyles } from './plugin-controls-styles.ts'
 import {
   bindDesktopSettingsForm,
@@ -124,10 +124,10 @@ export function applyDesktopSettings(
     inject: () => ({ api }),
   }, DesktopTerminalSettingsAction))
 
-  // The Plugins overview owns built-in Market and Remote Control selection.
-  // Their bundles must not expose duplicate switches in the generic plugin list.
+  // The Plugins overview owns built-in Market selection.
+  // Its bundle must not expose a duplicate switch in the generic plugin list.
   ctx.slots.inject('plugins.bundle.hidden', () => {
-    const disposers = [COMMUNITY_MARKET, DSH_MARKET, REMOTE_CONTROL_BUNDLE].map(key =>
+    const disposers = [DSH_MARKET].map(key =>
       ctx.slots.register({
         name: 'plugins.bundle.hidden',
         key,

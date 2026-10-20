@@ -6,7 +6,7 @@ export type DesktopSetupWizardMacosMaterial = 'off' | 'transparent'
 /** Windows has no selectable material; Setup always keeps the opaque window. */
 export type DesktopSetupWizardWindowsMaterial = 'off'
 export type DesktopSetupWizardNetworkExposure = 'loopback' | 'lan'
-export type DesktopSetupWizardMarket = 'disabled' | 'community-market' | 'dsh-market' | 'official-market'
+export type DesktopSetupWizardMarket = 'disabled' | 'dsh-market' | 'official-market'
 
 /** Every Setup screen, in the order the full Wizard presents them. */
 export const DESKTOP_SETUP_WIZARD_STEP_IDS = Object.freeze([
@@ -14,7 +14,6 @@ export const DESKTOP_SETUP_WIZARD_STEP_IDS = Object.freeze([
   'mode',
   'material',
   'market',
-  'aa',
   'notifications',
   'browser',
   'success',
@@ -38,7 +37,6 @@ export interface DesktopSetupWizardSelection {
   readonly windowsMaterial: DesktopSetupWizardWindowsMaterial
   readonly openBrowser: boolean
   readonly networkExposure: DesktopSetupWizardNetworkExposure
-  readonly aaEnabled?: boolean
   readonly market: DesktopSetupWizardMarket
   readonly notifications: DesktopSetupWizardNotifications
 }
@@ -61,7 +59,6 @@ const SELECTION_KEYS = Object.freeze([
   'windowsMaterial',
   'openBrowser',
   'networkExposure',
-  'aaEnabled',
   'market',
   'notifications',
 ] as const)
@@ -86,7 +83,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 function hasExactKeys(value: Record<string, unknown>, expected: readonly string[]): boolean {
-  const actual = Object.keys(expected.includes('aaEnabled') ? { aaEnabled: false, ...value } : value)
+  const actual = Object.keys(value)
   return actual.length === expected.length && actual.every(key => expected.includes(key))
 }
 
@@ -108,7 +105,6 @@ function isNetworkExposure(value: unknown): value is DesktopSetupWizardNetworkEx
 
 function isMarket(value: unknown): value is DesktopSetupWizardMarket {
   return value === 'disabled'
-    || value === 'community-market'
     || value === 'dsh-market'
     || value === 'official-market'
 }
@@ -126,8 +122,7 @@ export function isDesktopSetupWizardNotifications(
 }
 
 function hasSelectionValues(value: Record<string, unknown>): boolean {
-  return (value.aaEnabled === undefined || typeof value.aaEnabled === 'boolean')
-    && isMode(value.mode)
+  return isMode(value.mode)
     && isMacosMaterial(value.macosMaterial)
     && isWindowsMaterial(value.windowsMaterial)
     && typeof value.openBrowser === 'boolean'

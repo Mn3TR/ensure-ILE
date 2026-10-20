@@ -28,4 +28,4 @@
 # learner never has to pick a mode before asking a question.
 - id: agent-preset-registry
   config:
-    default: hrll-guide
+    default: guide

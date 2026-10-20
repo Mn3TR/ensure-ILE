@@ -68,7 +68,7 @@ export interface DesktopHostOptions {
 export async function bootDesktopHost(options: DesktopHostOptions, runtime: DesktopRuntime,
   browserAccess: DesktopBrowserAccess, lanHttps: DesktopLanHttpsRuntime,
   bindHost: (host: DesktopStartupGenerationHost) => void, requestQuit: (code: number) => void,
-): Promise<() => { aaRuntime: boolean; aaOnboarding: boolean }> {
+): Promise<void> {
   const { prepared, profilePreferences, homeDir, activeProfileName, pluginManagementStatePath,
     selectionStatePath, marketUserDataDir, releaseUserDataLocations, desktopLaunchEnvironment,
     desktopPnpmBootstrap } = options
@@ -117,17 +117,14 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
       await profilePreferencesWriteTail
     }
     let effectiveMarket = prepared.market.effective
-    let effectiveAa = prepared.aaEnabled
     const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl)
     const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, {
       onManagedBundlesChanged: state => {
         effectiveMarket = state.effectiveMarket
-        effectiveAa = state.effectiveAa
         void enqueueProfilePreferencesWrite(current => desktopProfilePreferencesFromSettings(
           current,
           current.notifications,
           state.requestedMarket,
-          state.requestedAa,
         )).then(() => selectDesktopMarketProvider(marketUserDataDir, state.requestedMarket))
           .catch(() => {})
       },
@@ -239,15 +236,6 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
         hostCtx.provide('desktopSettingsController', new DesktopSettingsController({
           profiles: hostCtx.desktopProfiles,
           readMarket,
-          readAa: () => ({ requested: readProfilePreferences().aaEnabled === true, effective: effectiveAa }),
-          selectAa: async enabled => {
-            await enqueueProfilePreferencesWrite(current => desktopProfilePreferencesFromSettings(
-              current,
-              current.notifications,
-              current.market,
-              enabled,
-            ))
-          },
           readWeb: () => {
             const port = hostCtx.webServer.port
             if (port === undefined) {
@@ -275,7 +263,6 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
               current,
               current.notifications,
               provider,
-              current.aaEnabled === true,
             ))
             return desktopMarketSnapshotWithEffective(
               await selectDesktopMarketProvider(marketUserDataDir, provider),
@@ -312,5 +299,4 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
     profileBoot.markReady()
     observeDesktopPreferenceSettings(ctx, fileExporter, enqueueProfilePreferencesWrite)
     void logInactiveStartupEntries(ctx, BIN_NAME)
-  return () => ({ aaRuntime: ctx.get('agentsAnywhereRuntime') !== undefined, aaOnboarding: ctx.get('agentsAnywhereOnboarding') !== undefined })
 }

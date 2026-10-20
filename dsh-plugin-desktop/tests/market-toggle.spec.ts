@@ -2,7 +2,6 @@ import { expect, it, vi } from 'vitest'
 import type { BundleInfo } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   BUILT_IN_MARKET_SOURCES,
-  COMMUNITY_MARKET,
   configureSingleMarketToOfficial,
   DSH_MARKET,
   importMarketSourcesToOfficial,
@@ -13,126 +12,93 @@ import {
   prefetchMarketIndexes,
   removeMarketSourcesFromOfficial,
   resolveActiveMarketSource,
-  resolveMarketSourceByKey,
   toggleMarketEndpointInOfficial,
 } from '../src/client/market-toggle.ts'
+
+const CHINA_SYNC = 'https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json'
+const GLOBAL_SYNC = 'https://realguan.github.io/dsh-plugin-market/dsh-index.json'
+const CUSTOM_SYNC = 'https://custom.example.com/index.json'
 
 const row = (name: string, enabled: boolean, readOnlyReason?: string) =>
   ({ name, enabled, readOnlyReason }) as BundleInfo
 
-it('enables the preferred market, falling back to the available provider', () => {
-  const markets = [row(COMMUNITY_MARKET, false), row(DSH_MARKET, false)]
-  expect(marketToggleTargets(markets, COMMUNITY_MARKET, true)).toEqual([COMMUNITY_MARKET])
-  expect(marketToggleTargets(markets, DSH_MARKET, true)).toEqual([DSH_MARKET])
-  expect(marketToggleTargets([row(COMMUNITY_MARKET, false, 'locked'), markets[1]!], COMMUNITY_MARKET, true)).toEqual([DSH_MARKET])
+it('enables the only built-in market and disables whichever copy is active', () => {
+  expect(marketToggleTargets([row(DSH_MARKET, false)], true)).toEqual([DSH_MARKET])
+  expect(marketToggleTargets([row(DSH_MARKET, false, 'locked')], true)).toEqual([])
+  expect(marketToggleTargets([row(DSH_MARKET, true), row('unrelated-bundle', true)], false)).toEqual([DSH_MARKET])
+  expect(marketToggleTargets([row(DSH_MARKET, false)], false)).toEqual([])
+  expect(marketToggleTargets([row(DSH_MARKET, true, 'locked')], false)).toEqual([])
 })
 
-it('disables whichever market is active, including both in a legacy Profile', () => {
-  const markets = [row(COMMUNITY_MARKET, true), row(DSH_MARKET, true)]
-  expect(marketToggleTargets(markets, COMMUNITY_MARKET, false)).toEqual([COMMUNITY_MARKET, DSH_MARKET])
-  expect(marketToggleTargets([markets[0]!, row(DSH_MARKET, false)], DSH_MARKET, false)).toEqual([COMMUNITY_MARKET])
-  expect(marketToggleTargets([row(COMMUNITY_MARKET, false), row(DSH_MARKET, false)], COMMUNITY_MARKET, false)).toEqual([])
-  expect(marketToggleTargets([row(COMMUNITY_MARKET, true, 'locked'), markets[1]!], DSH_MARKET, false)).toEqual([])
-})
-
-it('declares all three built-in plugin markets while only exposing dshmarket for official custom market configuration', () => {
-  expect(BUILT_IN_MARKET_SOURCES.map(item => item.key)).toEqual(['dsh-1024store', 'dshfind', 'dshmarket'])
+it('declares only the official-format dshmarket provider while keeping it configurable', () => {
+  expect(BUILT_IN_MARKET_SOURCES.map(item => item.key)).toEqual(['dshmarket'])
   expect(OFFICIAL_CONFIGURABLE_MARKET_SOURCES.map(item => item.key)).toEqual(['dshmarket'])
-  const urls = BUILT_IN_MARKET_SOURCES.flatMap(item => item.sources.map(source => source.url))
-  expect(urls).toEqual([
-    'https://deepseek1024.com/api/v2/plugins',
-    'https://deepseek1024.com/api/v1/registry',
-    'https://api.dshfind.com/market/v1/plugins',
-    'https://api.dshfind.com/market/manifest.json',
-    'https://api.dshfind.com/v1/catalog',
-    'https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json',
-    'https://realguan.github.io/dsh-plugin-market/dsh-index.json',
+  expect(BUILT_IN_MARKET_SOURCES.flatMap(item => item.sources.map(source => source.url))).toEqual([
+    CHINA_SYNC,
+    GLOBAL_SYNC,
   ])
 })
 
-it('resolves the active market source across Community Market providers and dshmarket regions', () => {
-  const communityActive = [row(COMMUNITY_MARKET, true), row(DSH_MARKET, false)]
-  expect(resolveActiveMarketSource(communityActive, COMMUNITY_MARKET, {
-    communitySources: [
-      { builtInProviderKey: 'dsh-1024store', enabled: false, endpoint: 'https://deepseek1024.com/api/v2/plugins' },
-      { builtInProviderKey: 'dshfind', enabled: true, endpoint: 'https://api.dshfind.com/market/v1/plugins' },
-    ],
-  })).toEqual({
-    enabled: true,
-    bundle: COMMUNITY_MARKET,
-    marketKey: 'dshfind',
-    desktopActiveUrl: 'https://api.dshfind.com/market/v1/plugins',
-    syncUrl: 'https://api.dshfind.com/market/v1/plugins',
-  })
-
-  const dshMarketActive = [row(COMMUNITY_MARKET, false), row(DSH_MARKET, true)]
-  expect(resolveActiveMarketSource(dshMarketActive, DSH_MARKET, { dshMarketRegion: 'global' })).toEqual({
-    enabled: true,
-    bundle: DSH_MARKET,
-    marketKey: 'dshmarket',
-    desktopActiveUrl: 'https://awesome-dsh-plugin.com/plugins.json',
-    syncUrl: 'https://realguan.github.io/dsh-plugin-market/dsh-index.json',
-    region: 'global',
-  })
-  expect(resolveActiveMarketSource(dshMarketActive, DSH_MARKET, { dshMarketRegion: 'china' })).toEqual({
+it('resolves the dshmarket source for the configured region', () => {
+  expect(resolveActiveMarketSource([row(DSH_MARKET, true)])).toEqual({
     enabled: true,
     bundle: DSH_MARKET,
     marketKey: 'dshmarket',
     desktopActiveUrl: 'https://mirrors.cloud.tencent.com/npm/dsh-plugin-catalog/latest',
-    syncUrl: 'https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json',
+    syncUrl: CHINA_SYNC,
+    region: 'china',
+  })
+  expect(resolveActiveMarketSource([row(DSH_MARKET, true)], { dshMarketRegion: 'global' })).toEqual({
+    enabled: true,
+    bundle: DSH_MARKET,
+    marketKey: 'dshmarket',
+    desktopActiveUrl: 'https://awesome-dsh-plugin.com/plugins.json',
+    syncUrl: GLOBAL_SYNC,
+    region: 'global',
+  })
+  expect(resolveActiveMarketSource([row(DSH_MARKET, false)])).toEqual({
+    enabled: false,
+    bundle: null,
+    marketKey: 'dshmarket',
+    desktopActiveUrl: null,
+    syncUrl: CHINA_SYNC,
     region: 'china',
   })
 })
 
-it('quick configuration enables the official custom plugin market, configures the adapted dshmarket default source first, and preloads all configured sources', async () => {
+it('quick configuration enables the official custom plugin market, configures the dshmarket default source first, and preloads all configured sources', async () => {
   const setBundleEnabled = vi.fn(async () => ({ ok: true as const, value: { application: 'applied' } }))
   const listIndexes = vi.fn(async () => ({
     ok: true as const,
-    value: [{ url: 'https://custom.example.com/index.json' }],
+    value: [{ url: CUSTOM_SYNC }],
   }))
   const setIndexes = vi.fn(async () => ({ ok: true as const, value: undefined }))
   const search = vi.fn(async (url: string) => ({ ok: true as const, value: { url, title: 'Loaded' } }))
-  const runtime = {
-    communitySources: [{ builtInProviderKey: 'dshfind', enabled: true, endpoint: 'https://api.dshfind.com/market/v1/plugins' }],
-  }
-  const resolution = resolveActiveMarketSource(
-    [row(COMMUNITY_MARKET, true), row(DSH_MARKET, false)],
-    COMMUNITY_MARKET,
-    runtime,
-  )
+  const resolution = resolveActiveMarketSource([row(DSH_MARKET, false)])
 
   const result = await importMarketSourcesToOfficial(
     { pluginManager: { setBundleEnabled }, pluginMarket: { listIndexes, setIndexes, search } },
     resolution,
     false,
-    runtime,
   )
 
   expect(setBundleEnabled).toHaveBeenCalledWith(OFFICIAL_MARKET, true)
   expect(setIndexes).toHaveBeenCalledTimes(2)
-  expect(setIndexes).toHaveBeenNthCalledWith(1, ['https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json'])
-  expect(result.syncedUrl).toBe('https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json')
-  expect(result.configuredUrls).toEqual([
-    'https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json',
-    'https://custom.example.com/index.json',
-  ])
-  expect(result.configuredUrls).toEqual(orderedMarketSourceUrls(resolution, ['https://custom.example.com/index.json'], runtime))
+  expect(setIndexes).toHaveBeenNthCalledWith(1, [CHINA_SYNC])
+  expect(result.syncedUrl).toBe(CHINA_SYNC)
+  expect(result.configuredUrls).toEqual([CHINA_SYNC, CUSTOM_SYNC])
+  expect(result.configuredUrls).toEqual(orderedMarketSourceUrls(resolution, [CUSTOM_SYNC]))
   expect(search).toHaveBeenCalledTimes(2)
   for (const url of result.configuredUrls) {
     expect(search).toHaveBeenCalledWith(url, { sort: { kind: 'index' }, offset: 0, limit: 1 })
   }
 })
 
-it('configures and unconfigures a single built-in market and individual sub-source endpoints', async () => {
-  expect(resolveMarketSourceByKey('dshmarket', { dshMarketRegion: 'global' }).syncUrl)
-    .toBe('https://realguan.github.io/dsh-plugin-market/dsh-index.json')
-  expect(resolveMarketSourceByKey('dsh-1024store').syncUrl)
-    .toBe('https://deepseek1024.com/api/v2/plugins')
-
+it('configures and unconfigures the single built-in market and individual sub-source endpoints', async () => {
   const setBundleEnabled = vi.fn(async () => ({ ok: true as const, value: { application: 'applied' } }))
   const listIndexes = vi.fn(async () => ({
     ok: true as const,
-    value: [{ url: 'https://deepseek1024.com/api/v2/plugins' }],
+    value: [{ url: CUSTOM_SYNC }],
   }))
   const setIndexes = vi.fn(async () => ({ ok: true as const, value: undefined }))
   const search = vi.fn(async () => ({ ok: true as const, value: {} }))
@@ -140,63 +106,50 @@ it('configures and unconfigures a single built-in market and individual sub-sour
   const result = await configureSingleMarketToOfficial(
     { pluginManager: { setBundleEnabled }, pluginMarket: { listIndexes, setIndexes, search } },
     'dshmarket',
-    { dshMarketRegion: 'china' },
+    { dshMarketRegion: 'global' },
     true,
   )
 
   expect(setBundleEnabled).not.toHaveBeenCalled()
-  expect(setIndexes).toHaveBeenNthCalledWith(1, ['https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json'])
-  expect(result.syncedUrl).toBe('https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json')
-  expect(result.configuredUrls).toEqual([
-    'https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json',
-    'https://realguan.github.io/dsh-plugin-market/dsh-index.json',
-    'https://deepseek1024.com/api/v2/plugins',
-  ])
+  expect(setIndexes).toHaveBeenNthCalledWith(1, [GLOBAL_SYNC])
+  expect(result.syncedUrl).toBe(GLOBAL_SYNC)
+  expect(result.configuredUrls).toEqual([GLOBAL_SYNC, CHINA_SYNC, CUSTOM_SYNC])
   expect(search).toHaveBeenCalledTimes(3)
 
   listIndexes.mockResolvedValueOnce({
     ok: true as const,
-    value: [
-      { url: 'https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json' },
-      { url: 'https://realguan.github.io/dsh-plugin-market/dsh-index.json' },
-      { url: 'https://deepseek1024.com/api/v2/plugins' },
-    ],
+    value: [{ url: GLOBAL_SYNC }, { url: CHINA_SYNC }, { url: CUSTOM_SYNC }],
   })
   const afterRemove = await removeMarketSourcesFromOfficial(
     { pluginManager: { setBundleEnabled }, pluginMarket: { listIndexes, setIndexes, search } },
     'dshmarket',
   )
-  expect(afterRemove).toEqual(['https://deepseek1024.com/api/v2/plugins'])
+  expect(afterRemove).toEqual([CUSTOM_SYNC])
 
   listIndexes.mockResolvedValueOnce({
     ok: true as const,
-    value: [{ url: 'https://deepseek1024.com/api/v2/plugins' }],
+    value: [{ url: CUSTOM_SYNC }],
   })
+  const endpoint = 'https://another.example.com/index.json'
   const toggledOn = await toggleMarketEndpointInOfficial(
     { pluginManager: { setBundleEnabled }, pluginMarket: { listIndexes, setIndexes, search } },
-    'https://api.dshfind.com/market/manifest.json',
+    endpoint,
     true,
     true,
   )
-  expect(toggledOn.configuredUrls).toEqual([
-    'https://api.dshfind.com/market/manifest.json',
-    'https://deepseek1024.com/api/v2/plugins',
-  ])
+  expect(toggledOn.configuredUrls).toEqual([endpoint, CUSTOM_SYNC])
 
   listIndexes.mockResolvedValueOnce({
     ok: true as const,
-    value: [
-      { url: 'https://api.dshfind.com/market/manifest.json' },
-      { url: 'https://deepseek1024.com/api/v2/plugins' },
-    ],
+    value: [{ url: endpoint }, { url: CUSTOM_SYNC }],
   })
   const toggledOff = await toggleMarketEndpointInOfficial(
     { pluginManager: { setBundleEnabled }, pluginMarket: { listIndexes, setIndexes, search } },
-    'https://api.dshfind.com/market/manifest.json',
+    endpoint,
     false,
     true,
   )
-  expect(toggledOff.configuredUrls).toEqual(['https://deepseek1024.com/api/v2/plugins'])
+  expect(toggledOff.configuredUrls).toEqual([CUSTOM_SYNC])
 })
 
 it('preloads configured index URLs on explicit configuration actions and bounds slow endpoints by timeout', async () => {
@@ -207,14 +160,11 @@ it('preloads configured index URLs on explicit configuration actions and bounds 
       setIndexes: async () => ({ ok: true, value: undefined }),
       search,
     },
-    [
-      'https://deepseek1024.com/api/v2/plugins',
-      'https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json',
-    ],
+    [CHINA_SYNC, GLOBAL_SYNC],
     0,
   )
   expect(search).toHaveBeenCalledTimes(2)
-  expect(search).toHaveBeenCalledWith('https://deepseek1024.com/api/v2/plugins', {
+  expect(search).toHaveBeenCalledWith(CHINA_SYNC, {
     sort: { kind: 'index' },
     offset: 0,
     limit: 1,

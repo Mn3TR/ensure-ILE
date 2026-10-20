@@ -20,8 +20,6 @@ export interface DesktopProfileBootHooks {
   onManagedBundlesChanged?: (state: {
     requestedMarket: DesktopMarketProvider
     effectiveMarket: DesktopMarketProvider
-    requestedAa: boolean
-    effectiveAa: boolean
   }) => void
 }
 
@@ -38,7 +36,6 @@ export function createDesktopProfileBoot(
   }
   syncDesktopManagedProfileBundles(prepared.profile.dir, {
     market: prepared.market.effective,
-    aaEnabled: prepared.aaEnabled,
   })
   const inheritedPath = Object.entries(process.env).find(([key]) => key.toUpperCase() === 'PATH')?.[1]
   const context: ProfileContext = {
@@ -74,7 +71,7 @@ export function createDesktopProfileBoot(
     },
     // The pinned app-boot patch delegates both manager operations and HMR here.
     // CLI reconstruction would drop Desktop shell/platform overrides and bypass
-    // the disabled-bundle, Market-provider and AA admission rules.
+    // the Market-provider admission rules.
     //
     // `profilePatches` is the caller's pending profile patch document, supplied
     // by the config editor while a settings write is still being validated. It
@@ -85,13 +82,12 @@ export function createDesktopProfileBoot(
       let managedChanged = false
       if (profilePatches === undefined) {
         const managed = readDesktopManagedProfileBundles(prepared.profile.dir)
-        if (managed.market !== options.marketSelection.effective || managed.aaEnabled !== options.aaEnabled) {
+        if (managed.market !== options.marketSelection.effective) {
           options.marketSelection = Object.freeze({
             requested: managed.market,
             effective: managed.market,
             legacyDefaulted: false,
           })
-          options.aaEnabled = managed.aaEnabled
           managedChanged = true
         }
       }
@@ -99,7 +95,6 @@ export function createDesktopProfileBoot(
         options.telemetryDisabled ?? '', prepared.homeDir, options.platform, options.profileName,
         options.pluginStatePath, options.marketSelection,
         {
-          aaEnabled: options.aaEnabled,
           lanAddresses: prepared.lanAddresses,
           generationMode: prepared.mode,
           ...(profilePatches === undefined ? {} : { profilePatches }),
@@ -107,20 +102,15 @@ export function createDesktopProfileBoot(
       )
       if (managedChanged) {
         const requestedMarket = options.marketSelection.requested
-        const requestedAa = options.aaEnabled
         options.marketSelection = next.market
-        options.aaEnabled = next.aaEnabled
-        if (next.market.effective !== requestedMarket || next.aaEnabled !== requestedAa) {
+        if (next.market.effective !== requestedMarket) {
           syncDesktopManagedProfileBundles(prepared.profile.dir, {
             market: next.market.effective,
-            aaEnabled: next.aaEnabled,
           })
         }
         hooks?.onManagedBundlesChanged?.({
           requestedMarket,
           effectiveMarket: next.market.effective,
-          requestedAa,
-          effectiveAa: next.aaEnabled,
         })
       }
       return [...next.patches, ...context.overlays]

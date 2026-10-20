@@ -40,19 +40,17 @@ Boundary result: network content enters product state only after Host validation
 ```mermaid
 flowchart TB
   Root[Root Yarn workspace] --> DesktopPkg[dsh-plugin-desktop]
-  Root --> Market[dsh-community-market]
   Root --> Fabric[dsh-community-fabric]
   Root --> Upstream[deepseek-harness submodule]
   DesktopPkg --> Main[Electron bootstrap / Host services]
   DesktopPkg --> Client[Desktop Client face / native shell]
   DesktopPkg --> Packaging[Packaging / release gates]
-  Market --> Catalog[Catalog, install intent, receipt ledger]
   Fabric --> RFC[Interoperability RFC scaffold]
   Upstream --> Official[Official Host / Client / Web carrier]
   Root -. root scripts enter pnpm workspace .-> Upstream
 ```
 
-`dsh-plugin-desktop` owns the desktop product. `dsh-community-market` owns community discovery and user-directed plugin operations. Fabric and Market scaffolds must not claim loadable entry points before their runtimes exist. Upstream retains its independent pnpm workspace.
+`dsh-plugin-desktop` owns the desktop product. The Fabric scaffold must not claim loadable entry points before its runtime exists. Upstream retains its independent pnpm workspace.
 
 ## 3. Process and runtime topology
 
@@ -112,9 +110,6 @@ flowchart TB
   Boot --> Host[Host plugin graph]
   Host --> Public[DesktopRuntime / DesktopProfiles / DesktopPnpm interfaces]
   Public --> Impl[Electron + profile + package implementations]
-  Host --> Market[Community Market Host face]
-  Market --> Consumer[Consumer-owned capability interfaces]
-  Consumer -. structural compatibility .-> Public
   Host --> Carrier[Upstream Web carrier]
   Carrier --> Client[Upstream Client loader]
   Client --> Compat[Compatibility: official layout owns presentation]
@@ -211,10 +206,9 @@ flowchart LR
   Evidence[userData/lifecycle-events/startup.jsonl] -->|LifecycleRecorder| Diagnostics[Diagnostics export]
   Logs[userData/logs] -->|LogFileSink / Cordis exporter| Diagnostics
   Crash[userData/crash-evidence + crashDumps] -->|Crash evidence / Crashpad| Diagnostics
-  Receipts[settings: dsh-community-market.installReceipts] -->|MarketInstallService| Market[Market]
 ```
 
-The SoC boundary separates file recovery from operation ownership. The Desktop WAL records restorable file state, while the Market receipt records which Market operation owns an installation. They correlate through `receiptId` and commit independently.
+The SoC boundary separates file recovery from operation ownership. The Desktop WAL records restorable file state, while plugin operations record their own receipts. They correlate through `receiptId` and commit independently.
 
 ## 8. Plugin composition and extension points
 
@@ -222,7 +216,6 @@ The SoC boundary separates file recovery from operation ownership. The Desktop W
 flowchart TB
   Base[Official Web bundle] --> Patch[cordis.patch.yml]
   Patch --> Shell[desktop-shell]
-  Patch --> Market[community-market]
   Patch --> Terminal[desktop-terminal]
   Patch --> Diagnostics[desktop-diagnostics]
   Patch --> Notifications[desktop-notifications]
@@ -304,6 +297,4 @@ Headless gates prove build, types, logic, Loader behavior, and packaged closure.
 - `dsh-plugin-desktop/src/startup-generation.ts`
 - `dsh-plugin-desktop/src/runtime.ts`
 - `dsh-plugin-desktop/cordis.patch.yml`
-- `dsh-community-market/src/install/service.ts`
-- `dsh-community-market/src/host/routes.ts`
 - `.agents/notes/implemented/architecture/`

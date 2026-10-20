@@ -47,8 +47,6 @@ jobs:
           set -euo pipefail
           node --test scripts/bilingual-docs.test.mjs
           node scripts/verify-bilingual-docs.mjs
-          node --test scripts/market-dependency-direction.test.mjs
-          node scripts/verify-market-dependency-direction.mjs
           if [[ "$EVENT_NAME" == "workflow_dispatch" || -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]]; then
             product=true
           else
@@ -57,8 +55,8 @@ jobs:
           fi
           echo "product=$product" >> "$GITHUB_OUTPUT"
 
-  # Product gate: AA profile smoke is temporarily paused below.
-  # A documentation-only change already passed diff validation in `changes`.
+  # Product gate: a documentation-only change already passed diff validation
+  # in `changes`.
   check:
     needs: changes
     runs-on: ubuntu-latest
@@ -89,24 +87,6 @@ jobs:
           key: yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock', '.yarnrc.yml') }}
       - if: needs.changes.outputs.product == 'true'
         run: yarn install --immutable
-      - name: Temporarily skip AA profile smoke in CI
-        if: needs.changes.outputs.product == 'true'
-        # Remove this step after AA Host service activation is fixed.
-        # Local checks and the standalone verify:aa command remain available.
-        run: |
-          node --input-type=module <<'NODE'
-          import { readFileSync, writeFileSync } from 'node:fs'
-          for (const workspace of ['dsh-plugin-desktop']) {
-            const path = `${workspace}/package.json`
-            const manifest = JSON.parse(readFileSync(path, 'utf8'))
-            const smoke = ' && yarn run verify:aa'
-            if (!manifest.scripts.check.includes(smoke)) throw new Error(`AA check not found in ${workspace}`)
-            // Stable owns the transition-specific source and tests. Its complete
-            // check runs here even though shared variants no longer exist.
-            manifest.scripts.check = manifest.scripts.check.replace(smoke, '')
-            writeFileSync(path, `${JSON.stringify(manifest, null, 2)}\n`)
-          }
-          NODE
       - if: needs.changes.outputs.product == 'true'
         run: yarn check
 

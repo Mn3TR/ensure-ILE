@@ -37,15 +37,15 @@
     # DHDL: a selectable agent preset that replaces the system prompt with the
     # guide document. Rows mounted inside a preset run in the agent scope, which
     # is the only scope where a persona may shadow the deployment persona.
-    - id: hrll-guide-preset
+    - id: guide-preset
       name: '@deepseek-ai/dsh-agent-preset'
       config:
-        id: hrll-guide
-        name: HRL 引导
+        id: guide
+        name: 引导模式
         description: 引导学生用自己的思路把题解出来，不给答案
         order: 40
         plugins:
-          - name: dsh-plugin-hrll
+          - name: dsh-plugin-guide
 
 # A desktop launch has no terminal operator waiting for the Web readiness line.
 - id: web-runtime

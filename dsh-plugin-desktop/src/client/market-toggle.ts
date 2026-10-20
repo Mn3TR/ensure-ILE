@@ -1,12 +1,10 @@
 /** Map the Plugins-page switch and source configuration to official bundle-manager and plugin-market operations. */
 import type { BundleInfo, MarketIndexSummary, RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
 
-export const COMMUNITY_MARKET = 'dsh-community-market'
 export const DSH_MARKET = 'dshmarket'
 export const OFFICIAL_MARKET = '@deepseek-ai/dsh-experimental-plugin-market-bundle'
-export const REMOTE_CONTROL_BUNDLE = '@agents-anywhere/dsh-bridge-next'
-export type MarketName = typeof COMMUNITY_MARKET | typeof DSH_MARKET
-export type BuiltInMarketKey = 'dsh-1024store' | 'dshfind' | 'dshmarket'
+export type MarketName = typeof DSH_MARKET
+export type BuiltInMarketKey = 'dshmarket'
 
 type MarketState = Pick<BundleInfo, 'name' | 'enabled' | 'readOnlyReason' | 'error'>
 
@@ -38,73 +36,6 @@ export interface BuiltInMarketDefinition {
 }
 
 export const BUILT_IN_MARKET_SOURCES: readonly BuiltInMarketDefinition[] = [
-  {
-    key: 'dsh-1024store',
-    bundle: COMMUNITY_MARKET,
-    providerId: 'com.deepseek1024.catalog',
-    title: { zh: 'DSH 1024Store（社区插件市场）', en: 'DSH 1024Store (Community Market)' },
-    description: {
-      zh: '社区插件市场内置源，提供经过策展的插件目录与版本索引。',
-      en: 'Built-in Community Market provider with curated plugin listings and version metadata.',
-    },
-    homepage: 'https://deepseek1024.com',
-    defaultSyncUrl: 'https://deepseek1024.com/api/v2/plugins',
-    sources: [
-      {
-        url: 'https://deepseek1024.com/api/v2/plugins',
-        label: { zh: '1024Store V2 插件目录源', en: '1024Store V2 catalog endpoint' },
-        tags: [
-          { zh: '默认源', en: 'Default' },
-          { zh: '社区市场 V2', en: 'Community V2' },
-        ],
-      },
-      {
-        url: 'https://deepseek1024.com/api/v1/registry',
-        label: { zh: '1024Store V1 注册表源', en: '1024Store V1 registry endpoint' },
-        tags: [
-          { zh: '备用源', en: 'Mirror' },
-          { zh: 'Registry V1', en: 'Registry V1' },
-        ],
-      },
-    ],
-  },
-  {
-    key: 'dshfind',
-    bundle: COMMUNITY_MARKET,
-    providerId: 'com.dshfind.catalog',
-    title: { zh: 'dshfind（社区插件市场）', en: 'dshfind (Community Market)' },
-    description: {
-      zh: '社区插件市场内置源，提供标准市场目录、Manifest 与全量快照源。',
-      en: 'Built-in Community Market provider with standard market catalog, manifest, and full snapshot endpoints.',
-    },
-    homepage: 'https://dshfind.com',
-    defaultSyncUrl: 'https://api.dshfind.com/market/v1/plugins',
-    sources: [
-      {
-        url: 'https://api.dshfind.com/market/v1/plugins',
-        label: { zh: 'dshfind 市场目录源', en: 'dshfind market catalog endpoint' },
-        tags: [
-          { zh: '默认源', en: 'Default' },
-          { zh: 'Market V1', en: 'Market V1' },
-        ],
-      },
-      {
-        url: 'https://api.dshfind.com/market/manifest.json',
-        label: { zh: 'dshfind 市场 Manifest 源', en: 'dshfind market manifest endpoint' },
-        tags: [
-          { zh: 'Manifest 源', en: 'Manifest' },
-        ],
-      },
-      {
-        url: 'https://api.dshfind.com/v1/catalog',
-        label: { zh: 'dshfind 全量快照目录源', en: 'dshfind full catalog snapshot' },
-        tags: [
-          { zh: '快照源', en: 'Snapshot' },
-          { zh: 'Catalog V1', en: 'Catalog V1' },
-        ],
-      },
-    ],
-  },
   {
     key: 'dshmarket',
     bundle: DSH_MARKET,
@@ -148,15 +79,7 @@ export const BUILT_IN_MARKET_SOURCES: readonly BuiltInMarketDefinition[] = [
 export const OFFICIAL_CONFIGURABLE_MARKET_SOURCES: readonly BuiltInMarketDefinition[] =
   BUILT_IN_MARKET_SOURCES.filter(item => item.key === 'dshmarket')
 
-export interface CommunitySourceLike {
-  readonly providerId?: string
-  readonly builtInProviderKey?: string
-  readonly enabled?: boolean
-  readonly endpoint?: string
-}
-
 export interface MarketRuntimeState {
-  readonly communitySources?: readonly CommunitySourceLike[] | undefined
   readonly dshMarketRegion?: 'global' | 'china' | undefined
 }
 
@@ -171,104 +94,45 @@ export interface ActiveMarketResolution {
   readonly region?: 'global' | 'china'
 }
 
+const DSH_MARKET_DESKTOP_ACTIVE_URLS: Readonly<Record<'global' | 'china', string>> = {
+  global: 'https://awesome-dsh-plugin.com/plugins.json',
+  china: 'https://mirrors.cloud.tencent.com/npm/dsh-plugin-catalog/latest',
+}
+
+const DSH_MARKET_SYNC_URLS: Readonly<Record<'global' | 'china', string>> = {
+  global: 'https://realguan.github.io/dsh-plugin-market/dsh-index.json',
+  china: 'https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json',
+}
+
 function editable(row: MarketState): boolean {
   return row.readOnlyReason === undefined && row.error === undefined
 }
 
-/** Disabling both handles older Profiles with two selected markets; enabling prefers the last choice. */
-export function marketToggleTargets(rows: readonly MarketState[], preferred: MarketName, enable: boolean): MarketName[] {
-  const markets = rows.filter((row): row is MarketState & { name: MarketName } =>
-    row.name === COMMUNITY_MARKET || row.name === DSH_MARKET)
+/** Enabling selects the dsh-market bundle; disabling clears every editable selected market row. */
+export function marketToggleTargets(rows: readonly MarketState[], enable: boolean): MarketName[] {
+  const markets = rows.filter((row): row is MarketState & { name: MarketName } => row.name === DSH_MARKET)
   if (!enable) {
     const active = markets.filter(row => row.enabled)
     return active.every(editable) ? active.map(row => row.name) : []
   }
-  const preferredRow = markets.find(row => row.name === preferred && editable(row))
-  const fallback = markets.find(row => editable(row))
-  return preferredRow ? [preferredRow.name] : fallback ? [fallback.name] : []
+  return markets.filter(row => editable(row)).map(row => row.name)
 }
 
-/** Resolve which of the 3 built-in markets and source endpoints is currently active on Desktop. */
+/** Resolve the dsh-market plugin state and the source endpoints it currently uses. */
 export function resolveActiveMarketSource(
   rows: readonly MarketState[],
-  preferred: MarketName = COMMUNITY_MARKET,
   runtime: MarketRuntimeState = {},
 ): ActiveMarketResolution {
-  const community = rows.find(row => row.name === COMMUNITY_MARKET)
-  const dshMarket = rows.find(row => row.name === DSH_MARKET)
-  const enabledBundle: MarketName | null = dshMarket?.enabled && !community?.enabled
-    ? DSH_MARKET
-    : community?.enabled
-      ? COMMUNITY_MARKET
-      : dshMarket?.enabled
-        ? DSH_MARKET
-        : null
-  const targetBundle = enabledBundle ?? preferred
-  if (targetBundle === DSH_MARKET) {
-    const region = runtime.dshMarketRegion ?? 'china'
-    const desktopActiveUrl = region === 'global'
-      ? 'https://awesome-dsh-plugin.com/plugins.json'
-      : 'https://mirrors.cloud.tencent.com/npm/dsh-plugin-catalog/latest'
-    const syncUrl = region === 'global'
-      ? 'https://realguan.github.io/dsh-plugin-market/dsh-index.json'
-      : 'https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json'
-    return {
-      enabled: enabledBundle !== null,
-      bundle: enabledBundle,
-      marketKey: 'dshmarket',
-      desktopActiveUrl: enabledBundle ? desktopActiveUrl : null,
-      syncUrl,
-      region,
-    }
-  }
-  const enabledCommunity = runtime.communitySources?.find(source => source.enabled)
-  const isDshfind = enabledCommunity?.builtInProviderKey === 'dshfind'
-    || enabledCommunity?.providerId === 'com.dshfind.catalog'
-  const marketKey: BuiltInMarketKey = isDshfind ? 'dshfind' : 'dsh-1024store'
-  const defaultUrl = isDshfind
-    ? 'https://api.dshfind.com/market/v1/plugins'
-    : 'https://deepseek1024.com/api/v2/plugins'
-  const endpoint = enabledCommunity?.endpoint?.trim()
-  const activeUrl = endpoint && URL.canParse(endpoint) ? endpoint : defaultUrl
+  const enabledBundle: MarketName | null =
+    rows.find(row => row.name === DSH_MARKET)?.enabled === true ? DSH_MARKET : null
+  const region = runtime.dshMarketRegion ?? 'china'
   return {
     enabled: enabledBundle !== null,
     bundle: enabledBundle,
-    marketKey,
-    desktopActiveUrl: enabledBundle ? activeUrl : null,
-    syncUrl: activeUrl,
-  }
-}
-
-/** Resolve the primary sync URL and endpoints for a specific built-in market key. */
-export function resolveMarketSourceByKey(
-  marketKey: BuiltInMarketKey,
-  runtime: MarketRuntimeState = {},
-): Pick<ActiveMarketResolution, 'marketKey' | 'syncUrl' | 'desktopActiveUrl' | 'region'> {
-  if (marketKey === 'dshmarket') {
-    const region = runtime.dshMarketRegion ?? 'china'
-    return {
-      marketKey: 'dshmarket',
-      desktopActiveUrl: region === 'global'
-        ? 'https://awesome-dsh-plugin.com/plugins.json'
-        : 'https://mirrors.cloud.tencent.com/npm/dsh-plugin-catalog/latest',
-      syncUrl: region === 'global'
-        ? 'https://realguan.github.io/dsh-plugin-market/dsh-index.json'
-        : 'https://cdn.jsdelivr.net/gh/realguan/dsh-plugin-market@dist/dsh-index.json',
-      region,
-    }
-  }
-  const providerId = marketKey === 'dshfind' ? 'com.dshfind.catalog' : 'com.deepseek1024.catalog'
-  const matched = runtime.communitySources?.find(source =>
-    source.builtInProviderKey === marketKey || source.providerId === providerId)
-  const defaultUrl = marketKey === 'dshfind'
-    ? 'https://api.dshfind.com/market/v1/plugins'
-    : 'https://deepseek1024.com/api/v2/plugins'
-  const endpoint = matched?.endpoint?.trim()
-  const url = endpoint && URL.canParse(endpoint) ? endpoint : defaultUrl
-  return {
-    marketKey,
-    desktopActiveUrl: url,
-    syncUrl: url,
+    marketKey: 'dshmarket',
+    desktopActiveUrl: enabledBundle ? DSH_MARKET_DESKTOP_ACTIVE_URLS[region] : null,
+    syncUrl: DSH_MARKET_SYNC_URLS[region],
+    region,
   }
 }
 
@@ -293,12 +157,9 @@ function deduplicateUrls(candidates: readonly string[]): string[] {
 export function orderedMarketSourceUrls(
   resolution: Pick<ActiveMarketResolution, 'marketKey' | 'syncUrl' | 'desktopActiveUrl'>,
   existingUrls: readonly string[] = [],
-  runtime: MarketRuntimeState = {},
 ): string[] {
   const defaultUrls = OFFICIAL_CONFIGURABLE_MARKET_SOURCES.map(item =>
-    item.key === resolution.marketKey
-      ? resolution.syncUrl
-      : resolveMarketSourceByKey(item.key, runtime).syncUrl)
+    item.key === resolution.marketKey ? resolution.syncUrl : item.defaultSyncUrl)
   return deduplicateUrls([
     ...defaultUrls,
     ...existingUrls,
@@ -392,22 +253,18 @@ async function applyOfficialIndexes(
 }
 
 /**
- * Quick-configure the official-configurable built-in plugin market (`dshmarket`) default source into the official
+ * Quick-configure the built-in plugin market (`dshmarket`) default source into the official
  * custom plugin market bundle (`@deepseek-ai/dsh-experimental-plugin-market-bundle`), synchronizing it as the selected index.
  */
 export async function importMarketSourcesToOfficial(
   remote: OfficialMarketImportClient,
   resolution: Pick<ActiveMarketResolution, 'marketKey' | 'syncUrl' | 'desktopActiveUrl'>,
   officialBundleEnabled: boolean,
-  runtime: MarketRuntimeState = {},
 ): Promise<OfficialMarketImportResult> {
   const existingResult = await remote.pluginMarket.listIndexes()
   const existingUrls = existingResult.ok ? existingResult.value.map(item => item.url) : []
-  const configuredUrls = orderedMarketSourceUrls(resolution, existingUrls, runtime)
-  const syncedUrl = resolution.marketKey === 'dshmarket'
-    ? resolution.syncUrl
-    : resolveMarketSourceByKey('dshmarket', runtime).syncUrl
-  return await applyOfficialIndexes(remote, syncedUrl, configuredUrls, existingUrls, officialBundleEnabled)
+  const configuredUrls = orderedMarketSourceUrls(resolution, existingUrls)
+  return await applyOfficialIndexes(remote, resolution.syncUrl, configuredUrls, existingUrls, officialBundleEnabled)
 }
 
 /**
@@ -420,7 +277,7 @@ export async function configureSingleMarketToOfficial(
   runtime: MarketRuntimeState,
   officialBundleEnabled: boolean,
 ): Promise<OfficialMarketImportResult> {
-  const target = resolveMarketSourceByKey(marketKey, runtime)
+  const target = resolveActiveMarketSource([], runtime)
   const marketDef = BUILT_IN_MARKET_SOURCES.find(item => item.key === marketKey)
   const marketUrls = marketDef ? marketDef.sources.map(source => source.url) : []
   const existingResult = await remote.pluginMarket.listIndexes()

@@ -82,14 +82,14 @@ const dshResolution = (name: string): unknown =>
   workspaceManifest.resolutions?.[`${name}@npm:${runtimeVersion}`]
 
 describe('published package surface', () => {
-  it('runs the desktop and community market typechecks from the root command', () => {
+  it('runs the desktop typecheck from the root command', () => {
     expect(workspaceManifest.scripts?.typecheck)
-      .toBe('yarn workspace dsh-plugin-desktop typecheck && yarn workspace dsh-community-market typecheck')
+      .toBe('yarn workspace dsh-plugin-desktop typecheck')
   })
 
-  it('runs the desktop and community market tests from the root command', () => {
+  it('runs the desktop tests from the root command', () => {
     expect(workspaceManifest.scripts?.test)
-      .toBe('yarn workspace dsh-plugin-desktop test && yarn workspace dsh-community-market test')
+      .toBe('yarn workspace dsh-plugin-desktop test')
   })
 
   it('registers both npm launcher names', () => {
@@ -186,7 +186,6 @@ describe('published package surface', () => {
       ],
     })
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop')
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).not.toContain('name: dsh-community-market')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/terminal')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/pnpm')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/profiles')
@@ -195,9 +194,8 @@ describe('published package surface', () => {
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/updates')
   })
 
-  it('pins both selectable Market providers in the published runtime', () => {
+  it('pins the selectable Market provider in the published runtime', () => {
     expect(manifest.dependencies).toMatchObject({
-      'dsh-community-market': '0.1.0-dev.0',
       dshmarket: expect.stringMatching(/^\d+\.\d+\.\d+/),
     })
     expect(manifest.optionalDependencies ?? {}).not.toHaveProperty('dshmarket')
@@ -683,10 +681,9 @@ describe('published package surface', () => {
     const captureNotifications = settingsBridge.indexOf('namespace !== DESKTOP_NOTIFICATIONS_SETTINGS_ENTRY_ID', captureDesktop)
     const captureFailure = settingsBridge.indexOf('failed to capture active Profile settings', captureNotifications)
 
-    const aaController = main.indexOf('selectAa: async enabled => {')
-    const aaWrite = main.slice(aaController, main.indexOf('readWeb:', aaController))
-    expect(aaWrite).toContain('desktopProfilePreferencesFromSettings(')
-    expect(aaWrite).not.toContain('...current')
+    const marketSelection = main.slice(marketController, main.indexOf('readWeb:', marketController))
+    expect(marketSelection).toContain('desktopProfilePreferencesFromSettings(')
+    expect(marketSelection).not.toContain('...current')
     expect(projection).toBeGreaterThanOrEqual(0)
     expect(legacyPresetMigration).toBeGreaterThan(firstPrepare)
     expect(legacyPresetMigration).toBeLessThan(missingState)
@@ -921,7 +918,6 @@ describe('published package surface', () => {
     expect(manifest.scripts?.['dist:mac-smoke']).toBe('node scripts/package-mac.ts')
     expect(manifest.scripts?.['dist:win']).toBe('node scripts/package-win.ts')
     expect(manifest.scripts?.['dist:win-portable']).toBe('node scripts/package-win-portable.ts')
-    expect(manifest.scripts?.['check:win-package:platform']).toContain('yarn workspace dsh-community-market build')
     expect(manifest.scripts?.['check:win-package:platform']).toContain('yarn run build')
     expect(manifest.scripts?.['check:win-package']).toBe('yarn run check:win-package:platform && yarn run typecheck')
     expect(manifest.scripts?.['check:win-package:platform']).not.toContain('typecheck')
@@ -934,7 +930,6 @@ describe('published package surface', () => {
     expect(manifest.scripts?.['check:win-package:platform']).toContain('tests/windows-volume-diagnostics.spec.ts')
     expect(manifest.scripts?.['check:win-package:platform']).not.toContain('verify:win-minimal-pty')
     expect(manifest.scripts?.['check:win-package:platform']).toContain('yarn run verify:closure')
-    expect(manifest.scripts?.['check:mac-package:platform']).toContain('yarn workspace dsh-community-market build')
     expect(manifest.scripts?.['check:mac-package:platform']).toContain('yarn run build')
     expect(manifest.scripts?.['check:mac-package']).toBe('yarn run check:mac-package:platform && yarn run typecheck')
     expect(manifest.scripts?.['check:mac-package:platform']).not.toContain('typecheck')
@@ -947,13 +942,13 @@ describe('published package surface', () => {
     expect(manifest.scripts?.['verify:cli']).toBe('node scripts/verify-cli-runtime.mjs')
     expect(manifest.scripts?.check).toContain('yarn run verify:cli')
     expect(workspaceManifest.scripts?.['dist:mac'])
-      .toBe('yarn market:prepare && yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac')
+      .toBe('yarn market:prepare && yarn workspace dsh-plugin-desktop dist:mac')
     expect(workspaceManifest.scripts?.['dist:mac-smoke'])
-      .toBe('yarn market:prepare && yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac-smoke')
+      .toBe('yarn market:prepare && yarn workspace dsh-plugin-desktop dist:mac-smoke')
     expect(workspaceManifest.scripts?.['dist:win'])
-      .toBe('yarn market:prepare && yarn aa:prepare-release && yarn aa:prepare-release --verify-release && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win')
+      .toBe('yarn market:prepare && yarn workspace dsh-plugin-desktop dist:win')
     expect(workspaceManifest.scripts?.['dist:win-portable'])
-      .toBe('yarn market:prepare && yarn aa:prepare-release && yarn aa:prepare-release --verify-release && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win-portable')
+      .toBe('yarn market:prepare && yarn workspace dsh-plugin-desktop dist:win-portable')
     expect(manifest.build?.afterPack).toBe('./scripts/verify-packaged-runtime.ts')
     expect(manifest.build?.afterAllArtifactBuild).toBe('./scripts/verify-electron-fuses.ts')
     expect(manifest.build?.mac).toEqual(expect.objectContaining({
@@ -1037,7 +1032,7 @@ describe('published package surface', () => {
       'docs/architecture.md',
       '.agents/notes/implemented/architecture/decision.md',
       '.agents/notes/implemented/architecture/decision.i18n.yaml',
-      'dsh-community-market/docs/schema.json',
+      'dsh-community-fabric/docs/rfc.md',
       '.github/ISSUE_TEMPLATE/feature_request.yml',
     ])).toBe('false')
     expect(classify(['README.md', 'dsh-plugin-desktop/src/index.ts'])).toBe('true')
@@ -1486,7 +1481,7 @@ describe('recovery bundle selection stays out of profile composition', () => {
     expect(profile).not.toContain('readDesktopRecoveryBundleInventory')
   })
 
-  it('keeps the recovery controller off the community-market disable state writers', () => {
+  it('keeps the recovery controller off the disable state writers', () => {
     const controller = readFileSync(new URL('src/startup-recovery-controller.ts', packageRoot), 'utf8')
     expect(controller).not.toMatch(
       /readDesktopDisabledBundles|disableDesktopProfileBundle|enableDesktopProfileBundle/u,

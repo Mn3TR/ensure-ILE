@@ -27,6 +27,47 @@
         ],
         "createdAt": 1792427596318,
         "updatedAt": 1792427596318
+      },
+      "09d8f398-948a-4a86-ac00-e9b384d162ac": {
+        "namespace": "project",
+        "status": "approved",
+        "injected": false,
+        "source": "agent",
+        "content": "DHDL 的开发组织名定为 **EnSure Lab**，中文名「因需」。是李（用户）自己起的：EnSure 双关 ensure（保证）与「因需」；他给的解释是「需要原因」——因=原因、需=需要，即每一步都要有理由，学生答完要能说清为什么。不配 tagline。包名继续用 dsh-plugin- 前缀（他明确要求保留前缀，只做分拆）。",
+        "keywords": [
+          "ensure lab",
+          "因需",
+          "组织名",
+          "org name",
+          "dhdl",
+          "命名",
+          "需要原因",
+          "ensure"
+        ],
+        "createdAt": 1792513274087,
+        "updatedAt": 1792513274087
+      },
+      "76cde169-040f-4645-8da1-b185d7989482": {
+        "namespace": "project",
+        "status": "approved",
+        "injected": false,
+        "source": "agent",
+        "content": "DHDL 的插件按「模式」拆包，三个模式互相独立、各自一个包和一个预设（不用 @ensurelab scope，名字保持干净的 dsh-plugin-*）：\n- `dsh-plugin-guide`（guide 模式，= 现在 `dsh-plugin-hrll` 改名，等子代理完成后做）：学生还没做出来，引导他一步一步做出来；不批改、不打分。\n- `dsh-plugin-hrl`（HRL 模式）：学生已有答案，帮他把答案优化；评价/对比/改，和 guide 对「评价」的态度相反。目前只有占位 README（`dsh-plugin-hrl/README.md`），没有 package.json，未登记 workspace。\n- `dsh-plugin-work`（work 模式，以后）：学生独立做题交答案和思路，判不过再转引导。\n预设 id 预定：guide / hrl / work；Profiles 默认 guide。旧 id `hrll-guide` 会随改名弃用，旧测试会话清 .dhdl 即可。",
+        "keywords": [
+          "dhdl",
+          "插件拆分",
+          "guide模式",
+          "hrl模式",
+          "work模式",
+          "dsh-plugin-guide",
+          "dsh-plugin-hrl",
+          "dsh-plugin-work",
+          "preset",
+          "预设",
+          "模式"
+        ],
+        "createdAt": 1792513574991,
+        "updatedAt": 1792513574991
       }
     }
   }

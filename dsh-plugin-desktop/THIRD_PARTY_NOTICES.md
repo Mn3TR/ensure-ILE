@@ -5,7 +5,6 @@ the package names, versions, and licenses for transparency.
 | Package | Version | License |
 | --- | --- | --- |
 | @agentclientprotocol/sdk | 1.4.0 | Apache-2.0 |
-| @agents-anywhere/dsh-bridge-next | 2.1.0-desktop.c58d98da25a23.r2e406d2a | MIT |
 | @anthropic-ai/sdk | 0.129.0 | MIT |
 | @aws-sdk/client-bedrock-runtime | 3.1127.0 | Apache-2.0 |
 | @aws-sdk/core | 3.978.1 | Apache-2.0 |
@@ -457,7 +456,6 @@ the package names, versions, and licenses for transparency.
 | dfa | 1.2.0 | MIT |
 | diff | 9.0.0 | BSD-3-Clause |
 | dijkstrajs | 1.0.3 | MIT |
-| dsh-community-market | 0.1.0-dev.0 | MIT |
 | dshmarket | 1.66.34 | MIT |
 | ecdsa-sig-formatter | 1.0.11 | Apache-2.0 |
 | ee-first | 1.1.1 | MIT |

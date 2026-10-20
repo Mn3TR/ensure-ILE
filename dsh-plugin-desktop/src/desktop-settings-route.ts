@@ -140,7 +140,7 @@ function parseProfileRequest(value: unknown): DesktopProfileCreateRequest | unde
 }
 
 function isMarketProvider(value: unknown): value is DesktopMarketProvider {
-  return value === 'disabled' || value === 'community-market' || value === 'dsh-market'
+  return value === 'disabled' || value === 'dsh-market'
 }
 
 function parseMarketRequest(value: unknown): DesktopMarketSelectRequest | undefined {
@@ -316,37 +316,6 @@ export async function handleDesktopMarketSelectRequest(
   } catch (cause) {
     reportError('select Market provider', cause)
     finishJson(res, 500, error('Market selection could not be saved'))
-  }
-}
-
-/** Save the AA opt-in before scheduling its next Host generation. */
-export async function handleDesktopAaSelectRequest(
-  req: IncomingMessage,
-  res: ServerResponse,
-  expectedOrigin: string,
-  controller: DesktopSettingsController,
-  reportError: (operation: string, cause: unknown) => void = () => {},
-): Promise<void> {
-  if (req.method !== 'POST') return finishJson(res, 405, error('method not allowed'), 'POST')
-  if (!isSameOriginLoopbackRequest(req, expectedOrigin, true)) {
-    return finishJson(res, 403, error('forbidden'))
-  }
-  const value = await parsePostBody(req, res)
-  if (value === INVALID_BODY) return
-  const request = isExactRecord(value, 'enabled') && typeof value.enabled === 'boolean' ? { enabled: value.enabled } : undefined
-  if (request === undefined) return finishJson(res, 400, error('invalid AA selection request'))
-  try {
-    const operation = await controller.selectAa(request.enabled)
-    finishPostResponse(
-      res,
-      operation.response.restartRequired ? 202 : 200,
-      operation,
-      'select AA plugin',
-      reportError,
-    )
-  } catch (cause) {
-    reportError('select AA plugin', cause)
-    finishJson(res, 500, error('AA selection could not be saved'))
   }
 }
 

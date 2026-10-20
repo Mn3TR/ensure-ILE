@@ -1,10 +1,7 @@
 /** Fail-loud verification of the runtime entries sealed into Electron's app.asar. */
 
 import { spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import {
-  accessSync,
-  constants,
   existsSync,
   lstatSync,
   mkdtempSync,
@@ -16,7 +13,7 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join, parse } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { extractFile, getRawHeader } from '@electron/asar'
+import { getRawHeader } from '@electron/asar'
 import {
   FORBIDDEN_MACOS_UNIVERSAL_ENTRIES,
   MACOS_UNIVERSAL_NATIVE_ENTRIES,
@@ -730,7 +727,7 @@ export function verifySelectiveUnpackedRuntime(
   const unexpectedPackageRoots = [...new Set(normalizedFiles.flatMap((file) => {
     const root = unpackedPackageRoot(file.path)
     return root === undefined || allowedSmartUnpackPackageRoot(root)
-      || file.path.startsWith('node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/') ? [] : [root]
+      ? [] : [root]
   }))].sort()
   if (unexpectedPackageRoots.length > 0) {
     throw new Error(
@@ -853,34 +850,6 @@ export function reportUnpackedRuntime(summary: UnpackedRuntimeSummary): void {
   process.stdout.write(`dsh-plugin-desktop: packaged runtime inventory: ${formatUnpackedRuntimeSummary(summary)}\n`)
 }
 
-/** Verify the AA version and built entry sealed into the actual installation payload. */
-export function verifyPackagedAgentsAnywhere(
-  context: PackagedRuntimeContext,
-  readInstalled: (path: string) => Buffer = readFileSync,
-  readPackaged: (path: string) => Buffer = path => usesAsarLayout(context)
-    ? extractFile(resolvePackagedAsarPath(context), path)
-    : readFileSync(join(resolvePackagedApplicationRoot(context), path)),
-): void {
-  if (context.electronPlatformName === 'darwin') {
-    const root = usesAsarLayout(context) ? resolvePackagedUnpackedRoot(context) : resolvePackagedApplicationRoot(context)
-    for (const entry of MACOS_UNIVERSAL_NATIVE_ENTRIES.filter(entry => entry.path.endsWith('/bin/uv'))) {
-      accessSync(join(root, entry.path), constants.X_OK)
-    }
-  }
-  const packagePath = 'node_modules/@agents-anywhere/dsh-bridge-next'
-  const desktopRoot = context.packager.projectDir ?? DESKTOP_PACKAGE_ROOT
-  const expected = JSON.parse(readInstalled(join(desktopRoot, packagePath, 'package.json')).toString()) as { version: string }
-  const actual = JSON.parse(readPackaged(`${packagePath}/package.json`).toString()) as { version: string }
-  if (expected.version !== actual.version) {
-    throw new Error(`Packaged AA version mismatch: expected ${expected.version}, received ${actual.version}`)
-  }
-  const digest = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex')
-  if (digest(readInstalled(join(desktopRoot, packagePath, 'lib/index.js')))
-    !== digest(readPackaged(`${packagePath}/lib/index.js`))) {
-    throw new Error('Packaged AA entry differs from the prepared release dependency')
-  }
-}
-
 /**
  * Check the interpreter payloads Electron Builder copied beside the application as extra resources:
  * every CPU this platform ships declares the platform, CPU and product version with Node, pnpm and
@@ -907,11 +876,9 @@ export async function afterPack(
   context: PackagedRuntimeContext,
   verify: typeof verifyPackagedRuntime = verifyPackagedRuntime,
   report: (summary: UnpackedRuntimeSummary) => void = reportUnpackedRuntime,
-  verifyAa: typeof verifyPackagedAgentsAnywhere = verifyPackagedAgentsAnywhere,
   verifyRuntime: typeof verifyPackagedPrimaryRuntime = verifyPackagedPrimaryRuntime,
 ): Promise<void> {
   const summary = verify(context)
-  verifyAa(context)
   verifyRuntime(context)
   report(summary)
 }

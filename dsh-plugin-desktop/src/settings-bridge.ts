@@ -526,7 +526,6 @@ export function observeDesktopPreferenceSettings(
       desktop,
       notifications,
       current.market,
-      current.aaEnabled === true,
     ))
     void write.catch((cause: unknown) => {
       ctx.logger.error(

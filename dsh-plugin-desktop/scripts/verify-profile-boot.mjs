@@ -1,9 +1,7 @@
 /** Headless smoke for the complete published DSH Web profile and renderer manifest. */
 
-import { createRequire, syncBuiltinESMExports } from 'node:module'
-import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import os, { tmpdir, userInfo } from 'node:os'
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -62,14 +60,6 @@ const LAN_HTTPS = Object.freeze({
   async stop() { return LAN_HTTPS_SNAPSHOT },
 })
 const home = mkdtempSync(join(tmpdir(), 'dsh-desktop-profile-'))
-// AA 2.0.3+ publishes its per-user bridge endpoint under `userInfo().homedir`
-// rather than `DSH_HOME`. Redirect `os.userInfo` and `os.homedir` to the
-// isolated smoke directory so `verify:aa` never touches the operator's real
-// `~/.agents-anywhere/` or collides with a running Desktop instance.
-const realUserInfo = os.userInfo.bind(os)
-os.userInfo = options => ({ ...realUserInfo(options), homedir: home })
-os.homedir = () => home
-syncBuiltinESMExports()
 let ctx
 let releasePackageResolver
 let pnpmRuntime
@@ -99,41 +89,6 @@ try {
     prepareDesktopProfile('1', home, 'win32').profile.patchPath,
     JSON.stringify([DESKTOP_SHELL_PATCH_ENTRY]),
   )
-  const aaRequested = process.env.DSH_VERIFY_AA === '1'
-  const brokenAa = process.env.DSH_VERIFY_AA_BROKEN === '1'
-  // A shared AA directory may already contain settings written by a newer channel.
-  const aaSettings = {
-    uvPath: '', uvPypiIndexUrl: '', uvPythonInstallMirror: '', syncIntervalSeconds: 37,
-  }
-  if (aaRequested && !brokenAa) {
-    // Older releases left an installation projection above the active Profile.
-    // Its lexically larger build hash must not override the current AA artifact,
-    // including during rc.2's compatibility preflight before Loader starts.
-    const aaPackage = '@agents-anywhere/dsh-bridge-next'
-    const installedManifest = createRequire(import.meta.url).resolve(`${aaPackage}/package.json`)
-    const stalePackage = join(home, 'profiles', 'node_modules', aaPackage)
-    mkdirSync(stalePackage, { recursive: true })
-    const staleManifest = JSON.parse(readFileSync(installedManifest, 'utf8'))
-    staleManifest.version = '0.1.0-dev.0.desktop.ca022d9286dd0.rc4b2a1d2'
-    staleManifest.peerDependencies['@deepseek-ai/dsh-session'] = '0.1.5-rc.2'
-    writeFileSync(join(stalePackage, 'package.json'), JSON.stringify(staleManifest))
-    cpSync(new URL('./cordis.patch.yml', pathToFileURL(installedManifest)), join(stalePackage, 'cordis.patch.yml'))
-    mkdirSync(join(stalePackage, 'lib', 'bundled-connector'), { recursive: true })
-    writeFileSync(join(stalePackage, 'lib', 'bundled-connector', 'pyproject.toml'), '')
-    mkdirSync(join(home, 'aa-smoke-state'))
-    writeFileSync(join(home, 'aa-smoke-state', 'connector-settings.json'), JSON.stringify(aaSettings))
-  }
-  if (brokenAa) {
-    const initial = prepareDesktopProfile('1', home, 'win32')
-    const brokenPackage = join(initial.profile.dir, 'node_modules', '@agents-anywhere', 'dsh-bridge-next')
-    mkdirSync(brokenPackage, { recursive: true })
-    writeFileSync(join(brokenPackage, 'package.json'), JSON.stringify({
-      name: '@agents-anywhere/dsh-bridge-next', version: '99.0.0',
-      dsh: { bundle: { patch: './missing.patch.yml' } },
-    }))
-  }
-  const prepared = prepareDesktopProfile('1', home, 'win32', undefined, undefined, undefined, { aaEnabled: aaRequested })
-  if (brokenAa && (!prepared.aaFailure || prepared.aaEnabled)) throw new Error('Broken AA bundle did not fail closed')
   const hostServicePluginDir = join(
     prepared.profile.dir,
     'node_modules',
@@ -149,10 +104,6 @@ try {
     { insert: [{ id: 'desktop-host-services-smoke-plugin', name: HOST_SERVICE_PLUGIN_NAME }] },
     // The smoke's explicit Profile home must also own account credentials.
     { id: 'credentials', config: { dshHome: home } },
-    // Isolate the bridge from the operator's real AA account on every reload.
-    ...(prepared.aaEnabled ? [{ id: 'agents-anywhere-bridge-next', config: {
-      dshHome: home, stateRoot: join(home, 'aa-smoke-state'), uvPath: 'uv',
-    } }] : []),
   ]
   const patches = [...prepared.patches, ...prepared.overlays]
   const packageRoot = new URL('../', import.meta.url)
@@ -308,7 +259,7 @@ try {
   // directly. Both generations must preserve the Desktop layers and fixture.
   const reloadProbePath = join(home, 'reload-probe.mjs')
   writeFileSync(reloadProbePath, "export function apply(ctx, config) { ctx.provide('desktopReloadProbe', config.value) }\n")
-  for (const value of aaRequested ? [1] : [1, 2]) {
+  for (const value of [1, 2]) {
     writeFileSync(prepared.profile.patchPath, JSON.stringify([DESKTOP_SHELL_PATCH_ENTRY, { insert: [{
       id: 'desktop-reload-probe', name: pathToFileURL(reloadProbePath).href, config: { value },
     }] }]))
@@ -433,37 +384,6 @@ try {
   }
   const graph = JSON.parse(bootMatch[1])
   const ids = new Set(graph.entries.map(entry => entry.id))
-  const aaEnabled = aaRequested && !brokenAa
-  if (ids.has('@agents-anywhere/dsh-bridge-next') !== aaEnabled) throw new Error('AA client graph does not match explicit selection')
-  if (aaEnabled && (!ctx.get('agentsAnywhereRuntime') || !ctx.get('agentsAnywhereOnboarding'))) {
-    throw new Error('AA Host services did not activate in the actual Desktop profile')
-  }
-  if (aaEnabled) {
-    // AA 2.0.3 publishes one fixed per-user rendezvous that DSH_HOME does not
-    // move, so the isolated Profile home is not where the Connector looks.
-    const endpoint = join(userInfo().homedir, '.agents-anywhere', 'dsh-bridge', 'endpoint.json')
-    const runtimeStatus = ctx.get('agentsAnywhereRuntime').status()
-    if (runtimeStatus.state !== 'ready') {
-      throw new Error(`AA local runtime is ${String(runtimeStatus.state)}: ${String(runtimeStatus.message)}`)
-    }
-    if (!existsSync(endpoint)) throw new Error('AA did not publish its per-user bridge endpoint')
-    if (JSON.parse(readFileSync(endpoint, 'utf8')).pid !== process.pid) {
-      throw new Error('AA bridge endpoint belongs to another process; quit any running Desktop with AA enabled')
-    }
-    const snapshot = await ctx.get('agentsAnywhereOnboarding').inspect()
-    if (snapshot.account) throw new Error('A fresh Profile inherited an AA account')
-    for (const [key, value] of Object.entries(aaSettings)) {
-      if (snapshot.connector.settings[key] !== value) {
-        throw new Error(`AA did not preserve the shared connector setting ${key}`)
-      }
-    }
-    const uvSuffix = join('node_modules', '@dataiku', `uv-${process.platform}-${process.arch}`, 'bin', process.platform === 'win32' ? 'uv.exe' : 'uv')
-    if (!snapshot.connector.resolvedUvPath?.endsWith(uvSuffix)) {
-      throw new Error('AA must resolve bundled uv instead of falling back to the operator PATH')
-    }
-    const uvVersion = execFileSync(snapshot.connector.resolvedUvPath, ['--version'], { encoding: 'utf8', timeout: 10_000 })
-    if (!/^uv \d+\./u.test(uvVersion)) throw new Error('Bundled AA uv did not return a version')
-  }
   for (const id of [
     'dsh-plugin-desktop',
     '@deepseek-ai/dsh-client-file-upload',

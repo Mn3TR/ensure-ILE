@@ -126,13 +126,9 @@ DSH Desktop 是可组合的插件平台。下列传输由您选择的服务、�
 
 默认组合还提供 DeepSeek `web_search`。当您主动使用该工具时，它会向配置的 DeepSeek Messages 端点发送 API Key、原始搜索词（嵌入固定提示中）、模型、token/使用次数限制和标准请求元数据；网页 `fetch` 工具默认关闭。
 
-### 6.2 Community Market 与软件包服务
+### 6.2 插件市场与软件包服务
 
-Community Market 默认不需要选中远程来源。选择并使用来源后，Host 会向该来源发起请求。当前内置的可选来源包括：
-
-- DSH 1024Store：`deepseek1024.com`；
-- dshfind：`api.dshfind.com`；
-- 您自行配置并确认的标准目录来源。
+内置的 `dshmarket` 插件市场默认关闭。启用后，Host 会按所选区域从 `cdn.jsdelivr.net`（国内 CDN）或 `realguan.github.io`（GitHub Pages）获取其索引源。您也可以改为启用官方插件市场并自行配置标准目录来源。
 
 这些来源会看到 IP 地址、时间、固定的 Market User-Agent 和请求的目录资源。依据所选来源支持的能力，请求还可能包含搜索关键词、分类、排序、语言、分页或游标。插件图片可能由 Desktop Host 代为从目录来源、GitHub 或其允许的图片主机获取，因此接收方可能推断您正在浏览的插件或发布者。
 

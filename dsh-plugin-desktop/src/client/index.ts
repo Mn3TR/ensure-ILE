@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { registerDesktopOnboarding } from './onboarding.tsx'
-import { PluginControls, REMOTE_CONTROL_BUNDLE, registerPluginControls } from './plugin-controls.tsx'
+import { PluginControls, registerPluginControls } from './plugin-controls.tsx'
 import { installPluginControlsStyles } from './plugin-controls-styles.ts'
 import { createElement } from 'react'
 import { SetupWizardApp, type EmbeddedSetupWizard } from '../native-ui/setup-wizard/App.tsx'
@@ -48,7 +48,7 @@ export type {
   DesktopSettingsView,
 } from './desktop-settings-api.ts'
 export { DesktopSettingsSection } from './DesktopSettingsSection.tsx'
-export { PluginControls, REMOTE_CONTROL_BUNDLE, registerPluginControls }
+export { PluginControls, registerPluginControls }
 export { installPluginControlsStyles }
 export { DesktopTerminalSettingsAction } from './DesktopTerminalSettingsAction.tsx'
 export type {
