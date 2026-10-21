@@ -14,5 +14,6 @@ dsh-plugin-desktop/lib/
 
 .env.yarn
 .dhdl/
+.dsh-ops/
 .dsh-ops-update-*.lock
 dsh-plugin-desktop/.desktop-build/

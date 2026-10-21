@@ -6,7 +6,7 @@
   disabled: false
 
 # DHDL: this build is a learning environment, so the new-session picker only
-# offers the standard preset and the HRL guide preset. The upstream PTC, minimal
+# offers the standard preset and the guide preset. The upstream PTC, minimal
 # and creator presets stay untouched in the pinned submodule; disabling them
 # here keeps the picker focused without editing upstream files.
 - id: preset-ptc

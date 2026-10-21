@@ -10,7 +10,6 @@ import {
 } from 'electron'
 import { configureDeveloperLogging, type DiagnosticPreferences } from './developer-logging.ts'
 import { spawn } from 'node:child_process'
-import { NextTransitionNotice } from './next-transition-notice.ts'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
@@ -197,7 +196,6 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
   private terminalSpec: DesktopTerminalSpec | undefined
   private diagnosticExport: Promise<void> | undefined
   private readonly workspaceAdmission: ElectronWorkspaceAdmission
-  private readonly nextTransitionNotice: NextTransitionNotice
   private updateCleanupTask: Promise<void> | undefined
   private rendererHealthGate: DesktopRendererHealthGate | undefined
   private rendererBootHealthy = false
@@ -226,11 +224,6 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
       showMessageBox: async options => await this.showDesktopMessageBox(options),
       logError: message => { this.logError(message) },
       ...(workspaceVolumeQuery === undefined ? {} : { volumeQuery: workspaceVolumeQuery }),
-    })
-    this.nextTransitionNotice = new NextTransitionNotice({
-      path: join(app.getPath('userData'), 'notices', 'next-transition-v1'),
-      show: options => this.showDesktopMessageBox(options),
-      reportError: cause => { this.logError(`dsh-plugin-desktop: Next transition notice failed: ${String(cause)}`) },
     })
     this.updates = {
       get isPackaged() { return app.isPackaged },
@@ -359,8 +352,7 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
       this.generation = generation
       this.mountTask = generation.mount(beforeInteractive).then(() => {
         this.rendererHealthGate?.acceptNativeMount()
-        void this.nextTransitionNotice.open(this.locale, DESKTOP_RELEASE_CHANNEL,
-          () => this.generation === generation && !this.quitting).then(() => this.offerUpdateArtifactCleanup()).catch((cause: unknown) => {
+        void this.offerUpdateArtifactCleanup().catch((cause: unknown) => {
           this.logError(`dsh-plugin-desktop: failed to resolve update installer cleanup: ${cause instanceof Error ? cause.message : String(cause)}`)
         })
       }).catch((cause: unknown) => {

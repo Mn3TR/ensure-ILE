@@ -1,5 +1,5 @@
 /**
- * HRL guide persona for DHDL.
+ * Guide persona for DHDL.
  *
  * One row, two jobs: replace the agent's system prompt with the guide document,
  * and expose `read_note` so the guide can pull the per-subject notes it tells

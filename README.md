@@ -176,10 +176,10 @@ headless 检查使用 `corepack yarn check`；完整的构建、测试和发布�
 
 ### macOS 麦克风权限
 
-Stable、Beta、Next 的主应用和 Electron Helper 签名直接使用固定上游 checkout 中的
+主应用和 Electron Helper 的签名直接使用固定上游 checkout 中的
 `deepseek-harness/apps/desktop/scripts/macos-entitlements.plist`。更新子模块版本后，打包会自动使用对应的权限文件，无需维护本地副本；打包前须初始化子模块。各版本的 macOS 配置保留产品自己的麦克风用途说明。
 
-语音输入沿用上游录音流程触发系统授权，语音插件旁不再提供额外权限按钮，Stable/Beta 也不再安装麦克风权限请求桥接或拦截器。
+语音输入沿用上游录音流程触发系统授权，语音插件旁不再提供额外权限按钮，Stable 也不再安装麦克风权限请求桥接或拦截器。
 
 ## 社区交流
 

@@ -24,7 +24,7 @@
     notifyOnScheduleCompletion: false
     notifyOnScheduleFailure: false
 
-# New sessions start in the HRL guide preset instead of the standard one, so a
+# New sessions start in the guide preset instead of the standard one, so a
 # learner never has to pick a mode before asking a question.
 - id: agent-preset-registry
   config:

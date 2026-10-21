@@ -94,7 +94,7 @@ desktop sidebar surface 会把上游 sidebar-fill token 局部设为透明，因
 
 ## 开发
 
-根目录的构建、开发启动及打包命令会先运行 `corepack yarn market:prepare`，查询 npm 的 `latest`，并同步 Stable、Beta、Next 内置的 `dshmarket`。解析后的精确版本与锁文件仍可复现，应一同提交。Desktop 的市场自更新与回滚兼容补丁会保留；查询、安装或补丁应用失败时停止准备，不会静默沿用旧版。`corepack yarn market:check` 只检查版本新鲜度，不修改文件。已安装应用不会在启动时下载或热替换插件；现有包选择机制会在应用与当前 Profile 已安装的副本中选择较新版本，不删除任何一方。
+根目录的构建、开发启动及打包命令会先运行 `corepack yarn market:prepare`，查询 npm 的 `latest`，并同步内置的 `dshmarket`。解析后的精确版本与锁文件仍可复现，应一同提交。Desktop 的市场自更新与回滚兼容补丁会保留；查询、安装或补丁应用失败时停止准备，不会静默沿用旧版。`corepack yarn market:check` 只检查版本新鲜度，不修改文件。已安装应用不会在启动时下载或热替换插件；现有包选择机制会在应用与当前 Profile 已安装的副本中选择较新版本，不删除任何一方。
 
 该包由仓库根目录的 Yarn workspace 管理。相邻的 `deepseek-harness/` checkout 仍是独立的上游 pnpm 项目，不属于 Yarn workspace。请从仓库根目录安装并验证 DSH Desktop：
 
@@ -140,7 +140,7 @@ dsh plugin update
 
 显式 `--profile <name>` 始终具有更高优先级，可用于在切换前准备其他 profile。
 
-`dshmarket@1.2.3` 尚未预装，也不是 DSH Desktop 的 dependency。该版本仍从 config/argv 解析 profile，并通过私有 child-process 代码启动 `dsh plugin`；它既不读取 `desktopProfiles`，也不使用 `desktopPnpm`，package exports 也没有 runner injection seam。后续兼容版本必须动态探测 Desktop service，同时在普通 DSH 中保留现有 CLI fallback。此外，`1.2.3` 的源码仓库与 npm tarball 均未包含完整 MIT 许可文本或版权通知，因此该版本尚未通过内置再分发 gate。用户主动安装第三方 package 与 Desktop 将其嵌入 application archive 或 installer 是两个独立边界。
+`dshmarket` 随桌面端一起内置：仓库在 `package.json` 里钉住它的精确版本，并在 `.yarn/patches/` 下带一份 Desktop 兼容补丁；构建、开发启动和打包入口会从 npm `latest` 刷新它，所以钉住的版本与锁文件要一起提交。用户自己装进当前 Profile 的副本是另一回事：包选择机制会运行较新的那一份，不删除任何一方。
 
 Required injection、可选 Desktop 适配、TypeScript 示例、cancellation 与 fallback 指南详见[面向插件作者的 service 文档](docs/plugin-services.zh.md)。
 
@@ -201,7 +201,7 @@ DSH Desktop 将 UTF-8 日志写入 Electron 用户数据目录：Windows 位于 
 
 ## 打包
 
-Stable 与 Beta 在 Windows、macOS 和 Linux 上均关闭 ASAR。打包后的 Electron smoke 会通过本地文件系统后端验证随包 Cordis 技能。
+Stable 在 Windows、macOS 和 Linux 上均关闭 ASAR。打包后的 Electron smoke 会通过本地文件系统后端验证随包 Cordis 技能。
 
 与上游桌面端一样，安装包在应用旁携带 primary runtime，位于 `Contents/Resources/runtime`（Windows 为 `resources/runtime`）：上游锁文件固定的独立 Python 3.12 及 numpy、pandas、python-docx、python-pptx、openpyxl、Pillow、lxml、XlsxWriter，独立 Node，随包 pnpm，以及每份载荷旁的 Office 技能资源。macOS 的 universal 应用每个 CPU 各带一份载荷，`runtime/arm64` 和 `runtime/x64`，安装版壳按自身运行的 CPU 选择载荷；Windows 只带 `runtime/x64`，Linux 不带。每个打包入口都会在运行各项 gate 之前执行 `scripts/prepare-runtime.ts`：把上游锁文件（`deepseek-harness/scripts/primary-runtime/lock.json`）固定的压缩包和 wheel 下载到 `.desktop-build/downloads`，在 `.desktop-build/runtime/<cpu>` 下组装每份载荷并按上游方式裁剪 NumPy 与 pandas 的测试套件，写入记录产品版本和载荷摘要的 `runtime.json`，校验整棵树，再执行本机能运行的载荷。签名的 macOS 发布版在运行 electron-builder 之前先给每个 Mach-O 载荷文件打上带 hardened runtime 和时间戳的 Developer ID 签名，与上游一致；`signIgnore` 阻止 electron-builder 重新签名，universal 合并规则则覆盖这些完全相同的载荷。`afterPack` 钩子、最终产物检查和挂载镜像的校验器会再次检查载荷。Host 挂载上游的 Office 组合：`load_workspace_dependencies` 工具首次使用时把载荷安装到 `<home>/dsh-runtimes/dsh-plugin-desktop-primary-runtime`（按版本区分的目录，因为 Stable 与官方桌面端共用 `~/.dsh`，而该工具会替换清单不同的安装），以及 `office-docx`、`office-pptx`、`office-xlsx` 技能，它们由随包 Node 运行 LibreOffice Kit CLI。打包后的 Host 缺少载荷即失败；开发运行的 Host 在 `yarn prepare:runtime` 执行之前只记录警告并在没有 Office 的情况下启动。
 
@@ -273,11 +273,11 @@ corepack.cmd yarn dist:win-portable
 - Linux 不支持扩展窗口与增强模式。Linux 继续使用兼容呈现。
 - macOS 与 Windows 托盘终端会提供私有 `dsh`、`pnpm` 与 `node` shim。除此之外，Host runtime 会在当前 Electron 进程的 `PATH` 中公开内置 `pnpm` 命令作为 ambient compatibility，并提供受管 `desktopPnpm` service；这些命令都不会加入系统 `PATH`，Linux 目前也没有 desktop 终端命令。
 - 在 Windows 上，ambient `pnpm` 命令与 lifecycle Node helper 是 `.cmd` shim。`desktopPnpm.run()` 会启动准确的已打包 pnpm entry，从而避免 manager process 的 shell lookup；上游 `dsh plugin`、PowerShell 与命令提示符则可通过 command interpreter 解析 ambient shim。第三方插件直接调用 Node `spawn('pnpm', { shell: false })`，或 lifecycle script 直接以 `shell: false` 执行其 `.cmd` `npm_node_execpath`，仍属于不可移植行为，应改用该 service 或 shell-aware 启动路径。
-- `dshmarket@1.2.3` 仍是用户可选安装的第三方 package，而不是内置 marketplace。只有重新审计的版本同时消费可选 Desktop service、保留普通 DSH fallback，并包含再分发所需的完整 license notice 后，才会重新评估预装。
+- `dshmarket` 随钉住的 npm 版本一起内置，并带 Desktop 兼容补丁，不再是用户可选安装的第三方 package。包选择机制仍会优先运行当前 Profile 里较新的副本。
 - 更新交接只验证下载容器，不验证 publisher 身份。macOS 仍要求用户从已打开的 DMG 替换应用；Windows 会运行已下载的 NSIS 安装器，但本地 `dist:win` 产物没有签名。签名产物、Authenticode/publisher 校验、SmartScreen 信誉与原生升级测试仍是发布 gate。
 - 共享 carrier 使用 HTTP 与 WebSocket，而不是 Electron IPC；默认只绑定 loopback，并支持经过明确确认的全接口局域网监听。替换 carrier 需要上游 DSH 提供 transport 扩展点，不属于该独立包的范围。
-- Stable、Beta 和 Next 均固定到已发布的 DSH `0.1.7-rc.1` family 及其对应的官方 `deepseek-harness/` release 源码。产品构建使用 `upstream.json` 记录并提交到仓库的官方 profile 运行时包，不会直接链接源码 checkout。
-- DSH `0.1.7-rc.1` 会将受支持的历史会话迁移至 V4，并保留原始日志。升级后写入的会话无法由此前 Stable 使用的 `0.1.5-rc.2` 运行时读取。
+- Stable 固定到已发布的 DSH `0.2.1-rc.2` family 及其对应的官方 `deepseek-harness/` release 源码。产品构建使用 `upstream.json` 记录并提交到仓库的官方 profile 运行时包，不会直接链接源码 checkout。
+- DSH 读取 V4 会话。升级后写入的会话无法由此前 Stable 使用的 `0.1.5-rc.2` 运行时读取。
 - `package:dir` 是用于 smoke 的未封装产物。`dist:win` 会额外生成未签名的 NSIS 测试安装包，但不会建立 Authenticode 身份或 SmartScreen 信誉。安装与升级行为、原生通知与终端、Windows ACL sandbox，以及每台目标机器上的原生材质外观仍属于目标平台验证边界。
 
 ### 开发者日志

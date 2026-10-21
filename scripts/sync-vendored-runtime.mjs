@@ -19,7 +19,7 @@ const channelFlag = process.argv.indexOf('--channel')
 const requestedChannel = channelFlag === -1 ? undefined : process.argv[channelFlag + 1]
 
 if (mode !== '--write' && mode !== '--check') {
-  throw new Error('usage: node scripts/sync-vendored-runtime.mjs <--write|--check> [--channel stable|beta]')
+  throw new Error('usage: node scripts/sync-vendored-runtime.mjs <--write|--check> [--channel <name>]')
 }
 
 const readJson = path => JSON.parse(readFileSync(path, 'utf8'))
@@ -33,13 +33,19 @@ const fail = message => { throw new Error(`sync-vendored-runtime: ${message}`) }
 
 const upstreamDocument = readJson(upstreamPath)
 const channel = requestedChannel ?? upstreamDocument.activeChannel
-if (channel !== 'stable' && channel !== 'beta') fail(`unknown release channel ${JSON.stringify(channel)}`)
-const upstream = upstreamDocument.channels?.[channel]
-if (upstream === undefined || typeof upstream !== 'object') fail(`missing upstream metadata for ${channel}`)
-const otherChannel = channel === 'stable' ? 'beta' : 'stable'
-const otherVersion = upstreamDocument.channels?.[otherChannel]?.sourceVersion
-if (typeof otherVersion !== 'string' || !/^[0-9A-Za-z][0-9A-Za-z.-]*$/u.test(otherVersion)) {
-  fail(`unsafe ${otherChannel} source version ${JSON.stringify(otherVersion)}`)
+if (typeof channel !== 'string' || upstreamDocument.channels?.[channel] === undefined) {
+  fail(`unknown release channel ${JSON.stringify(channel)}`)
+}
+const upstream = upstreamDocument.channels[channel]
+if (typeof upstream !== 'object') fail(`missing upstream metadata for ${channel}`)
+// Sibling channels only matter for preserving their resolutions during a write.
+const otherVersions = Object.entries(upstreamDocument.channels)
+  .filter(([name]) => name !== channel)
+  .map(([, metadata]) => metadata?.sourceVersion)
+for (const otherVersion of otherVersions) {
+  if (typeof otherVersion !== 'string' || !/^[0-9A-Za-z][0-9A-Za-z.-]*$/u.test(otherVersion)) {
+    fail(`unsafe sibling source version ${JSON.stringify(otherVersion)}`)
+  }
 }
 const pluginPaths = [join(root, upstream.package, 'package.json')]
 const version = upstream.sourceVersion
@@ -53,8 +59,8 @@ const manifestPath = join(vendorDirectory, 'manifest.json')
 const resolutionSelector = (name, range = version) => `${name}@npm:${range}`
 const isChannelResolution = selector => selector.endsWith(`@npm:${version}`)
   || selector.endsWith(`@npm:^${version}`)
-const isOtherChannelResolution = selector => selector.endsWith(`@npm:${otherVersion}`)
-  || selector.endsWith(`@npm:^${otherVersion}`)
+const isOtherChannelResolution = selector => otherVersions.some(otherVersion =>
+  selector.endsWith(`@npm:${otherVersion}`) || selector.endsWith(`@npm:^${otherVersion}`))
 
 function packageName(filename) {
   const suffix = `-${version}.tgz`

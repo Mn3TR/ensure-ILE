@@ -18,9 +18,10 @@ const fabric = readJson('dsh-community-fabric/package.json')
 const upstreamPackage = readJson('deepseek-harness/package.json')
 
 if (stablePlugin.name !== 'dsh-plugin-desktop') fail('the stable Desktop workspace must retain dsh-plugin-desktop')
-if (!['stable', 'beta'].includes(upstream.activeChannel)) fail('the pinned upstream checkout must follow a declared release channel')
-const activeUpstream = upstream.channels?.[upstream.activeChannel]
-if (activeUpstream === undefined) fail('the active upstream channel is missing')
+const activeUpstream = typeof upstream.activeChannel === 'string'
+  ? upstream.channels?.[upstream.activeChannel]
+  : undefined
+if (activeUpstream === undefined) fail('the pinned upstream checkout must follow a declared release channel')
 
 if (workspace.packageManager !== 'yarn@4.18.0') {
   fail('the product workspace must pin yarn@4.18.0')
