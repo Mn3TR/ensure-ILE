@@ -8,14 +8,35 @@
 >
 > 下面「DSH Desktop repository rules」是上游规则，对本仓库仍然全部有效。
 
-## 当前状态（2026-10-21 00:50）
+## 当前状态（2026-10-21 23:35）
 
-- **能跑**：`Start-Process dsh-plugin-desktop\node_modules\electron\dist\electron.exe dsh-plugin-desktop\lib\main.js` 能起窗口，`引导模式`（`dsh-plugin-guide`）是默认预设，首次引导只有一屏欢迎页。
-- **数据隔离已通**：`run()` 里先 `resolveDataRoot()` → `seedProfile()` → `DSH_HOME`/`DHDL_HOME`/`DSH_AGENTS_HOME`/`userData` 全部落在 `.dhdl/` 下；`start()` 见到 `DHDL_HOME` 就绕过 C 盘 `~/.dsh`。日志确认 `[dhdl] home resolution: ... resolved=E:\Projects\DHDL\.dhdl\home`。`seedProfile()` 只复制 `profiles/dhdl/` 的 `package.json` 与 `cordis.patch.yml`，**不装依赖**；删掉 `.dhdl/` 后要手动在 `.dhdl/home/profiles/desktop` 跑一次 `pnpm install`，否则起不来（`PackageOverlayNotFoundError: @max-null/dsh-memory`）。
-- **OOBE 已裁剪**（DHDL 自有）：默认只渲染 `['welcome']`，`DHDL_SETUP=full` 恢复上游 8 屏。固定默认值写在 `main.ts` 的 `dhdlSetupInput()`：增强模式（linux→兼容）、材质不透明、市场关闭、浏览器访问关 + loopback、通知 7 项全关；账号登录步被 `dismissDesktopSetupAccount()` 摘掉。步骤计划经 `setupOnboarding.read().steps` 传到 renderer，`App.tsx` 用注册表按计划渲染，进度条只在 `steps.length > 1` 时出现。
-- **坑**：`profile-setup/<hash>/state.json(.pending)` 是严格格式——`*.pending` 必须正好是 `pending\n`，手写空文件会让主进程进恢复页并报 `invalid pending marker`。想重看引导：删 `state.json`、`state.json.account`，写 `state.json.pending` 为 `pending\n`。
-- **只留必要能力**（2026-10-21）：社区市场（`dsh-community-market/`）与 Agents-Anywhere 远程控制已移除——插件市场只剩 `dshmarket` 与官方内置来源，OOBE 的市场步也只剩这两项。
-- **变体已移除**：`dsh-plugin-desktop-beta/` 与 `dsh-desktop-next/` 已从仓库删除，`verify-desktop-variants` 检查器一并移除；桌面代码只剩 `dsh-plugin-desktop/`。`dshmarket` 1.66.39 的连带升级与 DHDL 无关。
+**组织**：EnSure Lab / 因需（因=原因、需=需要，即「每一步都要说得清为什么」）。包名统一 `dsh-plugin-` 前缀，不用 npm scope。
+
+**仓库形态**（3 个 workspace + 3 个占位目录）：
+- `dsh-plugin-desktop/`：上游桌面壳（2.0.18）+ DHDL 改动（数据根、OOBE 裁剪、引导模式预设）。
+- `dsh-plugin-guide/`：guide 模式——整份替换系统提示（`prompts/guide.md`）+ `read_note` 工具读 `skills/{math,arts}.md`；预设 id `guide`、显示「引导模式」，是 Profile 默认预设。
+- `dsh-community-fabric/`：社区互操作 RFC，纯文档，不声明可加载入口。
+- 占位（只有 README，无 `package.json`、未进 workspaces）：`dsh-plugin-hrl/`（HRL 模式：学生已有答案→优化）、`dsh-plugin-schedule/`（课表+进度→明天讲什么/今日预习复习）、`dsh-plugin-bankmanager/`（题库状态机 new/guide/hrl/review/mastered/parked）。
+- 已删：Beta/Next 变体、`dsh-community-market/`、`vendor/agents-anywhere/`（含全部 AA 接线）；插件市场只剩 `dshmarket` 与官方内置来源。
+
+**能跑**：`Start-Process dsh-plugin-desktop\node_modules\electron\dist\electron.exe dsh-plugin-desktop\lib\main.js`，composer 预设默认「引导模式」；`DHDL_SETUP=full` 可看完整 7 屏向导。
+**数据隔离**：`run()` 把 `DSH_HOME`/`DHDL_HOME`/`DSH_AGENTS_HOME`/`userData` 全放 `.dhdl/`；`seedProfile()` 只复制 `profiles/dhdl/` 的 `package.json` 与 `cordis.patch.yml`，**不装依赖**——清掉 `.dhdl` 后要手动在 `.dhdl/home/profiles/desktop` 跑一次 `pnpm install`。
+**验证现状**：`check:layout`、`typecheck`、桌面包 `build` 通过；桌面包单测 26 个失败，全是 Windows 平台基线（module-resolution 15、linux-artifacts 5、compatibility-shell 2、desktop-runtime-environment 2、electron-runtime 1、recovery-plugin-uninstall 1）。`corepack yarn check` 全量门禁和 `dist:win` 打包尚未跑过。
+
+**提交**：`272a34c` 删 Beta/Next → `d9dfdba` 删社区市场+AA 并把 hrll 改名 guide → `bc5a422` 三个占位骨架 → `a24d2c9` 记忆。未 push。
+
+**待办（按优先级）**：
+1. 真机跑一道题，验证 guide 模式（系统提示替换 + `read_note` 调用）。
+2. `seedProfile()` 后自动装依赖，免手动 pnpm。
+3. HRL 模式定稿：优化到什么程度算完、要不要 A/B 保留原答案并采偏好信号、学科备注怎么分、发现学生没做出来是否退回 guide、入口在哪。
+4. `dsh-plugin-work` 骨架（学生独立做→交答案→判不过转引导）。
+5. schedule / bankmanager 落地（进度口径、课表来源、入库方式、SRS、存储）。
+6. 修 Windows 单测、跑全量 `yarn check`、试 `dist:win`。
+7. 清 `.dhdl` 里 `agentPreset: hrll-guide` 的旧测试会话。
+8. README/docs 补 EnSure Lab / 因需 署名。
+
+**坑**：`profile-setup/<hash>/state.json.pending` 必须精确 `pending\n`（8 字节），空文件会让主进程进恢复页；冷启动首屏「正在加载设置…」约 30 秒；billion-context 0.1.202 有 0.1.203 关键更新（升级后需重启 dsh）。
+
 
 ---
 
