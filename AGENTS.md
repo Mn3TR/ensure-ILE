@@ -17,7 +17,7 @@
 - `dsh-plugin-guide/`：guide 模式——整份替换系统提示（`prompts/guide.md`）+ `read_note` 工具读 `skills/{math,arts}.md`；预设 id `guide`、显示「引导模式」，是 Profile 默认预设。
 - `dsh-community-fabric/`：社区互操作 RFC，纯文档，不声明可加载入口。
 - 占位（只有 README，无 `package.json`、未进 workspaces）：`dsh-plugin-hrl/`（HRL 模式：学生已有答案→优化）、`dsh-plugin-schedule/`（课表+进度→明天讲什么/今日预习复习）、`dsh-plugin-bankmanager/`（题库状态机 new/guide/hrl/review/mastered/parked）、`dsh-plugin-work/`（work 模式：学生独立做→交答案→判卷，判不过转 guide）。
-- 已删：Beta/Next 变体、`dsh-community-market/`、`vendor/agents-anywhere/`（含全部 AA 接线）；插件市场只剩 `dshmarket` 与官方内置来源。2026-10-22 又删了 `_deprecated/`（上游 0.1.x 归档）、Next 交接提示（`next-transition-notice` 与 `docs/stable-next-transition`）、`upstream.json` 的 beta channel。
+- 已删：Beta/Next 变体、`dsh-community-market/`、`vendor/agents-anywhere/`（含全部 AA 接线）；插件市场只剩 `dshmarket` 与官方内置来源。2026-10-22 又删了 `_deprecated/`（上游 0.1.x 归档）、Next 交接提示（`next-transition-notice` 与 `docs/stable-next-transition`）、`upstream.json` 的 beta channel，以及旧 profile 的 retired bundle 兼容层（`RETIRED_BUNDLES`/`RETIRED_ROW_IDS`——DHDL 的 profile 都在 `.dhdl` 里新种，永远不读旧 profile，2026-10-22 李确认后删）。
 
 **能跑**：`Start-Process dsh-plugin-desktop\node_modules\electron\dist\electron.exe dsh-plugin-desktop\lib\main.js`，composer 预设默认「引导模式」；`DHDL_SETUP=full` 可看完整 7 屏向导。
 **数据隔离**：`run()` 把 `DSH_HOME`/`DHDL_HOME`/`DSH_AGENTS_HOME`/`userData` 全放 `.dhdl/`；`seedProfile()` 只复制 `profiles/dhdl/` 的 `package.json` 与 `cordis.patch.yml`，**不装依赖**——清掉 `.dhdl` 后要手动在 `.dhdl/home/profiles/desktop` 跑一次 `pnpm install`。

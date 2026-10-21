@@ -147,23 +147,17 @@ it('hot-applies the built-in market bundle toggle from profile package.json duri
     dsh?: { profile?: { bundles?: string[] } }
   }
   expect(initialPkg.dsh?.profile?.bundles).not.toContain('dshmarket')
-  expect(initialPkg.dsh?.profile?.bundles).not.toContain('dsh-community-market')
-  expect(initialPkg.dsh?.profile?.bundles).not.toContain('@agents-anywhere/dsh-bridge-next')
 
-  // Simulate setBundleEnabled switching to dshmarket; retired bundles never load again.
+  // Simulate setBundleEnabled switching to dshmarket.
   initialPkg.dsh!.profile!.bundles = [
     ...initialPkg.dsh!.profile!.bundles!,
     'dshmarket',
-    'dsh-community-market',
-    '@agents-anywhere/dsh-bridge-next',
   ]
   writeFileSync(profilePkgPath, `${JSON.stringify(initialPkg, null, 2)}
 `)
 
   const rows = composeEntries([readProfilePatches('test', ctx.profileContext)])
-  expect(rows.find(row => row.id === 'community-market')).toBeUndefined()
   expect(rows.find(row => row.id === 'dsh-market')?.name).toBe('dshmarket')
-  expect(rows.find(row => row.id === 'agents-anywhere-bridge-next')).toBeUndefined()
   expect(onManagedBundlesChanged).toHaveBeenCalledWith({
     requestedMarket: 'dsh-market',
     effectiveMarket: 'dsh-market',

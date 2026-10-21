@@ -83,12 +83,6 @@ export { DESKTOP_PACKAGE_NAME } from './product-identity.ts'
 /** Empty include root rewritten before every profile boot. */
 export const DESKTOP_PROFILE_ROOT = 'cordis.yml'
 
-/** Bundles retired from the Desktop product; old Profiles must neither load nor report them. */
-const RETIRED_BUNDLES: ReadonlySet<string> = new Set([
-  'dsh-community-market',
-  '@agents-anywhere/dsh-bridge-next',
-])
-const RETIRED_ROW_IDS: ReadonlySet<string> = new Set(['agents-anywhere-bridge-next'])
 const BIN_NAME = DESKTOP_PACKAGE_NAME
 const REQUIRED_BUNDLES = requiredWebBundles()
 const REQUIRED_BUNDLE_SET = new Set(REQUIRED_BUNDLES)
@@ -134,14 +128,8 @@ const DEFAULT_DESKTOP_MARKET_SNAPSHOT: DesktopMarketSnapshot = Object.freeze({
   effective: 'disabled',
   legacyDefaulted: true,
 })
-const MARKET_ROW_IDS: ReadonlySet<string> = new Set([
-  DESKTOP_MARKET_IDENTITIES.dshMarket.rowId,
-  ...RETIRED_ROW_IDS,
-])
-const MARKET_PACKAGE_NAMES: ReadonlySet<string> = new Set([
-  DESKTOP_MARKET_IDENTITIES.dshMarket.packageName,
-  ...RETIRED_BUNDLES,
-])
+const MARKET_ROW_IDS: ReadonlySet<string> = new Set([DESKTOP_MARKET_IDENTITIES.dshMarket.rowId])
+const MARKET_PACKAGE_NAMES: ReadonlySet<string> = new Set([DESKTOP_MARKET_IDENTITIES.dshMarket.packageName])
 
 /**
  * Parse desktop presentation state and reject corrupted values.
@@ -1047,9 +1035,8 @@ function loadRecoveryFilteredProfile(
   }
   const bundles = (rawBundles ?? []) as string[]
   const selectedBundles = bundles.filter(packageName =>
-    !RETIRED_BUNDLES.has(packageName)
-    && (marketProvider === DESKTOP_MARKET_IDENTITIES.dshMarket.provider
-      || packageName !== DESKTOP_MARKET_IDENTITIES.dshMarket.packageName),
+    marketProvider === DESKTOP_MARKET_IDENTITIES.dshMarket.provider
+    || packageName !== DESKTOP_MARKET_IDENTITIES.dshMarket.packageName,
   )
   if (marketProvider === DESKTOP_MARKET_IDENTITIES.dshMarket.provider
     && !selectedBundles.includes(DESKTOP_MARKET_IDENTITIES.dshMarket.packageName)) {
@@ -1274,13 +1261,10 @@ interface MarketPatchFilter {
   readonly removedProviderReference: boolean
 }
 
-/** Return whether one Loader row claims a Desktop-owned Market or retired bundle identity. */
+/** Return whether one Loader row claims the Desktop-owned Market identity. */
 function isMarketProviderEntry(entry: { readonly id?: unknown, readonly name?: unknown }): boolean {
   if (typeof entry.id === 'string' && MARKET_ROW_IDS.has(entry.id)) return true
-  const name = entry.name
-  if (typeof name !== 'string') return false
-  return MARKET_PACKAGE_NAMES.has(name)
-    || [...RETIRED_BUNDLES].some(retired => name.startsWith(`${retired}/`))
+  return typeof entry.name === 'string' && MARKET_PACKAGE_NAMES.has(entry.name)
 }
 
 /** Remove provider rows recursively before an untrusted patch can activate either implementation. */

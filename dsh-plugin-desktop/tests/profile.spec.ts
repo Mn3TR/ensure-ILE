@@ -505,8 +505,7 @@ virtualStoreDirMaxLength: 60
       effective: 'disabled',
       legacyDefaulted: true,
     })
-    expect(rows.some(row => row.id === 'community-market'
-      || row.id === DESKTOP_MARKET_IDENTITIES.dshMarket.rowId)).toBe(false)
+    expect(rows.some(row => row.id === DESKTOP_MARKET_IDENTITIES.dshMarket.rowId)).toBe(false)
   })
 
   it('loads the exact dshmarket dependency as a direct bundle only after explicit selection', () => {
@@ -538,7 +537,6 @@ virtualStoreDirMaxLength: 60
       id: DESKTOP_MARKET_IDENTITIES.dshMarket.rowId,
       name: DESKTOP_MARKET_IDENTITIES.dshMarket.packageName,
     }])
-    expect(rows.some(row => row.id === 'community-market')).toBe(false)
   })
 
   it('keeps the newer Desktop dshmarket when a Profile copy is older', () => {
@@ -664,8 +662,7 @@ virtualStoreDirMaxLength: 60
 
     expect(prepared.market.effective).toBe('disabled')
     expect(prepared.marketFailure).toContain('conflicting Market provider Loader identity')
-    expect(rows.some(row => row.id === DESKTOP_MARKET_IDENTITIES.dshMarket.rowId
-      || row.id === 'community-market')).toBe(false)
+    expect(rows.some(row => row.id === DESKTOP_MARKET_IDENTITIES.dshMarket.rowId)).toBe(false)
     expect(rows.some(row => row.id === 'webserver')).toBe(true)
   })
 
@@ -1481,27 +1478,6 @@ virtualStoreDirMaxLength: 60
       name: 'third-party-subprocess',
     }))
     expect(rows.map(row => row.id)).not.toContain('desktop-windows-subprocess')
-  })
-})
-
-describe('retired Desktop bundles', () => {
-  it('removes community-market and Agents-Anywhere rows from user patches', () => {
-    const home = temporaryHome()
-    writeFileSync(join(home, 'cordis.patch.yml'), [
-      '- insert:',
-      '    - id: legacy-community-market',
-      '      name: dsh-community-market',
-      '    - id: legacy-aa',
-      '      name: "@agents-anywhere/dsh-bridge-next"',
-      '',
-    ].join('\n'))
-
-    const prepared = prepareDesktopProfile(undefined, home, 'darwin')
-    const rows = composeEntries([prepared.patches])
-
-    expect(rows.some(row => row.name === 'dsh-community-market'
-      || row.name === '@agents-anywhere/dsh-bridge-next')).toBe(false)
-    expect(rows.some(row => row.id === 'settings')).toBe(true)
   })
 })
 
