@@ -76,6 +76,33 @@
         "createdAt": 1792513574991,
         "updatedAt": 1792515002804,
         "lastUsedAt": 1792514997921
+      },
+      "a4939d4b-994f-4ef3-8c67-40e097e1b41b": {
+        "namespace": "project",
+        "status": "approved",
+        "injected": false,
+        "source": "agent",
+        "content": "DHDL 状态快照（2026-10-21 23:35，供新会话接手）：\n- 仓库 E:\\Projects\\DHDL，工作区干净。提交：272a34c 删 Beta/Next → d9dfdba 删社区市场 dsh-community-market 与 vendor/agents-anywhere（含全部 AA 接线），并把 dsh-plugin-hrll 改名 dsh-plugin-guide → bc5a422 三个占位骨架 → a24d2c9 记忆。未 push。\n- 3 个 workspace：`dsh-plugin-desktop`（上游壳 2.0.18 + DHDL 改动）、`dsh-plugin-guide`（guide 模式：整份替换系统提示 + read_note；预设 id `guide`、显示「引导模式」、是默认预设）、`dsh-community-fabric`（纯文档）。占位目录（只有 README、无 package.json）：`dsh-plugin-hrl`（HRL 模式：学生已有答案→优化）、`dsh-plugin-schedule`、`dsh-plugin-bankmanager`。\n- 组织名：EnSure Lab / 因需（因=原因、需=需要），包名统一 dsh-plugin- 前缀、不用 scope。\n- 启动：`Start-Process dsh-plugin-desktop\\node_modules\\electron\\dist\\electron.exe dsh-plugin-desktop\\lib\\main.js`；数据在 .dhdl/；冷启动首屏约 30 秒；`DHDL_SETUP=full` 看 7 屏向导。\n- 验证：check:layout、typecheck、build 通过；桌面单测 26 失败（Windows 平台基线：module-resolution 15、linux-artifacts 5、compatibility-shell 2、desktop-runtime-environment 2、electron-runtime 1、recovery-plugin-uninstall 1）；全量 yarn check 与 dist:win 未跑。\n- 待办优先级：① 真机跑一题验证 guide；② seedProfile 后自动 pnpm install；③ HRL 模式定稿（优化程度/AB 对比采偏好/学科备注/退回 guide/入口）；④ work 模式骨架；⑤ schedule 与 bankmanager 落地；⑥ 修 Windows 单测、全量 check、dist:win；⑦ 清 .dhdl 旧 agentPreset: hrll-guide 会话；⑧ README 补 EnSure Lab 署名。\n- 坑：profile-setup/<hash>/state.json.pending 必须精确 `pending\\n`；billion-context 0.1.202 有 0.1.203 关键更新（升级需重启 dsh）。",
+        "keywords": [
+          "dhdl",
+          "状态快照",
+          "待办",
+          "todo",
+          "接手",
+          "新会话",
+          "dsh-plugin-guide",
+          "引导模式",
+          "ensure lab",
+          "因需",
+          "提交",
+          "272a34c",
+          "d9dfdba",
+          "hrl",
+          "schedule",
+          "bankmanager"
+        ],
+        "createdAt": 1792596851840,
+        "updatedAt": 1792596851840
       }
     }
   }
