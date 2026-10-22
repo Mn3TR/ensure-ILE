@@ -862,7 +862,7 @@ export function verifyPackagedPrimaryRuntime(context: PackagedRuntimeContext): s
   const projectDir = context.packager.projectDir ?? join(dirname(fileURLToPath(import.meta.url)), '..')
   const runtimes = verifyDesktopRuntimeTree(join(resources, 'runtime'), context.electronPlatformName as NodeJS.Platform, expectedDesktopVersion(projectDir))
   for (const runtime of runtimes) {
-    console.log(`Verified the ${runtime.arch} primary runtime: Python ${runtime.manifest.python}, Node ${String(runtime.manifest.node)}, pnpm ${String(runtime.manifest.pnpm)}`)
+    console.log(`Verified the ${runtime.arch} primary runtime: Node ${runtime.manifest.node}, pnpm ${runtime.manifest.pnpm}`)
   }
   return runtimes.map(runtime => runtime.arch)
 }

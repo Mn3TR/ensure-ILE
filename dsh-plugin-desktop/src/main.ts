@@ -8,8 +8,6 @@
 // runner child alone.
 
 import { formatUnexpectedHostExit, startIsolatedDesktopHost } from './host-process.ts'
-import * as desktopOffice from './desktop-office.ts'
-import { desktopPrimaryRuntime, resolveDesktopOfficeConfig } from './desktop-office.ts'
 import { app, crashReporter, safeStorage, session, shell } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
@@ -1639,12 +1637,6 @@ async function start(): Promise<void> {
       clearEnvironmentPath: pnpmRuntime.clearEnvironmentPath,
       dshBootstrapPath,
     }
-    // The bundled interpreter payload of this CPU: beside the application when packaged, prepared by `prepare:runtime` in development.
-    const primaryRuntime = desktopPrimaryRuntime({
-      packaged: app.isPackaged,
-      resourcesPath: process.resourcesPath,
-      packageRoot: fileURLToPath(new URL('..', import.meta.url)),
-    })
     await healDesktopProfileModuleFallback(homeDir, prepared.profile)
     if (profilePreferences === undefined) {
       throw new Error(`${BIN_NAME}: active Profile preferences were not initialized`)
@@ -1656,7 +1648,7 @@ async function start(): Promise<void> {
         host: { prepared, profilePreferences, homeDir, activeProfileName, pluginManagementStatePath,
           selectionStatePath, marketUserDataDir, releaseUserDataLocations, desktopLaunchEnvironment,
           desktopProxyOverlay: proxyResolution.overlay,
-          desktopPnpmBootstrap, primaryRuntime, diagnosticRunId: diagnosticRunId(), logDirectory: join(desktopUserDataDir, 'logs', 'host') },
+          desktopPnpmBootstrap, diagnosticRunId: diagnosticRunId(), logDirectory: join(desktopUserDataDir, 'logs', 'host') },
         runtime, rendererToken: browserAccess.rendererHeader.value,
         prepareCertificate: prepareHostCertificate,
         bindHost: host => generation.bindHost(host), requestQuit,
@@ -1775,14 +1767,6 @@ async function start(): Promise<void> {
           // Registered before the plugin tree mounts, so no agent can fail unrecorded.
           installAgentErrorLogging(hostCtx)
           installHostDeveloperLogging(hostCtx)
-          // Office skills and the workspace dependency tool need the bundled payload; a packaged Host without it fails here.
-          const office = resolveDesktopOfficeConfig(primaryRuntime, homeDir)
-          if (office === undefined) {
-            hostCtx.logger.warn(`${BIN_NAME}: Office skills are unavailable; run yarn prepare:runtime to prepare the primary runtime`)
-          } else {
-            await hostCtx.plugin(desktopOffice, office)
-            hostCtx.logger.info(`${BIN_NAME}: Office skills mounted from ${office.source}`)
-          }
           await hostCtx.plugin(DesktopProfileService, {
             current: {
               name: activeProfileName,

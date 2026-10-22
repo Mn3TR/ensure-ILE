@@ -1,11 +1,9 @@
 /** Prepare, execute and check the bundled interpreter payloads for every CPU one Desktop package carries; ported from upstream Desktop. */
 import { existsSync, readFileSync, rmSync, statSync } from 'node:fs'
-import { createRequire } from 'node:module'
-import { dirname, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parsePrimaryRuntime, workspaceDependencyPaths, type PrimaryRuntimeManifest } from '@deepseek-ai/dsh-tool-workspace-dependencies'
 import { macSmokeArchitecture } from './mac-universal.ts'
-import { machOArchitectures, preparePrimaryRuntime, readPrimaryRuntimeLock, rosettaAvailable, smokePrimaryRuntime, type PrimaryRuntimeTarget } from './primary-runtime.ts'
+import { machOArchitectures, parsePrimaryRuntime, preparePrimaryRuntime, primaryRuntimeEntries, readPrimaryRuntimeLock, rosettaAvailable, smokePrimaryRuntime, type PrimaryRuntimeManifest, type PrimaryRuntimeTarget } from './primary-runtime.ts'
 
 /** CPU of one bundled payload. */
 export type DesktopRuntimeArch = 'arm64' | 'x64'
@@ -46,24 +44,14 @@ export function desktopRuntimeBuildPaths(desktopRoot: string): { readonly runtim
 }
 
 /**
- * Payload directory of one CPU: `<root>/<arch>/primary-runtime`, with `office-skills` beside it as
- * upstream Desktop lays out `Resources/runtime`.
+ * Payload directory of one CPU: `<root>/<arch>/primary-runtime`, the layout
+ * `Resources/runtime` uses in a packaged application.
  * @param runtimeRoot - Prepared or packaged runtime root.
  * @param arch - Payload CPU.
  * @returns Absolute payload directory.
  */
 export function primaryRuntimeDirectory(runtimeRoot: string, arch: DesktopRuntimeArch): string {
   return join(runtimeRoot, arch, 'primary-runtime')
-}
-
-/**
- * Office skill resources of one CPU's payload.
- * @param runtimeRoot - Prepared or packaged runtime root.
- * @param arch - Payload CPU.
- * @returns Absolute resource directory.
- */
-export function officeSkillsDirectory(runtimeRoot: string, arch: DesktopRuntimeArch): string {
-  return join(runtimeRoot, arch, 'office-skills')
 }
 
 /**
@@ -99,10 +87,9 @@ export async function prepareDesktopRuntime(options: PrepareDesktopRuntimeOption
     return paths.runtime
   }
   const lock = readPrimaryRuntimeLock()
-  const skillSource = join(dirname(createRequire(import.meta.url).resolve('@deepseek-ai/dsh-skill-office/package.json')), 'assets')
   for (const { target, arch } of targets) {
-    log(`Preparing the ${target} primary runtime (Python ${lock.pythonVersion}, Node ${lock.nodeVersion}) for ${options.version}`)
-    await preparePrimaryRuntime({ lock, target, output: join(paths.runtime, arch), cache: paths.downloads, version: options.version, skillSource })
+    log(`Preparing the ${target} primary runtime (Node ${lock.nodeVersion}) for ${options.version}`)
+    await preparePrimaryRuntime({ lock, target, output: join(paths.runtime, arch), cache: paths.downloads, version: options.version })
   }
   return paths.runtime
 }
@@ -141,8 +128,8 @@ function requireFile(path: string, description: string): void {
 
 /**
  * Check a prepared or packaged runtime root: every CPU's payload declares this platform, CPU and
- * version with Node and pnpm, its entry points and Office resources exist, and on macOS the
- * interpreters are thin Mach-O files of the declared CPU.
+ * version with Node and pnpm, its entry points exist, and on macOS the interpreter is a thin
+ * Mach-O file of the declared CPU.
  * @param runtimeRoot - `.desktop-build/runtime` or the packaged `Resources/runtime`.
  * @param platform - Platform the package targets.
  * @param expectedVersion - Product version every manifest must record.
@@ -157,22 +144,13 @@ export function verifyDesktopRuntimeTree(runtimeRoot: string, platform: NodeJS.P
     const manifest = parsePrimaryRuntime(JSON.parse(readFileSync(manifestFile, 'utf8')))
     if (manifest.platform !== platform || manifest.arch !== arch) throw new Error(`Desktop runtime: ${directory} declares ${manifest.platform} ${manifest.arch}, expected ${platform} ${arch}`)
     if (manifest.desktopVersion !== expectedVersion) throw new Error(`Desktop runtime: ${directory} declares version ${manifest.desktopVersion}, expected ${expectedVersion}`)
-    if (manifest.node === undefined || manifest.pnpm === undefined) throw new Error(`Desktop runtime: ${directory} must bundle Node and pnpm`)
-    const entries = workspaceDependencyPaths(directory, manifest)
-    if (entries.node === undefined || entries.pnpm === undefined) throw new Error(`Desktop runtime: ${directory} resolves no Node or pnpm entry`)
-    requireFile(entries.python, `${arch} Python interpreter`)
+    const entries = primaryRuntimeEntries(directory, manifest)
     requireFile(entries.node, `${arch} Node executable`)
     requireFile(entries.pnpm, `${arch} pnpm entry`)
-    if (!existsSync(entries.pythonPackages) || !statSync(entries.pythonPackages).isDirectory()) throw new Error(`Desktop runtime: missing ${arch} site-packages: ${entries.pythonPackages}`)
+    if (!existsSync(entries.nodePackages) || !statSync(entries.nodePackages).isDirectory()) throw new Error(`Desktop runtime: missing ${arch} Node package directory: ${entries.nodePackages}`)
     if (platform === 'darwin') {
-      for (const file of [entries.python, entries.node]) {
-        const slices = machOArchitectures(file)
-        if (slices.length !== 1 || slices[0] !== arch) throw new Error(`Desktop runtime: ${file} is ${slices.join('/') || 'not Mach-O'}, expected a thin ${arch} executable`)
-      }
-    }
-    const skills = officeSkillsDirectory(runtimeRoot, arch)
-    for (const skill of ['office', 'office-docx', 'office-pptx', 'office-xlsx', 'office-render', 'office-recalculate', 'office-export-pdf']) {
-      requireFile(join(skills, skill, 'SKILL.md'), `${arch} ${skill} skill`)
+      const slices = machOArchitectures(entries.node)
+      if (slices.length !== 1 || slices[0] !== arch) throw new Error(`Desktop runtime: ${entries.node} is ${slices.join('/') || 'not Mach-O'}, expected a thin ${arch} executable`)
     }
     verified.push({ arch, directory, manifest })
   }

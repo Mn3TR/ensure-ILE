@@ -1,10 +1,9 @@
 /** Sign the bundled interpreter payloads before electron-builder signs the enclosing application; ported from upstream Desktop. */
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
-import { chmodSync, lstatSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { primaryRuntimePythonAliases, readPrimaryRuntime } from '@deepseek-ai/dsh-tool-workspace-dependencies'
 import { isMachO } from './primary-runtime.ts'
 
 /** The pinned upstream checkout owns the entitlement files the payload executables receive. */
@@ -23,9 +22,7 @@ export type VerifyRuntimeCode = (file: string, identity: MacRuntimeSigningIdenti
 
 /**
  * Entitlements one payload file needs. The standalone Node runs V8 and needs JIT; its x64 build also
- * maps executable memory without signatures, including under Rosetta. Python and its extension
- * modules run without entitlements, as upstream Desktop signs them. The Office helper beside the
- * archive is signed by electron-builder with the inherited application entitlements.
+ * maps executable memory without signatures, including under Rosetta.
  * @param path - Payload-relative POSIX path.
  * @param arch - Payload CPU.
  * @returns Entitlement plist, or undefined for a hardened-runtime signature without entitlements.
@@ -36,17 +33,11 @@ export function runtimeEntitlements(path: string, arch: 'arm64' | 'x64'): string
 }
 
 async function listFiles(root: string): Promise<string[]> {
-  let hasManifest = false
-  try { hasManifest = lstatSync(join(root, 'runtime.json')).isFile() } catch { /* fixtures without runtime.json */ }
-  const aliases = hasManifest ? await primaryRuntimePythonAliases(root, await readPrimaryRuntime(root)) : new Map<string, string>()
   const files: string[] = []
   const visit = (directory: string): void => {
     for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
       const path = directory === '' ? entry.name : `${directory}/${entry.name}`
-      if (entry.isSymbolicLink()) {
-        if (aliases.has(path)) continue
-        throw new Error(`Desktop runtime signing: the payload must not contain links: ${path}`)
-      }
+      if (entry.isSymbolicLink()) throw new Error(`Desktop runtime signing: the payload must not contain links: ${path}`)
       if (entry.isDirectory()) visit(path)
       else if (entry.isFile()) files.push(path)
     }
@@ -57,7 +48,7 @@ async function listFiles(root: string): Promise<string[]> {
 
 /**
  * Sign and verify every Mach-O file of one payload in place, awaiting all signers on failure.
- * @param root - Self-contained payload without symlinks other than validated Python aliases.
+ * @param root - Self-contained payload without symlinks.
  * @param appId - Release application identifier.
  * @param identity - Required signing identity.
  * @param arch - Payload CPU, independent of the signing host.

@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
-import { desktopRuntimeBuildPaths, desktopRuntimeTargets, expectedDesktopVersion, officeSkillsDirectory, primaryRuntimeDirectory, verifyDesktopRuntimeTree, verifyPreparedDesktopRuntime, type DesktopRuntimeArch } from '../scripts/prepare-runtime.ts'
+import { desktopRuntimeBuildPaths, desktopRuntimeTargets, expectedDesktopVersion, primaryRuntimeDirectory, verifyDesktopRuntimeTree, verifyPreparedDesktopRuntime, type DesktopRuntimeArch } from '../scripts/prepare-runtime.ts'
 
 const roots: string[] = []
 afterEach(() => { for (const path of roots.splice(0)) rmSync(path, { recursive: true, force: true }) })
@@ -15,27 +15,19 @@ interface PayloadOptions {
   readonly omit?: readonly string[]
 }
 
-/** Write one CPU payload with the Darwin layout the published tool resolves. */
+/** Write one CPU payload with the layout the published tool resolves. */
 function writePayload(runtimeRoot: string, arch: DesktopRuntimeArch, options: PayloadOptions = {}): string {
   const directory = primaryRuntimeDirectory(runtimeRoot, arch)
   const files: Record<string, Buffer | string> = {
-    'runtime.json': JSON.stringify({ desktopVersion: '2.0.0', platform: 'darwin', arch, payloadDigest: 'a'.repeat(64), python: '3.12.14', node: '24.21.0', pnpm: '11.8.0',
-      pythonPackages: { numpy: '2.3.5' }, ...options.manifest }),
-    'dependencies/python/bin/python3': machO[options.cpu ?? arch],
-    'dependencies/python/lib/python3.12/site-packages/numpy/__init__.py': '',
+    'runtime.json': JSON.stringify({ desktopVersion: '2.0.0', platform: 'darwin', arch, payloadDigest: 'a'.repeat(64), node: '24.21.0', pnpm: '11.8.0', ...options.manifest }),
     'dependencies/node/bin/node': machO[options.cpu ?? arch],
+    'dependencies/node/node_modules/.keep': '',
     'dependencies/pnpm/bin/pnpm.mjs': 'export {}\n',
   }
   for (const [path, content] of Object.entries(files)) {
     if (options.omit?.includes(path)) continue
     mkdirSync(join(directory, path, '..'), { recursive: true })
     writeFileSync(join(directory, path), content)
-  }
-  const skills = officeSkillsDirectory(runtimeRoot, arch)
-  for (const path of ['office/SKILL.md', 'office-docx/SKILL.md', 'office-pptx/SKILL.md', 'office-xlsx/SKILL.md', 'office-render/SKILL.md', 'office-recalculate/SKILL.md', 'office-export-pdf/SKILL.md']) {
-    if (options.omit?.includes(`office-skills/${path}`)) continue
-    mkdirSync(join(skills, path, '..'), { recursive: true })
-    writeFileSync(join(skills, path), '')
   }
   return directory
 }
@@ -54,10 +46,9 @@ it('ships both Darwin CPUs by default or the requested smoke CPU, Windows x64 an
   expect(desktopRuntimeTargets('linux', {})).toEqual([])
 })
 
-it('lays out each CPU payload beside its Office resources under the build directory', () => {
+it('lays out each CPU payload under the build directory', () => {
   expect(desktopRuntimeBuildPaths('/desktop')).toEqual({ runtime: join('/desktop', '.desktop-build', 'runtime'), downloads: join('/desktop', '.desktop-build', 'downloads') })
   expect(primaryRuntimeDirectory('/resources/runtime', 'x64')).toBe(join('/resources/runtime', 'x64', 'primary-runtime'))
-  expect(officeSkillsDirectory('/resources/runtime', 'x64')).toBe(join('/resources/runtime', 'x64', 'office-skills'))
 })
 
 it('reads the product version from the package manifest', () => {
@@ -100,24 +91,24 @@ it('rejects a missing CPU, another version, a payload without Node, or a foreign
   writePayload(swapped, 'arm64', { manifest: { arch: 'x64' } })
   expect(() => verifyDesktopRuntimeTree(swapped, 'darwin', '2.0.0')).toThrow('declares darwin x64, expected darwin arm64')
   const noNode = fixture()
-  writePayload(noNode, 'arm64', { manifest: { node: undefined, pnpm: undefined } })
-  expect(() => verifyDesktopRuntimeTree(noNode, 'darwin', '2.0.0')).toThrow('must bundle Node and pnpm')
+  writePayload(noNode, 'arm64', { manifest: { node: undefined } })
+  expect(() => verifyDesktopRuntimeTree(noNode, 'darwin', '2.0.0')).toThrow('must declare node and pnpm')
   const slice = fixture()
   writePayload(slice, 'arm64')
   writePayload(slice, 'x64', { cpu: 'arm64' })
   expect(() => verifyDesktopRuntimeTree(slice, 'darwin', '2.0.0')).toThrow('expected a thin x64 executable')
 })
 
-it('rejects missing entry points and Office resources', () => {
-  const python = fixture()
-  writePayload(python, 'arm64', { omit: ['dependencies/python/bin/python3'] })
-  writePayload(python, 'x64')
-  expect(() => verifyDesktopRuntimeTree(python, 'darwin', '2.0.0')).toThrow('missing arm64 Python interpreter')
-  const router = fixture()
-  writePayload(router, 'arm64')
-  writePayload(router, 'x64', { omit: ['office-skills/office/SKILL.md'] })
-  expect(() => verifyDesktopRuntimeTree(router, 'darwin', '2.0.0')).toThrow('missing x64 office skill')
-  const skill = fixture()
-  writePayload(skill, 'arm64', { omit: ['office-skills/office-xlsx/SKILL.md'] })
-  expect(() => verifyDesktopRuntimeTree(skill, 'darwin', '2.0.0')).toThrow('missing arm64 office-xlsx skill')
+it('rejects missing entry points', () => {
+  const node = fixture()
+  writePayload(node, 'arm64', { omit: ['dependencies/node/bin/node'] })
+  writePayload(node, 'x64')
+  expect(() => verifyDesktopRuntimeTree(node, 'darwin', '2.0.0')).toThrow('missing arm64 Node executable')
+  const pnpm = fixture()
+  writePayload(pnpm, 'arm64')
+  writePayload(pnpm, 'x64', { omit: ['dependencies/pnpm/bin/pnpm.mjs'] })
+  expect(() => verifyDesktopRuntimeTree(pnpm, 'darwin', '2.0.0')).toThrow('missing x64 pnpm entry')
+  const packages = fixture()
+  writePayload(packages, 'arm64', { omit: ['dependencies/node/node_modules/.keep'] })
+  expect(() => verifyDesktopRuntimeTree(packages, 'darwin', '2.0.0')).toThrow('missing arm64 Node package directory')
 })

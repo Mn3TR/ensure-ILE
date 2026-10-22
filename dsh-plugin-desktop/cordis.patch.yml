@@ -5,10 +5,15 @@
   # user patch can still disable the Browser explicitly.
   disabled: false
 
-# DHDL: this build is a learning environment, so the new-session picker only
-# offers the standard preset and the guide preset. The upstream PTC, minimal
-# and creator presets stay untouched in the pinned submodule; disabling them
-# here keeps the picker focused without editing upstream files.
+# DHDL: this build is a learning environment. The web-app bundle disables the
+# base tool rows and lets each preset mount its own, so the preset list is the
+# tool surface. `standard` is the preset carrying bash, fs, subagent, workflow,
+# todo and goal; disabling it leaves the guide preset (whose only tool is
+# `read_note`) as the only agent a learner can start. PTC, minimal and creator
+# stay untouched in the pinned submodule and are disabled here for the same
+# reason.
+- id: preset-standard
+  disabled: true
 - id: preset-ptc
   disabled: true
 - id: preset-minimal

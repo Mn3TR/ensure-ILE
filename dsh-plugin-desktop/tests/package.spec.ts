@@ -986,9 +986,6 @@ describe('published package surface', () => {
     expect(manifest.build?.mac?.signIgnore).toContain('/Contents/Resources/runtime/(?:arm64|x64)/primary-runtime(?:/|$)')
     expect(manifest.build?.mac?.x64ArchFiles).toMatch(/^\{\*\*\/node_modules\/\{.+\},Contents\/Resources\/runtime\/\*\*,Contents\/Resources\/runtime\/\*\*\/\.\*\/\*\*\}$/u)
     expect(manifest.scripts?.['prepare:runtime']).toBe('node scripts/prepare-runtime.ts')
-    for (const name of ['@deepseek-ai/dsh-skill-office', '@deepseek-ai/dsh-tool-workspace-dependencies']) {
-      expect(manifest.dependencies?.[name], name).toBe(runtimeVersion)
-    }
   })
 
   it('runs platform package gates before reusing native packaging outputs', () => {
