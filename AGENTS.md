@@ -17,12 +17,12 @@
 - `dsh-plugin-guide/`：guide 模式——整份替换系统提示（`prompts/guide.md`）+ `read_note` 工具读 `skills/{math,arts}.md`；预设 id `guide`、显示「引导模式」，是 Profile 默认预设。
 - `dsh-community-fabric/`：社区互操作 RFC，纯文档，不声明可加载入口。
 - 占位（只有 README，无 `package.json`、未进 workspaces）：`dsh-plugin-hrl/`（HRL 模式：学生已有答案→优化）、`dsh-plugin-schedule/`（课表+进度→明天讲什么/今日预习复习）、`dsh-plugin-bankmanager/`（题库状态机 new/guide/hrl/review/mastered/parked）、`dsh-plugin-work/`（work 模式：学生独立做→交答案→判卷，判不过转 guide）。
-- 已删：Beta/Next 变体、`dsh-community-market/`、`vendor/agents-anywhere/`（含全部 AA 接线）；插件市场只剩 `dshmarket` 与官方内置来源。2026-10-22 又删了 `_deprecated/`（上游 0.1.x 归档）、Next 交接提示（`next-transition-notice` 与 `docs/stable-next-transition`）、`upstream.json` 的 beta channel，以及旧 profile 的 retired bundle 兼容层（`RETIRED_BUNDLES`/`RETIRED_ROW_IDS`——DHDL 的 profile 都在 `.dhdl` 里新种，永远不读旧 profile，2026-10-22 李确认后删）。
+- 已删：Beta/Next 变体、`dsh-community-market/`、`vendor/agents-anywhere/`（含全部 AA 接线）；2026-10-22 又删了 `_deprecated/`（上游 0.1.x 归档）、Next 交接提示（`next-transition-notice` 与 `docs/stable-next-transition`）、`upstream.json` 的 beta channel，以及旧 profile 的 retired bundle 兼容层（`RETIRED_BUNDLES`/`RETIRED_ROW_IDS`——DHDL 的 profile 都在 `.dhdl` 里新种，永远不读旧 profile，2026-10-22 李确认后删）；插件市场整个从构建里拿掉（`dshmarket` 依赖、`.yarn/patches/dshmarket-*.patch`、`scripts/prepare-dsh-market.mjs`、三个 market 脚本与 `market:prepare` 的全部调用点、`dshmarket-compat.spec.ts`），学生装不了插件也不需要装。
 - 能力面与载荷（2026-10-22 精简）：web-app 关掉了 base 的工具行、工具只由 preset 挂载，所以 `preset-standard` 禁掉后学生只能开 guide，手上就 `read_note` 一个工具（PTC/minimal/creator 本来也禁）；打包只带 Node+pnpm 载荷，实测 109MB（原 265MB），Python 解释器、Office 技能和 `load_workspace_dependencies` 一起删了，`desktop-office.ts` 已不存在。
 
 **能跑**：`Start-Process dsh-plugin-desktop\node_modules\electron\dist\electron.exe dsh-plugin-desktop\lib\main.js`，composer 预设默认「引导模式」；`DHDL_SETUP=full` 可看完整 7 屏向导。
 **数据隔离**：`run()` 把 `DSH_HOME`/`DHDL_HOME`/`DSH_AGENTS_HOME`/`userData` 全放 `.dhdl/`；`seedProfile()` 只复制 `profiles/dhdl/` 的 `package.json` 与 `cordis.patch.yml`，**不装依赖**——清掉 `.dhdl` 后要手动在 `.dhdl/home/profiles/desktop` 跑一次 `pnpm install`。
-**验证现状**：`check:layout`、`typecheck`、桌面包 `build` 通过（2026-10-22 清理后复验过；`yarn build` 已经能跑通完整链条（`market:prepare` + 桌面构建）；桌面包单测 26 个失败（Python 载荷删完仍是一模一样的 26 个、同六个文件），全是 Windows 平台基线（module-resolution 15、linux-artifacts 5、compatibility-shell 2、desktop-runtime-environment 2、electron-runtime 1、recovery-plugin-uninstall 1；2026-10-22 复跑确认，另一次跑出 27，有 1 个偶发）。`corepack yarn check` 全量门禁和 `dist:win` 打包尚未跑过。
+**验证现状**：`check:layout`、`typecheck`、桌面包 `build` 通过（2026-10-22 清理后复验过；`yarn build` 不再需要 `market:prepare`，直接构建桌面包；桌面包单测 26 个失败（Python 载荷删完仍是一模一样的 26 个、同六个文件），全是 Windows 平台基线（module-resolution 15、linux-artifacts 5、compatibility-shell 2、desktop-runtime-environment 2、electron-runtime 1、recovery-plugin-uninstall 1；2026-10-22 复跑确认，另一次跑出 27，有 1 个偶发）。`corepack yarn check` 全量门禁和 `dist:win` 打包尚未跑过。
 
 **提交**：`272a34c` 删 Beta/Next → `d9dfdba` 删社区市场+AA 并把 hrll 改名 guide → `bc5a422` 三个占位骨架 → `a24d2c9` 记忆 → `c784397` 状态 → `4c56d90` 记忆快照。未 push。
 
@@ -36,7 +36,7 @@
 7. 真机验证 guide 会话：现在只有 `read_note` 一个工具，看学生拍照发题能不能进模型；不行就在 preset 里补 `tool-fs`（只开 `readImage`）或 `tool-web`。
 8. README/docs 补 EnSure Lab / 因需 署名。
 
-**坑**：`profile-setup/<hash>/state.json.pending` 必须精确 `pending\n`（8 字节），空文件会让主进程进恢复页；冷启动首屏「正在加载设置…」约 30 秒；billion-context 0.1.202 有 0.1.203 关键更新（升级后需重启 dsh）；`dshmarket` 钉 1.67.0，`.yarn/patches/dshmarket-desktop.patch` 已按 1.67.0 重做（上游 1.66.45 起 `checkUpdates` 改成 `options` 参数，我们的 `hostProvidedNpmVersions` 变成它后面的第 8 个参数）；npm 每发一版 `market:check` 就会报 stale、`market:prepare` 会追新并可能因补丁打不上而失败还原——那时要重新 port 补丁，别指望自动跟得上。
+**坑**：`profile-setup/<hash>/state.json.pending` 必须精确 `pending\n`（8 字节），空文件会让主进程进恢复页；冷启动首屏「正在加载设置…」约 30 秒；billion-context 0.1.202 有 0.1.203 关键更新（升级后需重启 dsh）；市场已经整个删掉，不再有追 latest 和 port 补丁的事；设置里的插件市场开关现在没有可挂载的 provider。
 
 
 ---
@@ -55,7 +55,7 @@ This repository owns the desktop product around an unmodified DeepSeek Harness c
 
 - Start the desktop development workflow with `corepack yarn dev`.
 - Build the desktop package with `corepack yarn build`.
-- Root build, dev/start, and packaging commands refresh `dshmarket` from npm `latest` via `corepack yarn market:prepare`. Commit its exact dependency versions, Desktop compatibility patch, and lockfile together. `corepack yarn market:check` verifies freshness without writes; offline lookups or incompatible patches fail rather than silently retaining an old market. Installed apps do not hot-update executable plugins on launch.
+- DHDL ships **no plugin market**. The upstream rule below applied while `dshmarket` was bundled; this fork removed the dependency, its compatibility patch, and the `market:prepare` / `market:check` / `test:market-release` scripts, so build, dev/start, and packaging commands run the desktop workspace directly. Installed apps do not hot-update executable plugins on launch.
 - Run unit tests with `corepack yarn test`.
 - Run type checking with `corepack yarn typecheck`.
 - Run the complete headless gate with `corepack yarn check`.

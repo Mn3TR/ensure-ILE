@@ -710,8 +710,7 @@
     "@deepseek-ai/dsh-webhook@npm:0.2.1-rc.2": "file:vendor/dsh-runtime/0.2.1-rc.2/deepseek-ai-dsh-webhook-0.2.1-rc.2.tgz",
     "@deepseek-ai/dsh-webhook@npm:^0.2.1-rc.2": "file:vendor/dsh-runtime/0.2.1-rc.2/deepseek-ai-dsh-webhook-0.2.1-rc.2.tgz",
     "@deepseek-ai/dsh-webhook-github@npm:0.2.1-rc.2": "file:vendor/dsh-runtime/0.2.1-rc.2/deepseek-ai-dsh-webhook-github-0.2.1-rc.2.tgz",
-    "@deepseek-ai/dsh-webhook-github@npm:^0.2.1-rc.2": "file:vendor/dsh-runtime/0.2.1-rc.2/deepseek-ai-dsh-webhook-github-0.2.1-rc.2.tgz",
-    "dshmarket@npm:1.67.0": "patch:dshmarket@npm%3A1.67.0#./.yarn/patches/dshmarket-desktop.patch"
+    "@deepseek-ai/dsh-webhook-github@npm:^0.2.1-rc.2": "file:vendor/dsh-runtime/0.2.1-rc.2/deepseek-ai-dsh-webhook-github-0.2.1-rc.2.tgz"
   },
   "dependenciesMeta": {
     "@deepseek-ai/dsh-subprocess-local": {
@@ -743,22 +742,22 @@
     }
   },
   "scripts": {
-    "build": "yarn market:prepare && yarn workspace dsh-plugin-desktop build",
+    "build": "yarn workspace dsh-plugin-desktop build",
     "typecheck": "yarn workspace dsh-plugin-desktop typecheck",
     "test": "yarn workspace dsh-plugin-desktop test",
     "test:bilingual-docs": "node --test scripts/bilingual-docs.test.mjs",
     "check:bilingual-docs": "yarn test:bilingual-docs && node scripts/verify-bilingual-docs.mjs",
     "check:vendored-runtime": "node scripts/sync-vendored-runtime.mjs --check --channel stable",
-    "check:layout": "node scripts/run-parallel.mjs \"node --test scripts/prepare-dsh-market.test.mjs scripts/bilingual-docs.test.mjs scripts/inspector-compat.test.mjs scripts/export-app-icons.test.mjs\" \"node scripts/verify-bilingual-docs.mjs\" \"node scripts/sync-vendored-runtime.mjs --check --channel stable\" \"node scripts/export-app-icons.mjs --check\" \"node scripts/verify-layout.mjs\"",
+    "check:layout": "node scripts/run-parallel.mjs \"node --test scripts/bilingual-docs.test.mjs scripts/inspector-compat.test.mjs scripts/export-app-icons.test.mjs\" \"node scripts/verify-bilingual-docs.mjs\" \"node scripts/sync-vendored-runtime.mjs --check --channel stable\" \"node scripts/export-app-icons.mjs --check\" \"node scripts/verify-layout.mjs\"",
     "check": "node scripts/run-parallel.mjs \"yarn check:layout\" \"yarn workspace dsh-community-fabric check\" && node scripts/run-parallel.mjs \"yarn workspace dsh-plugin-desktop check\"",
-    "dev": "yarn market:prepare && yarn workspace dsh-plugin-desktop dev",
-    "start": "yarn market:prepare && yarn workspace dsh-plugin-desktop start",
-    "package:dir": "yarn market:prepare && yarn workspace dsh-plugin-desktop package:dir",
-    "dist:mac": "yarn market:prepare && yarn workspace dsh-plugin-desktop dist:mac",
-    "dist:mac-smoke": "yarn market:prepare && yarn workspace dsh-plugin-desktop dist:mac-smoke",
-    "dist:win": "yarn market:prepare && yarn workspace dsh-plugin-desktop dist:win",
-    "dist:linux": "yarn market:prepare && yarn workspace dsh-plugin-desktop dist:linux",
-    "dist:win-portable": "yarn market:prepare && yarn workspace dsh-plugin-desktop dist:win-portable",
+    "dev": "yarn workspace dsh-plugin-desktop dev",
+    "start": "yarn workspace dsh-plugin-desktop start",
+    "package:dir": "yarn workspace dsh-plugin-desktop package:dir",
+    "dist:mac": "yarn workspace dsh-plugin-desktop dist:mac",
+    "dist:mac-smoke": "yarn workspace dsh-plugin-desktop dist:mac-smoke",
+    "dist:win": "yarn workspace dsh-plugin-desktop dist:win",
+    "dist:linux": "yarn workspace dsh-plugin-desktop dist:linux",
+    "dist:win-portable": "yarn workspace dsh-plugin-desktop dist:win-portable",
     "upstream:version": "cd deepseek-harness && corepack pnpm --version",
     "upstream:install": "cd deepseek-harness && CI=true corepack pnpm install --frozen-lockfile",
     "upstream:build": "cd deepseek-harness && corepack pnpm run build",
@@ -767,9 +766,6 @@
     "upstream:prepare-runtime": "yarn upstream:install && yarn upstream:build:official && yarn upstream:pack:dsh",
     "icons:export": "node scripts/export-app-icons.mjs",
     "icons:check": "node --test scripts/export-app-icons.test.mjs && node scripts/export-app-icons.mjs --check",
-    "market:prepare": "node scripts/prepare-dsh-market.mjs",
-    "market:check": "node scripts/prepare-dsh-market.mjs --check",
-    "test:market-release": "node --test scripts/prepare-dsh-market.test.mjs",
     "test:inspector-compat": "node --test scripts/inspector-compat.test.mjs"
   }
 }

@@ -539,35 +539,6 @@ virtualStoreDirMaxLength: 60
     }])
   })
 
-  it('keeps the newer Desktop dshmarket when a Profile copy is older', () => {
-    const home = temporaryHome()
-    const oldProfileMarketDir = installBundle(home, DESKTOP_MARKET_IDENTITIES.dshMarket.packageName, [
-      '- insert:',
-      '    - id: dsh-market',
-      '      name: dshmarket',
-      '',
-    ].join('\n'), '0.1.0')
-    const profileManifestPath = join(ensureDesktopProfile(home), 'package.json')
-    const profileManifest = JSON.parse(readFileSync(profileManifestPath, 'utf8')) as {
-      dsh: { profile: { bundles: string[] } }
-    }
-    profileManifest.dsh.profile.bundles.push(DESKTOP_MARKET_IDENTITIES.dshMarket.packageName)
-    writeFileSync(profileManifestPath, `${JSON.stringify(profileManifest)}\n`)
-
-    const prepared = prepareDesktopProfile(undefined, home, 'darwin', 'desktop', undefined, {
-      requested: 'dsh-market',
-      effective: 'dsh-market',
-      legacyDefaulted: false,
-    })
-    const selected = prepared.profile.layers.find(layer =>
-      layer.packageName === DESKTOP_MARKET_IDENTITIES.dshMarket.packageName)
-    expect(selected?.packageDir).not.toBe(oldProfileMarketDir)
-    expect(JSON.parse(readFileSync(join(selected!.packageDir, 'package.json'), 'utf8'))).toMatchObject({
-      name: 'dshmarket',
-      version: JSON.parse(readFileSync(createRequire(import.meta.url).resolve('dshmarket/package.json'), 'utf8')).version,
-    })
-  })
-
   it('honors plugin-management disables for third-party bundles under the selected market', () => {
     const home = temporaryHome()
     const packageName = 'third-party-plugin'

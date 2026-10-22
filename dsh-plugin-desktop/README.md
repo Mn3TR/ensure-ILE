@@ -94,7 +94,7 @@ On macOS the enhanced window uses its original hidden-inset geometry: traffic li
 
 ## Development
 
-Root build, development/start, and packaging commands run `corepack yarn market:prepare` to query npm `latest` and synchronize the bundled `dshmarket`. The resolved exact versions and lockfile remain reproducible and should be committed together. Desktop self-update/rollback compatibility patches are retained; a failed lookup, install, or patch application stops preparation instead of silently using an old version. `corepack yarn market:check` checks freshness without changes. Installed apps do not download or hot-replace plugins on startup; the existing package overlay chooses the newer installed copy between the application and the active Profile without deleting either.
+Root build, development/start, and packaging commands build the desktop package directly. DHDL ships no plugin market: `dshmarket` is neither a dependency nor a patched bundle, so there is no `market:prepare` step and nothing to refresh from npm. Installed apps do not download or hot-replace plugins on startup; the existing package overlay chooses the newer installed copy between the application and the active Profile without deleting either.
 
 This package is managed by the Yarn workspace at the repository root. The sibling `deepseek-harness/` checkout remains an independent upstream pnpm project and is not part of the Yarn workspace. Install and verify DSH Desktop from the repository root:
 
@@ -140,7 +140,7 @@ dsh plugin update
 
 An explicit `--profile <name>` remains authoritative and is useful for preparing another profile before selecting it.
 
-`dshmarket` ships with the desktop build. The repository pins its exact version in `package.json` and carries a Desktop compatibility patch under `.yarn/patches/`; build, development/start, and packaging entry points refresh it from npm `latest`, so the locked version and the lockfile are committed together. A copy the user installs into the active Profile is separate: the package overlay runs whichever copy is newer and deletes neither.
+DHDL ships no plugin market. `dshmarket` is not a dependency and `.yarn/patches/` carries no compatibility patch for it, so the profile composition never mounts a Market provider row and the settings surface has no market to enable.
 
 See [Plugin services for authors](docs/plugin-services.md) for required injection, optional Desktop adaptation, TypeScript examples, cancellation, and fallback guidance.
 
@@ -273,7 +273,7 @@ None. The same DSH Host and client feature plugins assemble model requests.
 - Extended and enhanced modes are unavailable on Linux. Linux continues to use the compatibility presentation.
 - The macOS and Windows tray terminal exposes private `dsh`, `pnpm`, and `node` shims. Separately, the Host runtime exposes the bundled `pnpm` command on the current Electron process `PATH` for ambient compatibility and provides the managed `desktopPnpm` service; none of these commands are added to the system `PATH`, and Linux currently has no desktop terminal command.
 - On Windows, the ambient `pnpm` command and lifecycle Node helper are `.cmd` shims. `desktopPnpm.run()` avoids shell lookup for the manager process by launching the exact packaged pnpm entry, while upstream `dsh plugin`, PowerShell, and Command Prompt can resolve ambient shims through a command interpreter. A third-party plugin that calls Node `spawn('pnpm', { shell: false })`, or a lifecycle script that directly executes its `.cmd` `npm_node_execpath` with `shell: false`, remains non-portable and should use the service or a shell-aware launch path.
-- `dshmarket` ships bundled from the pinned npm release together with the Desktop compatibility patch, rather than remaining an optional user-installed package. The package overlay still prefers a newer copy installed into the active Profile.
+- DHDL ships no Market provider: `dshmarket` and its Desktop compatibility patch were removed from the build, so a release cannot mount one.
 - The update handoff validates the download container, not publisher identity. macOS still requires the user to replace the application from the opened DMG; Windows runs the downloaded NSIS installer but the local `dist:win` artifact is unsigned. Signed artifacts, Authenticode/publisher verification, SmartScreen reputation, and native upgrade testing remain release gates.
 - The shared carrier is HTTP and WebSocket, not Electron IPC. It defaults to loopback and supports an explicitly confirmed all-interface LAN bind. Replacing the carrier requires transport extension points in upstream DSH and is outside this standalone package.
 - The Stable build pins the published DSH `0.2.1-rc.2` family and the corresponding official `deepseek-harness/` release source. Product builds consume the checked-in official-profile runtime tarballs recorded in `upstream.json`, rather than linking the source checkout.
