@@ -22,7 +22,7 @@
 
 **能跑**：`Start-Process dsh-plugin-desktop\node_modules\electron\dist\electron.exe dsh-plugin-desktop\lib\main.js`，composer 预设默认「引导模式」；`DHDL_SETUP=full` 可看完整 7 屏向导。
 **数据隔离**：`run()` 把 `DSH_HOME`/`DHDL_HOME`/`DSH_AGENTS_HOME`/`userData` 全放 `.dhdl/`；`seedProfile()` 只复制 `profiles/dhdl/` 的 `package.json` 与 `cordis.patch.yml`，**不装依赖**——清掉 `.dhdl` 后要手动在 `.dhdl/home/profiles/desktop` 跑一次 `pnpm install`。
-**验证现状**：`check:layout`、`typecheck`、桌面包 `build` 通过（2026-10-22 清理后复验过；`yarn build` 目前会先卡在 `market:prepare`，见坑）；桌面包单测 26 个失败（Python 载荷删完仍是一模一样的 26 个、同六个文件），全是 Windows 平台基线（module-resolution 15、linux-artifacts 5、compatibility-shell 2、desktop-runtime-environment 2、electron-runtime 1、recovery-plugin-uninstall 1；2026-10-22 复跑确认，另一次跑出 27，有 1 个偶发）。`corepack yarn check` 全量门禁和 `dist:win` 打包尚未跑过。
+**验证现状**：`check:layout`、`typecheck`、桌面包 `build` 通过（2026-10-22 清理后复验过；`yarn build` 已经能跑通完整链条（`market:prepare` + 桌面构建）；桌面包单测 26 个失败（Python 载荷删完仍是一模一样的 26 个、同六个文件），全是 Windows 平台基线（module-resolution 15、linux-artifacts 5、compatibility-shell 2、desktop-runtime-environment 2、electron-runtime 1、recovery-plugin-uninstall 1；2026-10-22 复跑确认，另一次跑出 27，有 1 个偶发）。`corepack yarn check` 全量门禁和 `dist:win` 打包尚未跑过。
 
 **提交**：`272a34c` 删 Beta/Next → `d9dfdba` 删社区市场+AA 并把 hrll 改名 guide → `bc5a422` 三个占位骨架 → `a24d2c9` 记忆 → `c784397` 状态 → `4c56d90` 记忆快照。未 push。
 
@@ -33,10 +33,10 @@
 4. `dsh-plugin-work` 实现（骨架已建，设计意图与待定问题见 `dsh-plugin-work/README.md`）。
 5. schedule / bankmanager 落地（进度口径、课表来源、入库方式、SRS、存储）。
 6. 修 Windows 单测、跑全量 `yarn check`、试 `dist:win`。
-7. 升级 `dshmarket` 到 1.66.45 并修 `.yarn/patches/dshmarket-desktop.patch`：npm latest 已到 1.66.45，补丁打不上（hunk #2），`build`/`dev`/`package:*` 全卡在 `market:prepare`。
+7. 真机验证 guide 会话：现在只有 `read_note` 一个工具，看学生拍照发题能不能进模型；不行就在 preset 里补 `tool-fs`（只开 `readImage`）或 `tool-web`。
 8. README/docs 补 EnSure Lab / 因需 署名。
 
-**坑**：`profile-setup/<hash>/state.json.pending` 必须精确 `pending\n`（8 字节），空文件会让主进程进恢复页；冷启动首屏「正在加载设置…」约 30 秒；billion-context 0.1.202 有 0.1.203 关键更新（升级后需重启 dsh）；`dshmarket` 钉 1.66.44 而 npm latest 是 1.66.45，补丁不兼容，`market:prepare` 失败会还原清单和锁文件——要验证构建就先跑 `workspace dsh-plugin-desktop build` 绕过。
+**坑**：`profile-setup/<hash>/state.json.pending` 必须精确 `pending\n`（8 字节），空文件会让主进程进恢复页；冷启动首屏「正在加载设置…」约 30 秒；billion-context 0.1.202 有 0.1.203 关键更新（升级后需重启 dsh）；`dshmarket` 钉 1.67.0，`.yarn/patches/dshmarket-desktop.patch` 已按 1.67.0 重做（上游 1.66.45 起 `checkUpdates` 改成 `options` 参数，我们的 `hostProvidedNpmVersions` 变成它后面的第 8 个参数）；npm 每发一版 `market:check` 就会报 stale、`market:prepare` 会追新并可能因补丁打不上而失败还原——那时要重新 port 补丁，别指望自动跟得上。
 
 
 ---

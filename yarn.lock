@@ -10133,7 +10133,7 @@ __metadata:
     class-variance-authority: "npm:^0.7.1"
     clsx: "npm:^2.1.1"
     dsh-plugin-guide: "workspace:*"
-    dshmarket: "npm:1.66.44"
+    dshmarket: "npm:1.67.0"
     electron: "npm:44.0.0"
     electron-builder: "npm:26.15.7"
     extract-zip: "npm:2.0.1"
@@ -10185,9 +10185,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"dshmarket@npm:1.66.44":
-  version: 1.66.44
-  resolution: "dshmarket@npm:1.66.44"
+"dshmarket@npm:1.67.0":
+  version: 1.67.0
+  resolution: "dshmarket@npm:1.67.0"
   dependencies:
     js-yaml: "npm:^4.3.2"
     undici: "npm:^7.29.1"
@@ -10200,13 +10200,13 @@ __metadata:
       optional: true
     "@deepseek-ai/schemastery":
       optional: true
-  checksum: 10c0/e9c8be16f6d4109c3b84474236060e6c4420cbcd4cc6ae6958e5a0c296b55159248bbbfadcc30744d6c42bf6f07be698e7a8ea7e3d8a0a4ff2fee48c6d6906e2
+  checksum: 10c0/d35d1983ff4734884333a592baf5bc6bf69fed42c7d2d32f2f2ff35b55891b9787cbf514a02d4e1c5e7da0daccf53159e067e0e31f83295fd551b13a4b7293ab
   languageName: node
   linkType: hard
 
-"dshmarket@patch:dshmarket@npm%3A1.66.44#./.yarn/patches/dshmarket-desktop.patch::locator=dhdl%40workspace%3A.":
-  version: 1.66.44
-  resolution: "dshmarket@patch:dshmarket@npm%3A1.66.44#./.yarn/patches/dshmarket-desktop.patch::version=1.66.44&hash=f39479&locator=dhdl%40workspace%3A."
+"dshmarket@patch:dshmarket@npm%3A1.67.0#./.yarn/patches/dshmarket-desktop.patch::locator=dhdl%40workspace%3A.":
+  version: 1.67.0
+  resolution: "dshmarket@patch:dshmarket@npm%3A1.67.0#./.yarn/patches/dshmarket-desktop.patch::version=1.67.0&hash=92dbc6&locator=dhdl%40workspace%3A."
   dependencies:
     js-yaml: "npm:^4.3.2"
     undici: "npm:^7.29.1"
@@ -10219,7 +10219,7 @@ __metadata:
       optional: true
     "@deepseek-ai/schemastery":
       optional: true
-  checksum: 10c0/1a561c29652e2f5eba58cb7f78aceb06d992dad3418c3cfb86ca772026dced4aad7478616a8f479af5053e680158196cfcb60716a443650bc10ab7ea7ff276f8
+  checksum: 10c0/821e13ddb4a885ceb2a4fd382c368207c18c3919bb65ba60b0ea466adc5fde92991f68a96698e1191f35f77b7acb20ec6038b1ae78949553275cf237564b69fb
   languageName: node
   linkType: hard
 
