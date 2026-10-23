@@ -8,7 +8,7 @@
 >
 > 下面「DSH Desktop repository rules」是上游规则，对本仓库仍然全部有效。
 
-## 当前状态（2026-10-22 00:04）
+## 当前状态（2026-10-23 23:25）
 
 **组织**：EnSure Lab / 因需（因=原因、需=需要，即「每一步都要说得清为什么」）。包名统一 `dsh-plugin-` 前缀，不用 npm scope。
 
@@ -22,21 +22,27 @@
 
 **能跑**：`Start-Process dsh-plugin-desktop\node_modules\electron\dist\electron.exe dsh-plugin-desktop\lib\main.js`，composer 预设默认「引导模式」；`DHDL_SETUP=full` 可看完整 7 屏向导。
 **数据隔离**：`run()` 把 `DSH_HOME`/`DHDL_HOME`/`DSH_AGENTS_HOME`/`userData` 全放 `.dhdl/`；`seedProfile()` 只复制 `profiles/dhdl/` 的 `package.json` 与 `cordis.patch.yml`，**不装依赖**——清掉 `.dhdl` 后要手动在 `.dhdl/home/profiles/desktop` 跑一次 `pnpm install`。
+
+**共享数据层（guide / work / hrl / schedule 都指着它）**：这一层现在只有一半。
+- **记忆**：`@max-null/dsh-memory` 0.15.1，以 bundle 形式挂在 profile 根（`profiles/dhdl/package.json` 的 `bundles` + 依赖），**不在 preset 里**——所以它的工具面不受 preset 裁剪控制，真机上 guide 会话到底看不看得到 `memory_*` 还没验证。存量按「global / 当前工作区」两层，工作区层落在会话工作区的 `.dsh/storages/`；`.dhdl/home/storages` 下目前一条记忆都没有，等于**插件挂着、一次都没真用过**。上游已到 0.18.0。
+- **题库**：**零代码**。只有 `dsh-plugin-bankmanager/README.md` 一份草案（状态机、字段、计划工具、待定问题），没有 `package.json`、没进 workspaces、没有任何工具。
+- **两者的边界没定**：记忆是「模型自己的跨会话笔记」（BM25 检索、自由文本），题库是「学生的一道道题」（结构化 + 状态机 + 调度）。现在没有任何一行代码把它们连起来。
+
 **验证现状**：`check:layout`、`typecheck`、桌面包 `build` 通过（2026-10-22 清理后复验过；`yarn build` 不再需要 `market:prepare`，直接构建桌面包；桌面包单测 26 个失败（Python 载荷删完仍是一模一样的 26 个、同六个文件），全是 Windows 平台基线（module-resolution 15、linux-artifacts 5、compatibility-shell 2、desktop-runtime-environment 2、electron-runtime 1、recovery-plugin-uninstall 1；2026-10-22 复跑确认，另一次跑出 27，有 1 个偶发）。`corepack yarn check` 全量门禁和 `dist:win` 打包尚未跑过。
 
-**提交**：`272a34c` 删 Beta/Next → `d9dfdba` 删社区市场+AA 并把 hrll 改名 guide → `bc5a422` 三个占位骨架 → `a24d2c9` 记忆 → `c784397` 状态 → `4c56d90` 记忆快照。未 push。
+**提交**：`272a34c` 删 Beta/Next → `d9dfdba` 删社区市场+AA 并把 hrll 改名 guide → `bc5a422` 三个占位骨架 → `a24d2c9` 记忆 → `c784397` 状态 → `4c56d90` 记忆快照 → `6b6760d` 删 Next 交接与 `_deprecated` → `380caf4` 删 retired bundle 兼容层 → `abf2025` 砍 preset + 删 Python 载荷 → `4e9546a` dshmarket 补丁挪 1.67.0 → `170edcc` 把插件市场从构建里删掉。**11 个提交未 push**。
 
 **待办（按优先级）**：
-1. 真机跑一道题，验证 guide 模式（系统提示替换 + `read_note` 调用）。
-2. `seedProfile()` 后自动装依赖，免手动 pnpm。
-3. HRL 模式定稿：优化到什么程度算完、要不要 A/B 保留原答案并采偏好信号、学科备注怎么分、发现学生没做出来是否退回 guide、入口在哪。
-4. `dsh-plugin-work` 实现（骨架已建，设计意图与待定问题见 `dsh-plugin-work/README.md`）。
-5. schedule / bankmanager 落地（进度口径、课表来源、入库方式、SRS、存储）。
-6. 修 Windows 单测、跑全量 `yarn check`、试 `dist:win`。
-7. 真机验证 guide 会话：现在只有 `read_note` 一个工具，看学生拍照发题能不能进模型；不行就在 preset 里补 `tool-fs`（只开 `readImage`）或 `tool-web`。
+1. **题库 / 记忆这一层定稿**——guide、work、hrl、schedule 全依赖它，先定边界、存储、接口再写代码；`dsh-plugin-bankmanager/README.md` 里的「还没定的问题」就是这轮的输入（2026-10-23 李点名要先做）。
+2. 真机跑一道题，验证 guide 模式（系统提示替换 + `read_note` 调用 + 拍照的题能不能进模型；进不去就在 preset 里补 `tool-fs` 只开 `readImage`）。
+3. `seedProfile()` 后自动装依赖，免手动 pnpm。
+4. HRL 模式定稿：优化到什么程度算完、要不要 A/B 保留原答案并采偏好信号、学科备注怎么分、发现学生没做出来是否退回 guide、入口在哪。
+5. `dsh-plugin-work` 实现（骨架已建，设计意图与待定问题见 `dsh-plugin-work/README.md`）。
+6. 题库实现 + schedule 落地（进度口径、课表来源、SRS、存储）。
+7. 修 Windows 单测、跑全量 `yarn check`、试 `dist:win`。
 8. README/docs 补 EnSure Lab / 因需 署名。
 
-**坑**：`profile-setup/<hash>/state.json.pending` 必须精确 `pending\n`（8 字节），空文件会让主进程进恢复页；冷启动首屏「正在加载设置…」约 30 秒；billion-context 0.1.202 有 0.1.203 关键更新（升级后需重启 dsh）；市场已经整个删掉，不再有追 latest 和 port 补丁的事；设置里的插件市场开关现在没有可挂载的 provider。
+**坑**：`profile-setup/<hash>/state.json.pending` 必须精确 `pending\n`（8 字节），空文件会让主进程进恢复页；冷启动首屏「正在加载设置…」约 30 秒；billion-context 0.1.202 有 0.1.203 关键更新（升级后需重启 dsh）；市场已经整个删掉，不再有追 latest 和 port 补丁的事；设置里的插件市场开关现在没有可挂载的 provider；`seedProfile()` **只在首次种、存在就不覆盖**——改完 `profiles/dhdl/` 要删掉 `.dhdl/home/profiles/desktop` 下那两个文件（或整个目录，记得重装依赖）再启动，本机这份还是 10-21 种的；模板路径是仓库根的 `profiles/dhdl/`，不是 `dsh-plugin-desktop/profiles/`。
 
 
 ---
