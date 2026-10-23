@@ -1,0 +1,92 @@
+{
+  "name": "dsh-plugin-memory",
+  "version": "0.18.0-dhdl.1",
+  "description": "Cross-session plaintext memory plugin for the DeepSeek Harness — deterministic BM25 recall, writes take effect immediately, signal-driven injection, no embeddings",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "docs/shots",
+    "scripts/scan-orphans.mjs",
+    "scripts/unzstd-frames.mjs",
+    "scripts/ancestor-probe.mjs",
+    "scripts/analyze-cooccurrence.mjs",
+    "scripts/check-memory-files.mjs"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-locale"
+      ],
+      "platform": "web"
+    }
+  },
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "memory",
+    "plugin",
+    "cordis"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Max-Null/dsh-memory.git"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node build-client.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "mutate:check": "node scripts/mutate-check.mjs",
+    "check:memory": "node scripts/check-memory-files.mjs",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-storage": ">=0.1.1-rc.1 <0.3.0",
+    "@deepseek-ai/dsh-storage-domain": ">=0.1.1-rc.1 <0.3.0",
+    "@deepseek-ai/dsh-storage-json": ">=0.1.1-rc.1 <0.3.0",
+    "@deepseek-ai/dsh-system-prompt": ">=0.1.1-rc.1 <0.3.0",
+    "@deepseek-ai/dsh-tools": ">=0.1.1-rc.1 <0.3.0",
+    "@deepseek-ai/dsh-typert-protocol": ">=0.1.1-rc.1 <0.3.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/cordis-plugin-loader": "^1.0.2",
+    "@deepseek-ai/dsh-storage": "0.2.0-rc.1",
+    "@deepseek-ai/dsh-storage-domain": "0.2.0-rc.1",
+    "@deepseek-ai/dsh-storage-json": "0.2.0-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "0.2.0-rc.1",
+    "@deepseek-ai/dsh-tools": "0.2.0-rc.1",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.0-rc.1",
+    "@types/node": "^26.2.0",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.0"
+  },
+  "private": true
+}
