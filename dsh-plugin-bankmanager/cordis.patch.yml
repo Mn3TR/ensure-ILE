@@ -1,0 +1,6 @@
+# ensure-ILE problem bank: one insert over the profile root.
+# The bank is shared state across modes, so it lives at the root rather than
+# inside a preset: every session sees the same five tools and the same files.
+- insert:
+    - id: problem-bank
+      name: dsh-plugin-bankmanager

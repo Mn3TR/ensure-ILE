@@ -9911,6 +9911,35 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"dsh-plugin-bankmanager@workspace:dsh-plugin-bankmanager":
+  version: 0.0.0-use.local
+  resolution: "dsh-plugin-bankmanager@workspace:dsh-plugin-bankmanager"
+  dependencies:
+    "@deepseek-ai/cordis": "npm:4.0.5"
+    "@deepseek-ai/dsh-agent": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-atomic-write": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-llm": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-ptc-runtime": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-sandbox": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-sandbox-policy": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-scope": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-session": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-tools": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-user-approval": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-working-directory": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/schemastery": "npm:^3.18.5"
+    "@types/node": "npm:^22.20.0"
+    tsdown: "npm:0.22.2"
+    typescript: "npm:6.0.3"
+    vitest: "npm:4.1.8"
+  peerDependencies:
+    "@deepseek-ai/cordis": 4.0.5
+    "@deepseek-ai/dsh-atomic-write": ^0.2.1-rc.2
+    "@deepseek-ai/dsh-tools": ^0.2.1-rc.2
+    "@deepseek-ai/schemastery": ^3.18.5
+  languageName: unknown
+  linkType: soft
+
 "dsh-plugin-desktop@workspace:dsh-plugin-desktop":
   version: 0.0.0-use.local
   resolution: "dsh-plugin-desktop@workspace:dsh-plugin-desktop"
@@ -10107,7 +10136,6 @@ __metadata:
     builder-util: "npm:26.15.3"
     class-variance-authority: "npm:^0.7.1"
     clsx: "npm:^2.1.1"
-    dsh-plugin-guide: "workspace:*"
     electron: "npm:44.0.0"
     electron-builder: "npm:26.15.7"
     extract-zip: "npm:2.0.1"
@@ -10145,7 +10173,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"dsh-plugin-guide@workspace:*, dsh-plugin-guide@workspace:dsh-plugin-guide":
+"dsh-plugin-guide@workspace:dsh-plugin-guide":
   version: 0.0.0-use.local
   resolution: "dsh-plugin-guide@workspace:dsh-plugin-guide"
   dependencies:
@@ -10156,6 +10184,11 @@ __metadata:
     "@types/node": "npm:^22.20.0"
     tsdown: "npm:0.22.2"
     typescript: "npm:6.0.3"
+  peerDependencies:
+    "@deepseek-ai/cordis": 4.0.5
+    "@deepseek-ai/dsh-system-prompt": ^0.2.1-rc.2
+    "@deepseek-ai/dsh-tools": ^0.2.1-rc.2
+    "@deepseek-ai/schemastery": ^3.18.5
   languageName: unknown
   linkType: soft
 

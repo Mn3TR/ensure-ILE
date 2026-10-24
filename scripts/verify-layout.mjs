@@ -28,6 +28,7 @@ if (workspace.packageManager !== 'yarn@4.18.0') {
 }
 if (JSON.stringify(workspace.workspaces) !== JSON.stringify([
   'dsh-plugin-guide',
+  'dsh-plugin-bankmanager',
   'dsh-plugin-desktop',
   'dsh-community-fabric',
 ])) {
