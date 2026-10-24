@@ -17,23 +17,21 @@
 
 - `package.json`：`name` → `dsh-plugin-memory`，`private: true`，`version` → `0.18.0-ensure-ile.1`，去掉 `publishConfig`
 - `cordis.patch.yml`：插入行的 `name` → `dsh-plugin-memory`
-- 其余原样：`src/`、`test/`、`scripts/`、`build-client.mjs`、`tsconfig.json` 一字未动
+- **zod 内联**：`build-bundle.mjs` 用 esbuild 把 `zod` 打进 `dist/index.js`，`@deepseek-ai/*` 全部 external；`zod` 从 `dependencies` 挪到 `devDependencies`，profile 安装不碰注册表
+- **client id 跟包名走**：`build-client.mjs` 从 `package.json` 读 `name`，`src/client/index.tsx` 里两处硬编码一起改
+- `src/index.ts` 加一行 type-only 的 `@deepseek-ai/dsh-system-prompt` 导入——原来缺它，`ctx.systemPrompt` 的类型补不出来
+- devDeps 对齐 host 的 `0.2.1-rc.2`（原来锁 `0.2.0-rc.1`，类型对不上）
 
-**还没改的**（下一版要做的）：
+**还没改的**（下一轮要做的）：
 
 1. 工具描述 / 系统提示段改成「学生」口径（现在还是「你的记忆」）
 2. `global` 层当学生档案用，`project` 层留给 agent 的工程笔记
-3. `client.js` 里还写死着 `@max-null/dsh-memory` 的 client id——等 `build-client.mjs` 重跑时会生成新的，
-   在那之前**不要**把这个包接进 profile（client id 和包名对不上）
 
-## 接入 profile（还没做）
+## 接入 profile（已完成，2026-10-24）
 
-现在 `profiles/ensure-ile/package.json` 里依赖的仍是 npm 上的 `@max-null/dsh-memory@0.15.1`。换成本包要动三处：
-
-1. 根 `package.json` 的 `workspaces` 加上 `dsh-plugin-memory`
-2. `scripts/verify-layout.mjs` 里写死的 workspace 列表同步加上（不然 `check:layout` 会红）
-3. `profiles/ensure-ile/package.json`：`bundles` 与 `dependencies` 换成 `file:../../../../dsh-plugin-memory`，
-   然后在 `.ensure-ile/home/profiles/desktop` 里 `pnpm install`
+`profiles/ensure-ile/package.json` 的 `bundles` 与 `dependencies` 已换成 `dsh-plugin-memory` + `file:../../../../dsh-plugin-memory`；
+根 `workspaces`、`scripts/verify-layout.mjs` 都已加。离线装：在 `.ensure-ile/home/profiles/desktop` 跑
+`node ../../../../dsh-plugin-desktop/node_modules/pnpm/bin/pnpm.cjs install --offline`（profile 里带 `pnpm-workspace.yaml`，关掉了 peer 自动安装）。
 
 ## 怎么同步上游
 

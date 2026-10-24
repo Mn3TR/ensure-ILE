@@ -15,7 +15,7 @@ ensure-ILE 的第一个插件：把 agent 的系统提示换成**引导文档**�
 | `skills/math.md` | 理科备注：怎么验对不对、什么算解完、知识和策略的边界。 |
 | `skills/arts.md` | 文科备注，同上。 |
 | `src/index.ts` | 插件本体：注册提示段落 + `read_note` 工具。 |
-| `cordis.patch.yml` | 不在本包。预设声明追加在 `dsh-plugin-desktop/cordis.patch.yml` 里。 |
+| `cordis.patch.yml` | 本包自带。作为 bundle 挂进 profile 时，这条 patch 把 `guide` 预设声明插到 profile 根。 |
 
 ## 为什么系统提示要整份替换
 
@@ -29,7 +29,7 @@ DeepSeek Harness 的提示词服务允许**恰好一个** `complete` 段落。�
 
 - **改引导的说法**：直接编辑 `prompts/guide.md`，重启会话。
 - **加一个科目**：在 `skills/` 放 `<name>.md`，同时在 `guide.md` 的「这道题有它的科目」那节加一行。
-- **换掉整个预设**：改 `dsh-plugin-desktop/cordis.patch.yml` 里 `guide-preset` 那段。
+- **换掉整个预设**：改本包 `cordis.patch.yml` 里 `guide-preset` 那段。壳不再参与。
 
 ## 还没做的
 

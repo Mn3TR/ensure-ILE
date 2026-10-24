@@ -1,7 +1,7 @@
 # dsh-plugin-bankmanager
 
-> **还没实现——但设计已经定案。** 这次不是占位了：字段、存储、状态判定都拍过板（2026-10-23 李），
-> 接下来只差 `package.json` / `src/`，并登记进根 workspaces。
+> **已实现（2026-10-24）。** 字段、存储、状态判定按 2026-10-23 那版设计落地：`src/store.ts` 管文件，
+> `src/index.ts` 挂五个工具；15 个单测 + `scripts/verify-bank.mjs` 挂载 smoke。
 
 ## 这个插件做什么
 
@@ -74,7 +74,7 @@ new ──> guide ──> review ──> mastered
 - `bank_due(date?)`：到期该复习的题（schedule 模式用）
 - `bank_stats`：各状态计数
 
-第一版先做前四个。
+五个都已实现；`bank_due` 等复习调度落地再加（见 AGENTS 待办）。
 
 ## 状态谁说了算（2026-10-23 定）
 
