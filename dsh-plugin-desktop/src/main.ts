@@ -1997,7 +1997,7 @@ function seedProfile(dataRoot: string, projectRoot: string): void {
   if (!existsSync(template)) return
   const target = join(dataRoot, 'home', 'profiles', 'desktop')
   mkdirSync(target, { recursive: true })
-  for (const file of ['package.json', 'cordis.patch.yml']) {
+  for (const file of ['package.json', 'cordis.patch.yml', 'pnpm-workspace.yaml']) {
     const source = join(template, file)
     const destination = join(target, file)
     if (existsSync(source) && !existsSync(destination)) copyFileSync(source, destination)

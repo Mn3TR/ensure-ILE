@@ -21,7 +21,8 @@
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify": "node scripts/verify-bank.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.5",

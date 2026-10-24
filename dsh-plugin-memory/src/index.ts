@@ -10,6 +10,9 @@ import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView } from '@deepseek-ai/dsh-tools'
+// Type-only: loads the ctx.systemPrompt service declaration and the
+// system-prompt/assemble event typing this plugin contributes through.
+import type {} from '@deepseek-ai/dsh-system-prompt'
 import { MemoryEngine } from './engine.ts'
 import type { MemoryConfig, MemoryHit, MemoryRecord } from './engine.ts'
 import { MemoryGateway } from './remote.ts'

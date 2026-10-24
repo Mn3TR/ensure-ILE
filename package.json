@@ -10,6 +10,7 @@
   "workspaces": [
     "dsh-plugin-guide",
     "dsh-plugin-bankmanager",
+    "dsh-plugin-memory",
     "dsh-plugin-desktop",
     "dsh-community-fabric"
   ],

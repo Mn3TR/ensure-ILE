@@ -5,9 +5,10 @@
  * @deepseek-ai/dsh-* specifier stay external so the factory resolves them
  * through the module table — same shape as dsh-plugin-center / dsh-ssid-panels.
  */
+import { readFileSync } from 'node:fs'
 import { build } from 'esbuild'
 
-const ID = '@max-null/dsh-memory'
+const ID = JSON.parse(readFileSync('package.json', 'utf8')).name
 
 await build({
   entryPoints: ['src/client/index.tsx'],

@@ -1,5 +1,5 @@
 /**
- * @max-null/dsh-memory browser half (0.3.3): the memory panel, moved home
+ * dsh-plugin-memory browser half (0.3.3): the memory panel, moved home
  * from dsh-ssid-panels (2026-08-19 用户: 记忆面板应跟随 dsh-memory)。
  * Data goes straight through the Typert `remote.memory` surface
  * (list/search/confirm/forget/setInjected/reload) — no /ssid/api bridge,
@@ -125,7 +125,7 @@ function injectNavCss(): void {
   if (navCssInjected || typeof document === 'undefined') return
   navCssInjected = true
   const style = document.createElement('style')
-  style.setAttribute('data-plugin', '@max-null/dsh-memory')
+  style.setAttribute('data-plugin', 'dsh-plugin-memory')
   style.textContent = NAV_ICON_CSS
   document.head.append(style)
 }
@@ -1056,7 +1056,7 @@ export function apply(ctx: unknown): void {
     }
     const tabCtx = ctx as LocaleAwareContext
     service.registerTab({
-      id: '@max-null/dsh-memory:memory',
+      id: 'dsh-plugin-memory:memory',
       title: () => STRINGS[localeId].tabMemory,
       icon: brainIcon,
       order: 60,

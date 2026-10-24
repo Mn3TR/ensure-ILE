@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: "@max-null/dsh-memory",
+  id: "dsh-plugin-memory",
   factory: (require) => {
     var module = { exports: {} };
     var exports = module.exports;
@@ -123,7 +123,7 @@ function injectNavCss() {
   if (navCssInjected || typeof document === "undefined") return;
   navCssInjected = true;
   const style = document.createElement("style");
-  style.setAttribute("data-plugin", "@max-null/dsh-memory");
+  style.setAttribute("data-plugin", "dsh-plugin-memory");
   style.textContent = NAV_ICON_CSS;
   document.head.append(style);
 }
@@ -1065,7 +1065,7 @@ function apply(ctx) {
     }
     const tabCtx = ctx;
     service.registerTab({
-      id: "@max-null/dsh-memory:memory",
+      id: "dsh-plugin-memory:memory",
       title: () => STRINGS[localeId].tabMemory,
       icon: brainIcon,
       order: 60,

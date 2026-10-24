@@ -8,13 +8,13 @@
         "@deepseek-ai/dsh-web-app",
         "dsh-plugin-guide",
         "dsh-plugin-bankmanager",
-        "@max-null/dsh-memory"
+        "dsh-plugin-memory"
       ]
     }
   },
   "dependencies": {
     "dsh-plugin-guide": "file:../../../../dsh-plugin-guide",
     "dsh-plugin-bankmanager": "file:../../../../dsh-plugin-bankmanager",
-    "@max-null/dsh-memory": "0.15.1"
+    "dsh-plugin-memory": "file:../../../../dsh-plugin-memory"
   }
 }
