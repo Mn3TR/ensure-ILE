@@ -1,4 +1,4 @@
-/** Headless, confirmation-gated downloads for DSH Desktop installers. */
+/** Headless, confirmation-gated downloads for ensure-ILE installers. */
 
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
 import { chmod, lstat, mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
@@ -23,7 +23,7 @@ export const DESKTOP_DOWNLOAD_URLS: Readonly<Record<DesktopDownloadPlatform, str
 }
 
 /** Header pinning a download request and response to the checked release. */
-export const DESKTOP_TARGET_VERSION_HEADER = 'X-DSH-Desktop-Target-Version'
+export const DESKTOP_TARGET_VERSION_HEADER = 'X-ensure-ILE-Target-Version'
 
 /** Maximum accepted installer size, in bytes. */
 export const MAX_UPDATE_DOWNLOAD_BYTES = 1024 * 1024 * 1024
@@ -220,7 +220,7 @@ export function desktopUpdateFilename(
   validatedVersion(version, channel)
   const extension = platform === 'darwin' ? 'dmg' : 'exe'
   const platformName = platform === 'darwin' ? 'mac' : 'windows'
-  const product = parseCanonicalChannelVersion(version, 'next') !== null ? 'DSH-NEXT' : channel === 'beta' ? 'DSH-Desktop-Beta' : 'DSH-Desktop'
+  const product = parseCanonicalChannelVersion(version, 'next') !== null ? 'DSH-NEXT' : channel === 'beta' ? 'ensure-ILE-Beta' : 'ensure-ILE'
   return `${product}-${version}-${platformName}.${extension}`
 }
 

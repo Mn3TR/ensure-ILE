@@ -78,7 +78,7 @@ for (const [owner, manifest] of [
   for (const field of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies', 'resolutions']) {
     for (const [name, range] of Object.entries(manifest[field] ?? {})) {
       if (typeof range !== 'string') continue
-      // DHDL owns `dsh-plugin-guide`; it is a local preset plugin, not a published
+      // ensure-ILE owns `dsh-plugin-guide`; it is a local preset plugin, not a published
       // DSH package, so the published-boundary rule does not apply to it alone.
       if (name === 'dsh-plugin-guide') continue
       if (/^(?:workspace|portal|link):/u.test(range)

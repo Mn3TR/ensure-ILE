@@ -61,7 +61,7 @@ function context(
     ...(arch === undefined ? {} : { arch }),
     packager: {
       ...(executableName === undefined ? {} : { executableName }),
-      appInfo: { productFilename: 'DSH Desktop' },
+      appInfo: { productFilename: 'ensure-ILE' },
     },
   }
 }
@@ -294,13 +294,13 @@ describe('packaged desktop runtime verification', () => {
   it.each([
     [
       'darwin',
-      join('/build', 'DSH Desktop.app', 'Contents', 'Resources', 'app.asar'),
-      join('/build', 'DSH Desktop.app', 'Contents', 'MacOS', 'DSH Desktop'),
+      join('/build', 'ensure-ILE.app', 'Contents', 'Resources', 'app.asar'),
+      join('/build', 'ensure-ILE.app', 'Contents', 'MacOS', 'ensure-ILE'),
     ],
     [
       'win32',
       join('/build', 'resources', 'app.asar'),
-      join('/build', 'DSH Desktop.exe'),
+      join('/build', 'ensure-ILE.exe'),
     ],
   ])('inspects the %s selective ASAR layout', (platform, expectedPath, expectedExecutable) => {
     const runtimeContext = context('/build', platform)

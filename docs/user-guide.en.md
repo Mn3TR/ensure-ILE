@@ -1,8 +1,8 @@
-# DSH Desktop User Guide
+# ensure-ILE User Guide
 
 ## Installation and first launch
 
-Download the macOS or Windows installer from the product download page. DSH Desktop includes Electron, Node, and its pinned DSH dependencies, so normal users do not need to install Node.js or pnpm separately.
+Download the macOS or Windows installer from the product download page. ensure-ILE includes Electron, Node, and its pinned DSH dependencies, so normal users do not need to install Node.js or pnpm separately.
 
 On first launch, the application prepares the default profile and starts the official DSH Web surface locally. Closing the window normally hides it; use **Quit** from the tray when you want to stop the application and Host process.
 
@@ -10,12 +10,12 @@ On first launch, the application prepares the default profile and starts the off
 
 Besides choosing a directory inside the interface, you can name a folder when the application starts. The folder is registered as a workspace and opened. A folder that is already a workspace is simply opened again; nothing is duplicated.
 
-- **Windows drag and drop**: drop the folder onto the **DSH Desktop** desktop shortcut or its Start menu entry. A stopped application starts first; a running one comes to the front and opens the workspace.
+- **Windows drag and drop**: drop the folder onto the **ensure-ILE** desktop shortcut or its Start menu entry. A stopped application starts first; a running one comes to the front and opens the workspace.
 - **Command line**: run `dsh-desktop <folder>`. Relative paths resolve against the current directory. The installed EXE accepts one folder argument as well.
 
 When the path does not exist, names a file, or lives on unsupported storage such as exFAT, FAT32, or a network drive, the application shows a native message and registers nothing. Launching with a folder is one-shot: a later restart triggered from settings does not reopen it.
 
-Known limits: a DSH Desktop icon pinned to the Windows taskbar does not accept drops yet (that needs a folder association, planned separately); Linux supports the command line only; macOS supports neither route yet.
+Known limits: a ensure-ILE icon pinned to the Windows taskbar does not accept drops yet (that needs a folder association, planned separately); Linux supports the command line only; macOS supports neither route yet.
 
 ## Profiles
 
@@ -46,7 +46,7 @@ The port must be an integer from `0` through `65535`. Changing it performs an or
 
 ## Plugin management
 
-Plugins are extensions that add capabilities to DSH, such as models, tools, interfaces, and workflows. DSH Desktop uses the same plugin system as official Harness, so official plugins install and work directly; multiple plugins follow the same conventions and can be installed and used together.
+Plugins are extensions that add capabilities to DSH, such as models, tools, interfaces, and workflows. ensure-ILE uses the same plugin system as official Harness, so official plugins install and work directly; multiple plugins follow the same conventions and can be installed and used together.
 
 Ordinary DSH plugins use the upstream CLI semantics:
 
@@ -56,7 +56,7 @@ dsh plugin --profile desktop remove <plugin>
 dsh plugin --profile desktop update
 ```
 
-In the terminal opened from the DSH Desktop tray, bare `dsh` and plugin commands without `--profile` default to the active profile:
+In the terminal opened from the ensure-ILE tray, bare `dsh` and plugin commands without `--profile` default to the active profile:
 
 ```sh
 dsh plugin add <plugin>
@@ -64,7 +64,7 @@ dsh plugin remove <plugin>
 dsh plugin update
 ```
 
-An explicit `--profile <name>` always wins. Restart DSH Desktop after plugin changes so the new bundle enters the Loader composition.
+An explicit `--profile <name>` always wins. Restart ensure-ILE after plugin changes so the new bundle enters the Loader composition.
 
 ## Opening the terminal
 
@@ -88,7 +88,7 @@ Desktop confirmations, warnings, and operation results open as separate shadcn-b
 - **The application crashes repeatedly before the tray appears**: run the installed executable directly with the recovery option. The default Windows installation command is below; replace the path if you selected another installation directory.
 
   ```powershell
-  & "$env:LOCALAPPDATA\Programs\DSH Desktop\DSH Desktop.exe" --export-diagnostics
+  & "$env:LOCALAPPDATA\Programs\ensure-ILE\ensure-ILE.exe" --export-diagnostics
   ```
 
   For npm installs, run `dsh-desktop --export-diagnostics`. This command does not start Host, profiles, plugins, or a window. It prints the absolute diagnostics ZIP path when complete.

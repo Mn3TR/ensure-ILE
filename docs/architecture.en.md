@@ -1,8 +1,8 @@
-# DSH Desktop Architecture
+# ensure-ILE Architecture
 
 ## Overview
 
-DSH Desktop is a thin Electron host. It starts the official DSH Host in Electron's main process; the Host exposes the ordinary Web UI over an HTTP/WebSocket Web carrier. The carrier listens on loopback by default and can be exposed to the LAN only after the user explicitly acknowledges the risk. Desktop does not create a second renderer IPC plugin system and does not expose raw Electron APIs to the page.
+ensure-ILE is a thin Electron host. It starts the official DSH Host in Electron's main process; the Host exposes the ordinary Web UI over an HTTP/WebSocket Web carrier. The carrier listens on loopback by default and can be exposed to the LAN only after the user explicitly acknowledges the risk. Desktop does not create a second renderer IPC plugin system and does not expose raw Electron APIs to the page.
 
 ```mermaid
 flowchart LR
@@ -63,9 +63,9 @@ The outer workspace uses Yarn. The pinned `deepseek-harness/` submodule keeps it
 
 ## Release-channel protocol
 
-Desktop is one physical npm package and one system application; Git branches do not define the channel. It uses `dsh-plugin-desktop`, `DSH Desktop`, and `ai.deepseek.dsh.desktop`. `upstream.json` records the upstream version, commit, and vendored-runtime manifest; exact root resolutions ensure that each workspace resolves only its own DSH runtime.
+Desktop is one physical npm package and one system application; Git branches do not define the channel. It uses `dsh-plugin-desktop`, `ensure-ILE`, and `com.ensurelab.ensureile`. `upstream.json` records the upstream version, commit, and vendored-runtime manifest; exact root resolutions ensure that each workspace resolves only its own DSH runtime.
 
-Version checks and installer downloads send `X-DSH-Desktop-Channel: stable|beta`. A check also sends the current version, while a download sends `X-DSH-Desktop-Target-Version`; the service must echo the requested channel and version. Legacy clients without the channel header are treated as stable. A Beta client requires an explicit `channel: "beta"` response. Stable accepts only release SemVer, while Beta accepts only `-beta.N`. Automatic Beta updates query only Beta. **Install Stable Edition** is a separate explicit operation that may select a lower version and installs Stable alongside Beta.
+Version checks and installer downloads send `X-ensure-ILE-Channel: stable|beta`. A check also sends the current version, while a download sends `X-ensure-ILE-Target-Version`; the service must echo the requested channel and version. Legacy clients without the channel header are treated as stable. A Beta client requires an explicit `channel: "beta"` response. Stable accepts only release SemVer, while Beta accepts only `-beta.N`. Automatic Beta updates query only Beta. **Install Stable Edition** is a separate explicit operation that may select a lower version and installs Stable alongside Beta.
 
 The service must implement these selection and echo rules, with complete platform artifacts for both channels, before a Beta release becomes discoverable. Otherwise the client treats the response as invalid and will not silently cross channels.
 

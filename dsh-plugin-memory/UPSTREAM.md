@@ -5,17 +5,17 @@
 
 - 上游 tag：`v0.18.0`
 - 拷贝日期：2026-10-23
-- 我们的版本号：`0.18.0-dhdl.N`（`N` 是我们自己的改动轮次，不是上游补丁号）
+- 我们的版本号：`0.18.0-ensure-ile.N`（`N` 是我们自己的改动轮次，不是上游补丁号）
 
 ## 为什么 fork
 
-上游是「模型自己的跨会话记忆」。DHDL 要的是「**这个学生**的记忆」：工具描述、提示段、
+上游是「模型自己的跨会话记忆」。ensure-ILE 要的是「**这个学生**的记忆」：工具描述、提示段、
 命名空间语义、注入策略都得换成学生口径（见 `AGENTS.md` 的「共享数据层」）。上游没有扩展点，
 所以拿源码自己改，不再跟着它的 release 走。
 
 ## 今天改了什么（相对 v0.18.0）
 
-- `package.json`：`name` → `dsh-plugin-memory`，`private: true`，`version` → `0.18.0-dhdl.1`，去掉 `publishConfig`
+- `package.json`：`name` → `dsh-plugin-memory`，`private: true`，`version` → `0.18.0-ensure-ile.1`，去掉 `publishConfig`
 - `cordis.patch.yml`：插入行的 `name` → `dsh-plugin-memory`
 - 其余原样：`src/`、`test/`、`scripts/`、`build-client.mjs`、`tsconfig.json` 一字未动
 
@@ -28,12 +28,12 @@
 
 ## 接入 profile（还没做）
 
-现在 `profiles/dhdl/package.json` 里依赖的仍是 npm 上的 `@max-null/dsh-memory@0.15.1`。换成本包要动三处：
+现在 `profiles/ensure-ile/package.json` 里依赖的仍是 npm 上的 `@max-null/dsh-memory@0.15.1`。换成本包要动三处：
 
 1. 根 `package.json` 的 `workspaces` 加上 `dsh-plugin-memory`
 2. `scripts/verify-layout.mjs` 里写死的 workspace 列表同步加上（不然 `check:layout` 会红）
-3. `profiles/dhdl/package.json`：`bundles` 与 `dependencies` 换成 `file:../../../../dsh-plugin-memory`，
-   然后在 `.dhdl/home/profiles/desktop` 里 `pnpm install`
+3. `profiles/ensure-ile/package.json`：`bundles` 与 `dependencies` 换成 `file:../../../../dsh-plugin-memory`，
+   然后在 `.ensure-ile/home/profiles/desktop` 里 `pnpm install`
 
 ## 怎么同步上游
 

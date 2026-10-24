@@ -5,7 +5,7 @@ import { serializeHostEnvironment } from '../src/host-launch-environment.ts'
 import { withDesktopDshHome } from '../src/launch-environment.ts'
 
 describe('Desktop DSH home launch environment', () => {
-  const homeDir = 'C:\\Users\\Desktop User\\AppData\\Roaming\\DSH Desktop\\safe-mode\\dsh-home'
+  const homeDir = 'C:\\Users\\Desktop User\\AppData\\Roaming\\ensure-ILE\\safe-mode\\dsh-home'
 
   it.each(['DSH_HOME', 'dsh_home', 'Dsh_Home'])('overrides %s for Windows Host child launches', name => {
     const environment = createLaunchEnvironmentSnapshot([{

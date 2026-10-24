@@ -111,7 +111,7 @@ describe('packaged filesystem smoke', () => {
 })
 
 describe('Electron asar archive view', () => {
-  const resourcesRoot = join(tmpdir(), 'DSH Desktop', 'resources')
+  const resourcesRoot = join(tmpdir(), 'ensure-ILE', 'resources')
   const moduleIn = (...segments: string[]): string => pathToFileURL(join(resourcesRoot, ...segments)).href
 
   it('turns the archive view off for code shipped unpacked', () => {

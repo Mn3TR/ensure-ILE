@@ -1,4 +1,4 @@
-# DHDL profile patch - the learning build's own configuration layer.
+# ensure-ILE profile patch - the learning build's own configuration layer.
 #
 # It is applied after every bundle layer. Keep it small: everything a learner
 # needs should be visible here, and anything this file does not mention falls

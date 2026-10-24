@@ -1,6 +1,6 @@
 # dsh-plugin-work
 
-> **占位包。** work 模式还没有开始实现——这里先放设计意图。等模式内容定下来，再补 `package.json`、`src/`，并登记进根 `package.json` 的 workspaces 与 `profiles/dhdl/cordis.patch.yml` 的预设列表。
+> **占位包。** work 模式还没有开始实现——这里先放设计意图。等模式内容定下来，再补 `package.json`、`src/`，并登记进根 `package.json` 的 workspaces 与 `profiles/ensure-ile/cordis.patch.yml` 的预设列表。
 
 ## 这个模式做什么
 

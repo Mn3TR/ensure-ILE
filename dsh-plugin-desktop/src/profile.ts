@@ -1682,7 +1682,7 @@ export function prepareDesktopProfile(
     patches.push({ id: 'session-telemetry-otel', disabled: true })
   }
   // Upstream mounts its Desktop product analytics for every Profile named
-  // `desktop` and reports to DeepSeek's collector by default. DSH Desktop does
+  // `desktop` and reports to DeepSeek's collector by default. ensure-ILE does
   // not take part in that collection, so both rows stay off after every bundle
   // and user layer. The exporter also requires the upstream Electron shell's
   // DSH_CLIENT_VERSION, which this launcher never provides.

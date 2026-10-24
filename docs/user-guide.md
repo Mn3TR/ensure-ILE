@@ -1,8 +1,8 @@
-# DSH Desktop 用户指南
+# ensure-ILE 用户指南
 
 ## 安装与首次启动
 
-从产品下载入口获取 macOS 或 Windows 安装包。安装后的 DSH Desktop 自带运行所需的 Electron、Node 和 DSH 依赖，普通用户不需要另行安装 Node.js 或 pnpm。
+从产品下载入口获取 macOS 或 Windows 安装包。安装后的 ensure-ILE 自带运行所需的 Electron、Node 和 DSH 依赖，普通用户不需要另行安装 Node.js 或 pnpm。
 
 首次启动时，应用会准备默认 profile，并在本机启动官方 DSH Web surface。关闭窗口通常只会隐藏窗口；可以从托盘重新打开，选择 **退出** 才会结束应用和 Host 进程。
 
@@ -10,7 +10,7 @@
 
 除了在界面里选择目录，还可以在启动时直接指定一个文件夹。该文件夹会被注册为工作区并自动打开；如果它已经是工作区，则直接打开，不会重复创建。
 
-- **Windows 拖放**：把文件夹拖到桌面快捷方式或开始菜单里的 **DSH Desktop** 图标上。应用没运行时会先启动，已经在运行时会抬到前台并打开这个工作区。
+- **Windows 拖放**：把文件夹拖到桌面快捷方式或开始菜单里的 **ensure-ILE** 图标上。应用没运行时会先启动，已经在运行时会抬到前台并打开这个工作区。
 - **命令行**：运行 `dsh-desktop <文件夹>`。相对路径按当前目录解析。安装后的 EXE 同样接受一个文件夹参数。
 
 路径不存在、指向的是文件，或者位于 exFAT、FAT32、网络盘等不受支持的存储上时，应用会弹出原生提示并且不注册该工作区。用文件夹启动是一次性的：之后由设置触发的重启不会再次打开它。
@@ -46,7 +46,7 @@ dsh-desktop:
 
 ## 插件管理
 
-插件是给 DSH 添加能力的扩展包，例如模型、工具、界面和工作流。DSH Desktop 使用的就是官方 Harness 的插件体系，官方插件可以直接安装使用；多个插件遵循统一的约定，可以一起安装、一起工作。
+插件是给 DSH 添加能力的扩展包，例如模型、工具、界面和工作流。ensure-ILE 使用的就是官方 Harness 的插件体系，官方插件可以直接安装使用；多个插件遵循统一的约定，可以一起安装、一起工作。
 
 普通 DSH 插件仍使用官方 CLI 语义：
 
@@ -56,7 +56,7 @@ dsh plugin --profile desktop remove <plugin>
 dsh plugin --profile desktop update
 ```
 
-在 DSH Desktop 托盘打开的终端中，裸 `dsh` 和不带 `--profile` 的 plugin 命令默认使用当前激活 profile：
+在 ensure-ILE 托盘打开的终端中，裸 `dsh` 和不带 `--profile` 的 plugin 命令默认使用当前激活 profile：
 
 ```sh
 dsh plugin add <plugin>
@@ -64,7 +64,7 @@ dsh plugin remove <plugin>
 dsh plugin update
 ```
 
-显式 `--profile <name>` 始终优先。插件变更后需要重启 DSH Desktop，才能让新的 bundle 进入 Loader 组合。
+显式 `--profile <name>` 始终优先。插件变更后需要重启 ensure-ILE，才能让新的 bundle 进入 Loader 组合。
 
 ## 打开终端
 
@@ -88,7 +88,7 @@ Desktop 的确认、警告与操作结果会打开独立、基于 shadcn 的桌�
 - **应用持续闪退，无法进入托盘**：在 PowerShell 中直接运行安装后的程序并加上恢复参数。默认安装位置的命令如下；如果安装时修改过目录，请替换为实际的 EXE 路径。
 
   ```powershell
-  & "$env:LOCALAPPDATA\Programs\DSH Desktop\DSH Desktop.exe" --export-diagnostics
+  & "$env:LOCALAPPDATA\Programs\ensure-ILE\ensure-ILE.exe" --export-diagnostics
   ```
 
   通过 npm 安装时，可运行 `dsh-desktop --export-diagnostics`。这个命令不会启动 Host、profile、插件或窗口；完成后会在终端输出诊断 ZIP 的绝对路径。

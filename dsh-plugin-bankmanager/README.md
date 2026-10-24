@@ -30,7 +30,7 @@ new ──> guide ──> review ──> mastered
 <DSH_HOME>/bank/problems/<id>.json
 ```
 
-`DSH_HOME` 是 `.dhdl/home`（`run()` 设的），数据跟着数据根走，清空 `.dhdl` 就整份消失。
+`DSH_HOME` 是 `.ensure-ile/home`（`run()` 设的），数据跟着数据根走，清空 `.ensure-ile` 就整份消失。
 
 **id 格式**：`YYYYMMDD-<subject>-<6 位 hex>`，例如 `20261023-math-a3f91c`。
 日期段让文件按名排序就等于按录入时间排序，6 位 hex 是人看不出来但不会撞的那部分。

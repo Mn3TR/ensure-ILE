@@ -2,7 +2,7 @@
   "name": "dsh-plugin-guide",
   "version": "0.1.0",
   "private": true,
-  "description": "Guide-mode persona for DHDL",
+  "description": "Guide-mode persona for ensure-ILE",
   "license": "MIT",
   "type": "module",
   "main": "./lib/index.js",

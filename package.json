@@ -1,7 +1,7 @@
 {
-  "name": "dhdl",
+  "name": "ensure-ile",
   "private": true,
-  "description": "DHDL — DeepSeek Harness Desktop in Learning",
+  "description": "ensure-ILE — DeepSeek Harness Desktop in Learning",
   "license": "MIT",
   "packageManager": "yarn@4.18.0",
   "engines": {

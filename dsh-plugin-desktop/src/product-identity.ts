@@ -3,15 +3,15 @@ export const DESKTOP_RELEASE_IDENTITIES = Object.freeze({
   stable: Object.freeze({
     releaseChannel: 'stable' as const,
     packageName: 'dsh-plugin-desktop',
-    productName: 'DSH Desktop',
-    appId: 'ai.deepseek.dsh.desktop',
+    productName: 'ensure-ILE',
+    appId: 'com.ensurelab.ensureile',
     homeDirectoryName: '.dsh',
   }),
   beta: Object.freeze({
     releaseChannel: 'beta' as const,
     packageName: 'dsh-plugin-desktop-beta',
-    productName: 'DSH Desktop Beta',
-    appId: 'ai.deepseek.dsh.desktop.beta',
+    productName: 'ensure-ILE Beta',
+    appId: 'com.ensurelab.ensureile.beta',
     homeDirectoryName: '.dsh-beta',
   }),
 })

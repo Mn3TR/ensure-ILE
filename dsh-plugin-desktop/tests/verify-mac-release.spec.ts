@@ -12,8 +12,8 @@ function options(overrides: Partial<MacReleaseVerificationOptions> = {}) {
   const verifyEntitlements = vi.fn()
   const value: MacReleaseVerificationOptions = {
     distDir: '/release/dist',
-    productName: 'DSH Desktop',
-    listDmgs: () => ['/release/dist/DSH Desktop-2.0.0-universal.dmg'],
+    productName: 'ensure-ILE',
+    listDmgs: () => ['/release/dist/ensure-ILE-2.0.0-universal.dmg'],
     makeMountPoint: () => '/private/tmp/dsh-desktop-dmg-test',
     run: (command, args) => { calls.push({ command, args: [...args] }) },
     removeMountPoint,
@@ -26,28 +26,28 @@ function options(overrides: Partial<MacReleaseVerificationOptions> = {}) {
 describe('macOS release artifact verification', () => {
   it('mounts one DMG and verifies signature, Gatekeeper, and the stapled ticket', () => {
     const harness = options()
-    const appPath = join('/private/tmp/dsh-desktop-dmg-test', 'DSH Desktop.app')
+    const appPath = join('/private/tmp/dsh-desktop-dmg-test', 'ensure-ILE.app')
 
     expect(verifyMacRelease(harness.value)).toEqual({
       appPath,
-      dmgPath: '/release/dist/DSH Desktop-2.0.0-universal.dmg',
+      dmgPath: '/release/dist/ensure-ILE-2.0.0-universal.dmg',
     })
 
     expect(harness.calls).toEqual([
       {
         command: 'hdiutil',
         args: [
-          'attach', '/release/dist/DSH Desktop-2.0.0-universal.dmg',
+          'attach', '/release/dist/ensure-ILE-2.0.0-universal.dmg',
           '-mountpoint', '/private/tmp/dsh-desktop-dmg-test', '-nobrowse', '-readonly',
         ],
       },
       {
         command: 'lipo',
-        args: [join(appPath, 'Contents', 'MacOS', 'DSH Desktop'), '-verify_arch', 'x86_64'],
+        args: [join(appPath, 'Contents', 'MacOS', 'ensure-ILE'), '-verify_arch', 'x86_64'],
       },
       {
         command: 'lipo',
-        args: [join(appPath, 'Contents', 'MacOS', 'DSH Desktop'), '-verify_arch', 'arm64'],
+        args: [join(appPath, 'Contents', 'MacOS', 'ensure-ILE'), '-verify_arch', 'arm64'],
       },
       ...MACOS_UNIVERSAL_NATIVE_ENTRIES.flatMap(entry => [{
         command: 'lipo',
@@ -79,7 +79,7 @@ describe('macOS release artifact verification', () => {
       },
     ])
     expect(harness.removeMountPoint).toHaveBeenCalledWith('/private/tmp/dsh-desktop-dmg-test')
-    expect(harness.verifyEntitlements).toHaveBeenCalledWith(appPath, 'DSH Desktop')
+    expect(harness.verifyEntitlements).toHaveBeenCalledWith(appPath, 'ensure-ILE')
   })
 
   it('rejects a release missing microphone signature access and detaches the image', () => {
@@ -101,7 +101,7 @@ describe('macOS release artifact verification', () => {
       verifyRuntime: appPath => { order.push(`runtime:${appPath}`) },
     })
     verifyMacRelease(harness.value)
-    expect(order).toEqual(['entitlements', `runtime:${join('/private/tmp/dsh-desktop-dmg-test', 'DSH Desktop.app')}`])
+    expect(order).toEqual(['entitlements', `runtime:${join('/private/tmp/dsh-desktop-dmg-test', 'ensure-ILE.app')}`])
     expect(harness.calls.some(call => call.command === 'spctl')).toBe(true)
   })
 
