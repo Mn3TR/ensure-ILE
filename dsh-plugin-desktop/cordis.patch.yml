@@ -39,18 +39,6 @@
       name: dsh-plugin-desktop/profiles
     - id: desktop-updates
       name: dsh-plugin-desktop/updates
-    # ensure-ILE: a selectable agent preset that replaces the system prompt with the
-    # guide document. Rows mounted inside a preset run in the agent scope, which
-    # is the only scope where a persona may shadow the deployment persona.
-    - id: guide-preset
-      name: '@deepseek-ai/dsh-agent-preset'
-      config:
-        id: guide
-        name: 引导模式
-        description: 引导学生用自己的思路把题解出来，不给答案
-        order: 40
-        plugins:
-          - name: dsh-plugin-guide
 
 # A desktop launch has no terminal operator waiting for the Web readiness line.
 - id: web-runtime
