@@ -85,8 +85,9 @@ try {
   // patch layer the way that one-shot import leaves it, which is what every boot
   // after the upgrade reads. Without it this smoke would assert the single
   // pre-import boot, where the window necessarily still opens in compatibility.
+  const prepared = prepareDesktopProfile('1', home, 'win32')
   writeFileSync(
-    prepareDesktopProfile('1', home, 'win32').profile.patchPath,
+    prepared.profile.patchPath,
     JSON.stringify([DESKTOP_SHELL_PATCH_ENTRY]),
   )
   const hostServicePluginDir = join(
