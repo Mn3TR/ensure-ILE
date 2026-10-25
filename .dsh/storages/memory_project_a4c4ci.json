@@ -13,22 +13,19 @@
         "quarantined": false,
         "hitCount": 5,
         "source": "agent",
-        "content": "DHDL 的 OOBE（DSH Desktop 首启 Setup Wizard）已裁剪为「只欢迎一屏」，实现落在 stable 包 dsh-plugin-desktop：\n- 主进程 main.ts 用 `setupOnboarding.read()` 返回 `steps`（新增可选字段）给 renderer；默认 `['welcome']`，环境变量 `DHDL_SETUP=full` 恢复上游步骤（现为 7 屏：welcome/mode/material/market/notifications/browser/success；aa 步已在删 Agents-Anywhere 时移除）。\n- 固定默认值在 `dhdlSetupInput()`：advanced（linux→compatibility）/材质 off/market disabled/openBrowser false/loopback/通知 7 项 false；账号登录步用 `dismissDesktopSetupAccount()` 去掉（必须在 completeOrSkipDesktopSetupWizard 之后调用，否则 applyPending「立即重启」会因 account marker 残留而抛错）。\n- 契约 setup-wizard-contract.ts 有 DESKTOP_SETUP_WIZARD_STEP_IDS 与 normalizeDesktopSetupWizardSteps（只接受从 welcome 开始的有序子集）；App.tsx 改成注册表按步骤计划渲染，进度条只在 steps.length>1 时显示。\n- 关键坑：`.dhdl/appdata/profile-setup/<hash>/state.json.pending` 必须是精确的 `pending\\n`（8 字节），手写空文件会让主进程进恢复页报 `invalid pending marker`。想重看引导：删 state.json 和 state.json.account，写 pending marker。\n- 验证方式：`corepack yarn workspace dsh-plugin-desktop build` 后 `Start-Process dsh-plugin-desktop\\node_modules\\electron\\dist\\electron.exe dsh-plugin-desktop\\lib\\main.js`；composer 预设显示「引导模式」即成功（默认预设）。",
+        "content": "ensure-ILE 的 OOBE（DSH Desktop 首启 Setup Wizard）已裁剪为「只欢迎一屏」，实现落在 dsh-plugin-desktop：\n- 主进程 main.ts 用 `setupOnboarding.read()` 返回 `steps` 给 renderer；默认 `['welcome']`，环境变量 `ENSURE_ILE_SETUP=full`（改名前的 DHDL_SETUP）恢复 7 屏。\n- 固定默认值在 setup 输入构造里：advanced/材质 off/market disabled/openBrowser false/loopback/通知全 false；账号登录步用 `dismissDesktopSetupAccount()` 去掉（必须在 completeOrSkipDesktopSetupWizard 之后调用）。\n- 契约 setup-wizard-contract.ts 有 DESKTOP_SETUP_WIZARD_STEP_IDS 与 normalizeDesktopSetupWizardSteps（只接受从 welcome 开始的有序子集）。\n- 关键坑：`.ensure-ile/appdata/profile-setup/<hash>/state.json.pending` 必须是精确 `pending\\n`（8 字节；改名前的旧数据根是 `.dhdl/appdata`），空文件会进恢复页报 `invalid pending marker`。\n- 验证：build 后 `Start-Process dsh-plugin-desktop\\node_modules\\electron\\dist\\electron.exe dsh-plugin-desktop\\lib\\main.js`，composer 显示「引导模式」即成功。",
         "keywords": [
           "oobe",
           "setup wizard",
-          "dhdl_setup",
+          "ensure_ile_setup",
           "welcome",
           "setup-wizard-contract",
-          "steps",
           "pending marker",
-          "dismissdesktopsetupaccount",
-          "dhdlsetupinput",
           "首次引导",
           "引导裁剪"
         ],
         "createdAt": 1792427596318,
-        "updatedAt": 1792515002816,
+        "updatedAt": 1792892358781,
         "lastUsedAt": 1792767247255
       },
       "09d8f398-948a-4a86-ac00-e9b384d162ac": {
@@ -59,59 +56,29 @@
         "quarantined": false,
         "hitCount": 5,
         "source": "agent",
-        "content": "DHDL 的插件按「模式」拆包，三个模式互相独立、各自一个包和一个预设（不用 @ensurelab scope，名字保持干净的 dsh-plugin-*）：\n- `dsh-plugin-guide`（guide 模式，已完成改名，2026-10-21）：学生还没做出来，引导他一步一步做出来；不批改、不打分。预设 `guide`（显示名「引导模式」，description「引导学生用自己的思路把题解出来，不给答案」），是 Profile 默认预设。\n- `dsh-plugin-hrl`（HRL 模式）：学生已有答案，帮他把答案优化；评价/对比/改，和 guide 对「评价」的态度相反。目前只有占位 README（`dsh-plugin-hrl/README.md`），没有 package.json，未登记 workspace。\n- `dsh-plugin-work`（work 模式，已有占位 README，2026-10-22）：学生独立做题交答案，我们判卷；判不过转 guide，过了但答得糙转 hrl。\n- 另有 `dsh-plugin-schedule`（课表+进度→预习/复习清单）与 `dsh-plugin-bankmanager`（题库状态机）的占位 README，均未进 workspaces。\n预设 id 预定：guide / hrl / work；Profiles 默认 guide。旧 id `hrll-guide` 已弃用，旧测试会话清 .dhdl 即可。",
+        "content": "DHDL（现名 ensure-ILE）按「模式」拆包的现状（2026-10-25 复核）：四个模式各自一个包 + 一个预设，名字保持 dsh-plugin-*、不用 npm scope；\n- `dsh-plugin-guide` 引导模式（默认预设 `guide`）：引学生自己把题做出来，不批改不打分。\n- `dsh-plugin-setup` 开学（预设 `setup`）：问年级/课表/作息/偏好，状态落 `<DSH_HOME>/setup.json`，完成判据是「能给出下一步」。\n- `dsh-plugin-work` 独立做题（预设 `work`）：学生自己做、交上来判，重交只给一次，判不过转 guide 并写 handoff。\n- `dsh-plugin-hrl` 答案优化（预设 `hrl`）：教师轨迹一次写全 + 逐小步 A/B（student/teacher/merged）。\n占位只剩 `dsh-plugin-schedule`；`dsh-plugin-bankmanager` 与 `dsh-plugin-memory` 已实现并挂在 profile 根。旧 id `hrll-guide` 已弃用。",
         "keywords": [
           "dhdl",
           "插件拆分",
           "guide模式",
           "hrl模式",
           "work模式",
-          "dsh-plugin-guide",
-          "dsh-plugin-hrl",
-          "dsh-plugin-work",
+          "setup模式",
           "preset",
           "预设",
           "模式"
         ],
         "createdAt": 1792513574991,
-        "updatedAt": 1792598752885,
+        "updatedAt": 1792892358792,
         "lastUsedAt": 1792767247255
-      },
-      "a4939d4b-994f-4ef3-8c67-40e097e1b41b": {
-        "namespace": "project",
-        "status": "approved",
-        "injected": false,
-        "hitCount": 5,
-        "source": "agent",
-        "content": "DHDL 状态快照（2026-10-21 23:35，供新会话接手）：\n- 仓库 E:\\Projects\\DHDL，工作区干净。提交：272a34c 删 Beta/Next → d9dfdba 删社区市场 dsh-community-market 与 vendor/agents-anywhere（含全部 AA 接线），并把 dsh-plugin-hrll 改名 dsh-plugin-guide → bc5a422 三个占位骨架 → a24d2c9 记忆。未 push。\n- 3 个 workspace：`dsh-plugin-desktop`（上游壳 2.0.18 + DHDL 改动）、`dsh-plugin-guide`（guide 模式：整份替换系统提示 + read_note；预设 id `guide`、显示「引导模式」、是默认预设）、`dsh-community-fabric`（纯文档）。占位目录（只有 README、无 package.json）：`dsh-plugin-hrl`（HRL 模式：学生已有答案→优化）、`dsh-plugin-schedule`、`dsh-plugin-bankmanager`。\n- 组织名：EnSure Lab / 因需（因=原因、需=需要），包名统一 dsh-plugin- 前缀、不用 scope。\n- 启动：`Start-Process dsh-plugin-desktop\\node_modules\\electron\\dist\\electron.exe dsh-plugin-desktop\\lib\\main.js`；数据在 .dhdl/；冷启动首屏约 30 秒；`DHDL_SETUP=full` 看 7 屏向导。\n- 验证：check:layout、typecheck、build 通过；桌面单测 26 失败（Windows 平台基线：module-resolution 15、linux-artifacts 5、compatibility-shell 2、desktop-runtime-environment 2、electron-runtime 1、recovery-plugin-uninstall 1）；全量 yarn check 与 dist:win 未跑。\n- 待办优先级：① 真机跑一题验证 guide；② seedProfile 后自动 pnpm install；③ HRL 模式定稿（优化程度/AB 对比采偏好/学科备注/退回 guide/入口）；④ work 模式骨架；⑤ schedule 与 bankmanager 落地；⑥ 修 Windows 单测、全量 check、dist:win；⑦ 清 .dhdl 旧 agentPreset: hrll-guide 会话；⑧ README 补 EnSure Lab 署名。\n- 坑：profile-setup/<hash>/state.json.pending 必须精确 `pending\\n`；billion-context 0.1.202 有 0.1.203 关键更新（升级需重启 dsh）。",
-        "keywords": [
-          "dhdl",
-          "状态快照",
-          "待办",
-          "todo",
-          "接手",
-          "新会话",
-          "dsh-plugin-guide",
-          "引导模式",
-          "ensure lab",
-          "因需",
-          "提交",
-          "272a34c",
-          "d9dfdba",
-          "hrl",
-          "schedule",
-          "bankmanager"
-        ],
-        "createdAt": 1792596851840,
-        "updatedAt": 1792596851840,
-        "lastUsedAt": 1792878545981
       },
       "f3609485-6d71-47e2-a7e3-be5fbfc0945c": {
         "namespace": "project",
         "status": "approved",
         "injected": false,
+        "quarantined": false,
         "source": "agent",
-        "content": "DHDL 题库（dsh-plugin-bankmanager）设计定案（2026-10-23 李拍板）：\n- 存储：一道题 = 一个 JSON 文件，路径 `<DSH_HOME>/bank/problems/<id>.json`（DSH_HOME = `.dhdl/home`），guide 会话、attempts、review 全塞进这一个文件。\n- id 格式：`YYYYMMDD-<subject>-<6 位 hex>`，例 `20261023-math-a3f91c`（李明确要 6 位 hex）。\n- 状态机 new/guide/hrl/review/mastered/parked 不变；**状态由模型判断，但收尾必须问学生一句「这题你自己做出来了吗」**；独立审计先不做（记在 AGENTS.md 待办 10）。\n- guide 也挂题库工具（第一版 bank_add / bank_list / bank_show / bank_update），模型自己写回。\n- 图片/拍照链路明确「之后搞」（待办 9）；题怎么进库先走「会话里模型收」。\n定案写进了 `dsh-plugin-bankmanager/README.md`（字段+工具）和 `AGENTS.md` 的「共享数据层」一节；改设计先看这两处。",
+        "content": "DHDL（现名 ensure-ILE）题库（dsh-plugin-bankmanager）定案（2026-10-23 李拍板，2026-10-25 已到 schema v2.1）：\n- 存储：一道题 = 一个 JSON，`<DSH_HOME>/bank/problems/<id>.json`；DSH_HOME = `.ensure-ile/home`（改名前的 `.dhdl/home` 已于 2026-10-25 删除）。\n- id：`YYYYMMDD-<subject>-<6 位 hex>`。\n- 状态机 new/guide/hrl/review/mastered/parked 不变；状态由模型判断，但收尾必须问学生「这题你自己做出来了吗」。\n- 工具六个：bank_add / bank_list / bank_show / bank_update / bank_stats / bank_resume；schema v2.1 按 guide/work/hrl 分块 + handoff。\n- 图片/拍照链路仍「之后搞」。\n改设计先看 `dsh-plugin-bankmanager/README.md` 与 AGENTS.md「共享数据层」。",
         "keywords": [
           "题库",
           "bankmanager",
@@ -119,13 +86,12 @@
           "一道题一个文件",
           "6位hex",
           "状态机",
-          "srs",
           "review",
           "学生档案",
-          "dhdl"
+          "schema 2.1"
         ],
         "createdAt": 1792769623767,
-        "updatedAt": 1792769623767
+        "updatedAt": 1792892358803
       },
       "1cfa3d26-88ad-417e-8527-b18c39cdeb67": {
         "namespace": "project",
@@ -196,6 +162,27 @@
         ],
         "createdAt": 1792886493276,
         "updatedAt": 1792886493276
+      },
+      "d7ef930c-b60b-4268-b59a-1b6f6d18f6a7": {
+        "namespace": "project",
+        "status": "approved",
+        "injected": false,
+        "source": "agent",
+        "content": "ensure-ILE 的运行数据都在仓库根的 .ensure-ile/ 下：home/ 里是 bank/problems（题库 JSON）、sessions（会话记录）、storages（记忆与 workspace.json）、profiles/desktop（离线 pnpm install 出来的 profile，node_modules 是 file: 链接）；默认会话工作区在 .ensure-ile/deepseek-harness/default-workspace（2026-10-25 09:23 学生把 7 本必修 PDF 与教辅复制进了这里，原拷贝还在 C:\\Users\\libai\\Documents\\deepseek-harness\\default-workspace）。改名前的旧数据根 .dhdl/（约 100MB，最后一次写入 10-21）还留着，已无引用，可删。看数据先来这里，别只看仓库源码。",
+        "keywords": [
+          "ensure-ile",
+          ".ensure-ile",
+          "dsh_home",
+          "数据根",
+          "题库",
+          "sessions",
+          "default-workspace",
+          ".dhdl",
+          "教材",
+          "profiles"
+        ],
+        "createdAt": 1792891954029,
+        "updatedAt": 1792891954029
       }
     }
   }
