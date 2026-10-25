@@ -97,15 +97,21 @@ function asArray(value, field) {
 function parseRecord(raw) {
 	if (typeof raw !== "object" || raw === null) throw new BankError("题目文件不是对象", "invalid-record");
 	const value = raw;
-	if (value.schema !== 1) throw new BankError("schema 必须是 1", "invalid-record");
+	if (value.schema !== 2) throw new BankError("schema 必须是 2（v1 文件需要手工迁移）", "invalid-record");
 	const status = asString(value.status, "status");
 	if (!isProblemStatus(status)) throw new BankError("未知状态 " + status, "invalid-record");
 	const guide = value.guide;
 	if (typeof guide !== "object" || guide === null) throw new BankError("guide 必须是对象", "invalid-record");
+	const work = value.work;
+	if (typeof work !== "object" || work === null) throw new BankError("work 必须是对象", "invalid-record");
 	const review = value.review;
 	if (typeof review !== "object" || review === null) throw new BankError("review 必须是对象", "invalid-record");
-	return {
-		schema: 1,
+	const hrl = value.hrl;
+	if (hrl !== void 0 && (typeof hrl !== "object" || hrl === null)) throw new BankError("hrl 必须是对象", "invalid-record");
+	const handoff = value.handoff;
+	if (handoff !== void 0 && (typeof handoff !== "object" || handoff === null)) throw new BankError("handoff 必须是对象", "invalid-record");
+	const record = {
+		schema: 2,
 		id: asString(value.id, "id"),
 		subject: asString(value.subject, "subject"),
 		tags: asArray(value.tags ?? [], "tags"),
@@ -115,10 +121,13 @@ function parseRecord(raw) {
 		createdAt: asString(value.createdAt, "createdAt"),
 		updatedAt: asString(value.updatedAt, "updatedAt"),
 		guide,
-		attempts: asArray(value.attempts ?? [], "attempts"),
+		work,
 		review,
 		history: asArray(value.history ?? [], "history")
 	};
+	if (hrl !== void 0) record.hrl = hrl;
+	if (handoff !== void 0) record.handoff = handoff;
+	return record;
 }
 /** Read one problem, or throw a model-facing error. */
 function readProblem(directory, id) {
@@ -179,7 +188,7 @@ async function createProblem(directory, input) {
 	}
 	if (id.length === 0) throw new BankError("生成题目 id 失败，请重试", "id-collision");
 	const record = {
-		schema: 1,
+		schema: 2,
 		id,
 		subject,
 		tags: input.tags ?? [],
@@ -189,7 +198,7 @@ async function createProblem(directory, input) {
 		createdAt: at,
 		updatedAt: at,
 		guide: { sessions: [] },
-		attempts: [],
+		work: { attempts: [] },
 		review: {
 			count: 0,
 			history: []
@@ -204,6 +213,79 @@ async function createProblem(directory, input) {
 		dirMode: 448
 	});
 	return record;
+}
+/** The last pairing still waiting for its result. */
+function openPairing(hrl) {
+	for (let index = hrl.pairings.length - 1; index >= 0; index -= 1) {
+		const pairing = hrl.pairings[index];
+		if (pairing !== void 0 && pairing.result === void 0) return pairing;
+	}
+}
+/** Apply one HRL write; steps land in the open pairing, which `result` closes. */
+function applyHrl(record, input, at) {
+	const events = [];
+	const hrl = record.hrl ?? (record.hrl = { pairings: [] });
+	if (input.input !== void 0) {
+		hrl.input = input.input;
+		events.push("hrl input " + input.input.from);
+	}
+	if (input.teacher !== void 0) {
+		hrl.teacher = input.teacher;
+		events.push("hrl teacher " + input.teacher.steps.length + " steps");
+	}
+	if (input.step !== void 0) {
+		let pairing = openPairing(hrl);
+		if (pairing === void 0) {
+			pairing = {
+				at,
+				steps: []
+			};
+			hrl.pairings.push(pairing);
+		}
+		const step = input.step;
+		const existing = pairing.steps.findIndex((entry) => entry.index === step.index);
+		if (existing >= 0) pairing.steps[existing] = step;
+		else pairing.steps.push(step);
+		pairing.steps.sort((left, right) => left.index - right.index);
+		events.push("hrl step " + step.index + " " + step.match);
+	}
+	if (input.result !== void 0) {
+		const pairing = openPairing(hrl);
+		if (pairing === void 0) throw new BankError("没有进行中的对比，先写步骤再写结果", "invalid-input");
+		pairing.result = input.result;
+		events.push("hrl result");
+	}
+	return events;
+}
+/** Write a handoff, dropping whatever unconsumed package it replaces. */
+function applyHandoff(record, input, at) {
+	const events = [];
+	const previous = record.handoff;
+	if (previous !== void 0 && previous.consumedAt === void 0) events.push("handoff dropped " + previous.id);
+	record.handoff = {
+		id: input.id ?? "hlt-" + randomBytes(3).toString("hex"),
+		at,
+		from: input.from,
+		to: input.to,
+		why: input.why,
+		state: input.state,
+		...input.detail === void 0 ? {} : { detail: input.detail }
+	};
+	events.push("handoff -> " + input.to);
+	return events;
+}
+/** Mark the handoff accepted, or clear that mark so the package is selectable again. */
+function consumeHandoff(record, sessionId, at) {
+	const handoff = record.handoff;
+	if (handoff === void 0) throw new BankError("题库里没有待接收的交接", "invalid-input");
+	if (sessionId.length === 0) {
+		delete handoff.consumedAt;
+		delete handoff.consumerSessionId;
+		return ["handoff released"];
+	}
+	handoff.consumedAt = at;
+	handoff.consumerSessionId = sessionId;
+	return ["handoff consumed by " + sessionId];
 }
 /**
 * Apply one update under a cross-process file lock. Unknown fields merge
@@ -235,18 +317,27 @@ async function updateProblem(directory, id, input) {
 			if (open === void 0) record.guide.sessions.push(session);
 			events.push("guide " + input.guideOutcome);
 		}
+		if (input.guideResult !== void 0) {
+			const open = record.guide.sessions.find((session) => session.endedAt === void 0) ?? record.guide.sessions[record.guide.sessions.length - 1];
+			if (open === void 0) throw new BankError("没有可写入的引导会话", "invalid-input");
+			open.result = input.guideResult;
+			events.push("guide result");
+		}
 		if (input.insight !== void 0) record.guide.insight = input.insight;
 		if (input.reviewNextAt !== void 0) record.review.nextAt = input.reviewNextAt;
 		if (input.reviewInterval !== void 0) record.review.interval = input.reviewInterval;
-		if (input.attempt !== void 0) {
-			record.attempts.push({
+		if (input.workAttempt !== void 0) {
+			record.work.attempts.push({
 				at,
-				mode: input.attempt.mode,
-				answer: input.attempt.answer,
-				verdict: input.attempt.verdict
+				answer: input.workAttempt.answer,
+				verdict: input.workAttempt.verdict,
+				source: "text"
 			});
-			events.push("attempt " + input.attempt.mode);
+			events.push("work attempt " + input.workAttempt.verdict);
 		}
+		if (input.hrl !== void 0) events.push(...applyHrl(record, input.hrl, at));
+		if (input.handoff !== void 0) events.push(...applyHandoff(record, input.handoff, at));
+		if (input.handoffConsume !== void 0) events.push(...consumeHandoff(record, input.handoffConsume, at));
 		if (input.patch !== void 0) for (const [key, value] of Object.entries(input.patch)) {
 			if (key === "schema" || key === "id" || key === "history") continue;
 			record[key] = value;
@@ -264,16 +355,21 @@ async function updateProblem(directory, id, input) {
 		return record;
 	});
 }
-/** One-line summary used by `bank_list`. */
+/** True when this problem carries a handoff no session has accepted yet. */
+function hasPendingHandoff(record) {
+	return record.handoff !== void 0 && record.handoff.consumedAt === void 0;
+}
+/** One-line summary used by `bank_list`; a pending handoff is named so the list can offer it. */
 function summarizeProblem(record) {
 	const statement = record.statement.replace(/\s+/gu, " ").slice(0, 40);
+	const pending = hasPendingHandoff(record) && record.handoff !== void 0 ? " -> " + record.handoff.to + " 待接" : "";
 	return [
 		record.id,
 		record.status,
 		record.subject,
 		record.createdAt.slice(0, 10),
 		statement
-	].join(" | ");
+	].join(" | ") + pending;
 }
 /**
 * Aggregate the whole bank.
@@ -283,9 +379,11 @@ function summarizeProblem(record) {
 function summarizeStats(records, limit = 5) {
 	const byStatus = {};
 	const bySubject = {};
+	let pendingHandoffs = 0;
 	for (const record of records) {
 		byStatus[record.status] = (byStatus[record.status] ?? 0) + 1;
 		bySubject[record.subject] = (bySubject[record.subject] ?? 0) + 1;
+		if (hasPendingHandoff(record)) pendingHandoffs += 1;
 	}
 	const stalest = [...records].sort((left, right) => left.updatedAt.localeCompare(right.updatedAt)).slice(0, limit).map((record) => ({
 		id: record.id,
@@ -296,6 +394,7 @@ function summarizeStats(records, limit = 5) {
 		total: records.length,
 		byStatus,
 		bySubject,
+		pendingHandoffs,
 		stalest
 	};
 }
@@ -450,7 +549,14 @@ function apply(ctx, config) {
 	ctx.tools.register(defineTool({
 		name: "bank_update",
 		description: [
-			"更新一道题。显式字段：status、guideOutcome（solved / stuck / abandoned）、whereStuck、insight、reviewNextAt、reviewInterval、attempt。",
+			"更新一道题。显式字段：status、guideOutcome（solved / stuck / abandoned）、whereStuck、guideResult、insight、reviewNextAt、reviewInterval。",
+			"workAttempt：交一次卷——answer 原文 + verdict（ok / partial / wrong）。只放学生独立做的卷；引导里做出来的写 guideResult。",
+			"hrl：答案优化的增量写入，四段都可选，按 input → teacher → step → result 的顺序应用。",
+			"  input 是这次在打磨哪份答案；teacher 是教师轨迹（一次写全，按学生偏好写）；",
+			"  step 是一个小步的对比，写进最近一个还没有 result 的 pairing；result 是这条 pairing 拼好的最终解。",
+			"  每 3 步落一次盘，pairing 结束必须写 result。",
+			"handoff：交接包（from / to / why / state / detail）。同一道题最多一个未接收的，新的会顶掉旧的。",
+			"handoffConsume：传会话 id 表示这份交接已被接收；传空字符串表示撤销接收，卡片重新可点。",
 			"patch 是自由对象，浅合并进记录（数组整体替换），用来写工具还没覆盖的字段。",
 			"每次修改都会追加 history，updatedAt 自动刷新。",
 			"收尾：先问学生「这题你自己做出来了吗」。做出来 → status=review、guideOutcome=solved；",
@@ -474,6 +580,10 @@ function apply(ctx, config) {
 				type: "string",
 				description: "卡在哪一步（配合 guideOutcome=stuck）"
 			},
+			guideResult: {
+				type: "string",
+				description: "引导结束时他自己写出来的原稿"
+			},
 			insight: {
 				type: "string",
 				description: "这道题的关键转折，写给以后的自己"
@@ -486,20 +596,15 @@ function apply(ctx, config) {
 				type: "integer",
 				description: "复习间隔（天）"
 			},
-			attempt: {
+			workAttempt: {
 				type: "object",
 				additionalProperties: false,
-				description: "记录一次作答",
+				description: "记录一次独立作答",
 				properties: {
-					mode: {
-						type: "string",
-						required: true,
-						description: "work / hrl / guide"
-					},
 					answer: {
 						type: "string",
 						required: true,
-						description: "学生的答案"
+						description: "学生原文"
 					},
 					verdict: {
 						type: "string",
@@ -507,6 +612,179 @@ function apply(ctx, config) {
 						description: "ok / partial / wrong"
 					}
 				}
+			},
+			hrl: {
+				type: "object",
+				additionalProperties: false,
+				description: "答案优化的增量写入",
+				properties: {
+					input: {
+						type: "object",
+						additionalProperties: false,
+						description: "这次打磨的是哪份答案",
+						properties: {
+							at: {
+								type: "string",
+								description: "ISO 时间，省略用当前时间"
+							},
+							from: {
+								type: "string",
+								description: "work（从题库带的）或 pasted（学生当场贴的）"
+							},
+							attemptAt: {
+								type: "string",
+								description: "对应 work.attempts 里的 at"
+							},
+							answer: {
+								type: "string",
+								required: true,
+								description: "原文"
+							}
+						}
+					},
+					teacher: {
+						type: "object",
+						additionalProperties: false,
+						description: "教师轨迹，一次写全",
+						properties: {
+							writtenAt: {
+								type: "string",
+								description: "ISO 时间，省略用当前时间"
+							},
+							answer: {
+								type: "string",
+								required: true,
+								description: "教师版最终答案"
+							},
+							note: {
+								type: "string",
+								description: "按什么偏好写的，可省略"
+							},
+							steps: {
+								type: "array",
+								description: "按步拆开的全解",
+								items: {
+									type: "object",
+									additionalProperties: false,
+									properties: {
+										index: {
+											type: "integer",
+											required: true
+										},
+										body: {
+											type: "string",
+											required: true,
+											description: "这一步做什么"
+										},
+										reason: {
+											type: "string",
+											required: true,
+											description: "为什么能这么做"
+										}
+									}
+								}
+							}
+						}
+					},
+					step: {
+						type: "object",
+						additionalProperties: false,
+						description: "一个小步的对比",
+						properties: {
+							index: {
+								type: "integer",
+								required: true
+							},
+							studentQuote: {
+								type: "string",
+								description: "学生原句，逐字"
+							},
+							teacherStep: {
+								type: "integer",
+								description: "对应教师轨迹的 index"
+							},
+							match: {
+								type: "string",
+								required: true,
+								description: "same / partial / missing"
+							},
+							chosen: {
+								type: "string",
+								description: "student / teacher / merged"
+							},
+							mergedText: {
+								type: "string",
+								description: "chosen=merged 时学生自己重写的这步"
+							},
+							chosenAt: {
+								type: "string",
+								description: "ISO 时间"
+							},
+							note: {
+								type: "string",
+								description: "为什么这么选"
+							}
+						}
+					},
+					result: {
+						type: "string",
+						description: "这条 pairing 逐条选完后拼出的解"
+					}
+				}
+			},
+			handoff: {
+				type: "object",
+				additionalProperties: false,
+				description: "给下一个模式的交接包",
+				properties: {
+					id: {
+						type: "string",
+						description: "省略则自动生成"
+					},
+					from: {
+						type: "string",
+						required: true,
+						description: "work / guide / hrl / setup"
+					},
+					to: {
+						type: "string",
+						required: true,
+						description: "目标模式"
+					},
+					why: {
+						type: "string",
+						required: true,
+						description: "一句话，为什么换"
+					},
+					state: {
+						type: "string",
+						required: true,
+						description: "这题到哪了"
+					},
+					detail: {
+						type: "object",
+						additionalProperties: false,
+						description: "三段散文，给下一个模式的你",
+						properties: {
+							lastWords: {
+								type: "string",
+								description: "学生最后说了什么"
+							},
+							blocker: {
+								type: "string",
+								description: "卡点"
+							},
+							nextStep: {
+								type: "string",
+								description: "下一步从哪接"
+							}
+						}
+					}
+				}
+			},
+			handoffConsume: {
+				type: "string",
+				description: "接受这份交接的会话 id；空字符串表示撤销接收"
 			},
 			patch: {
 				type: "json",
@@ -522,14 +800,62 @@ function apply(ctx, config) {
 		},
 		execute: async (args) => {
 			try {
+				const now = (/* @__PURE__ */ new Date()).toISOString();
+				const workAttempt = args.workAttempt === void 0 ? void 0 : {
+					answer: args.workAttempt.answer,
+					verdict: args.workAttempt.verdict
+				};
+				let hrl;
+				if (args.hrl !== void 0) {
+					const source = args.hrl;
+					hrl = {};
+					if (source.input !== void 0) hrl.input = {
+						at: source.input.at ?? now,
+						from: source.input.from ?? "pasted",
+						answer: source.input.answer,
+						...source.input.attemptAt === void 0 ? {} : { attemptAt: source.input.attemptAt }
+					};
+					if (source.teacher !== void 0) hrl.teacher = {
+						writtenAt: source.teacher.writtenAt ?? now,
+						answer: source.teacher.answer,
+						steps: source.teacher.steps ?? [],
+						...source.teacher.note === void 0 ? {} : { note: source.teacher.note }
+					};
+					if (source.step !== void 0) {
+						const step = source.step;
+						hrl.step = {
+							index: step.index,
+							match: step.match,
+							...step.studentQuote === void 0 ? {} : { studentQuote: step.studentQuote },
+							...step.teacherStep === void 0 ? {} : { teacherStep: step.teacherStep },
+							...step.chosen === void 0 ? {} : { chosen: step.chosen },
+							...step.mergedText === void 0 ? {} : { mergedText: step.mergedText },
+							...step.chosenAt === void 0 ? {} : { chosenAt: step.chosenAt },
+							...step.note === void 0 ? {} : { note: step.note }
+						};
+					}
+					if (source.result !== void 0) hrl.result = source.result;
+				}
+				const handoff = args.handoff === void 0 ? void 0 : {
+					from: args.handoff.from,
+					to: args.handoff.to,
+					why: args.handoff.why,
+					state: args.handoff.state,
+					...args.handoff.id === void 0 ? {} : { id: args.handoff.id },
+					...args.handoff.detail === void 0 ? {} : { detail: args.handoff.detail }
+				};
 				const record = await updateProblem(directory, args.id, {
 					...args.status === void 0 ? {} : { status: args.status },
 					...args.guideOutcome === void 0 ? {} : { guideOutcome: args.guideOutcome },
 					...args.whereStuck === void 0 ? {} : { whereStuck: args.whereStuck },
+					...args.guideResult === void 0 ? {} : { guideResult: args.guideResult },
 					...args.insight === void 0 ? {} : { insight: args.insight },
 					...args.reviewNextAt === void 0 ? {} : { reviewNextAt: args.reviewNextAt },
 					...args.reviewInterval === void 0 ? {} : { reviewInterval: args.reviewInterval },
-					...args.attempt === void 0 ? {} : { attempt: args.attempt },
+					...workAttempt === void 0 ? {} : { workAttempt },
+					...hrl === void 0 ? {} : { hrl },
+					...handoff === void 0 ? {} : { handoff },
+					...args.handoffConsume === void 0 ? {} : { handoffConsume: args.handoffConsume },
 					...args.patch === void 0 ? {} : { patch: args.patch }
 				});
 				return "已更新 " + record.id + "：状态 " + record.status + "，历史 " + record.history.length + " 条。";
@@ -540,7 +866,7 @@ function apply(ctx, config) {
 	}));
 	ctx.tools.register(defineTool({
 		name: "bank_stats",
-		description: ["题库概况：各状态计数、总数、最久没动的 5 道题。", "用在：学生问「我还有多少题没做」，或者你判断先带哪道题。"].join("\n"),
+		description: ["题库概况：各状态计数、总数、待接交接数、最久没动的 5 道题。", "用在：学生问「我还有多少题没做」，或者你判断先带哪道题。"].join("\n"),
 		parameters: {},
 		output: {
 			schema: { type: "string" },
@@ -555,6 +881,7 @@ function apply(ctx, config) {
 				const stats = summarizeStats(records);
 				const lines = [
 					"总数：" + stats.total,
+					"待接交接：" + stats.pendingHandoffs,
 					"按状态：" + (Object.keys(stats.byStatus).length === 0 ? "（空）" : Object.entries(stats.byStatus).map(([key, value]) => key + "=" + value).join("，")),
 					"按科目：" + (Object.keys(stats.bySubject).length === 0 ? "（空）" : Object.entries(stats.bySubject).map(([key, value]) => key + "=" + value).join("，")),
 					"最久没动：",

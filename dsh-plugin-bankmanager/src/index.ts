@@ -24,7 +24,12 @@ import {
   summarizeProblem,
   summarizeStats,
   updateProblem,
+  type HandoffInput,
+  type HrlUpdateInput,
+  type PairingChoice,
+  type PairingMatch,
   type ProblemStatus,
+  type WorkAttemptInput,
 } from './store.ts'
 
 /** Cordis plugin name. */
@@ -164,7 +169,14 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'bank_update',
     description: [
-      '更新一道题。显式字段：status、guideOutcome（solved / stuck / abandoned）、whereStuck、insight、reviewNextAt、reviewInterval、attempt。',
+      '更新一道题。显式字段：status、guideOutcome（solved / stuck / abandoned）、whereStuck、guideResult、insight、reviewNextAt、reviewInterval。',
+      'workAttempt：交一次卷——answer 原文 + verdict（ok / partial / wrong）。只放学生独立做的卷；引导里做出来的写 guideResult。',
+      'hrl：答案优化的增量写入，四段都可选，按 input → teacher → step → result 的顺序应用。',
+      '  input 是这次在打磨哪份答案；teacher 是教师轨迹（一次写全，按学生偏好写）；',
+      '  step 是一个小步的对比，写进最近一个还没有 result 的 pairing；result 是这条 pairing 拼好的最终解。',
+      '  每 3 步落一次盘，pairing 结束必须写 result。',
+      'handoff：交接包（from / to / why / state / detail）。同一道题最多一个未接收的，新的会顶掉旧的。',
+      'handoffConsume：传会话 id 表示这份交接已被接收；传空字符串表示撤销接收，卡片重新可点。',
       'patch 是自由对象，浅合并进记录（数组整体替换），用来写工具还没覆盖的字段。',
       '每次修改都会追加 history，updatedAt 自动刷新。',
       '收尾：先问学生「这题你自己做出来了吗」。做出来 → status=review、guideOutcome=solved；',
@@ -175,19 +187,99 @@ export function apply(ctx: Context, config: Config): void {
       status: { type: 'string', description: 'new / guide / hrl / review / mastered / parked' },
       guideOutcome: { type: 'string', description: 'solved / stuck / abandoned' },
       whereStuck: { type: 'string', description: '卡在哪一步（配合 guideOutcome=stuck）' },
+      guideResult: { type: 'string', description: '引导结束时他自己写出来的原稿' },
       insight: { type: 'string', description: '这道题的关键转折，写给以后的自己' },
       reviewNextAt: { type: 'string', description: '下次复习时间（ISO 8601）' },
       reviewInterval: { type: 'integer', description: '复习间隔（天）' },
-      attempt: {
+      workAttempt: {
         type: 'object',
         additionalProperties: false,
-        description: '记录一次作答',
+        description: '记录一次独立作答',
         properties: {
-          mode: { type: 'string', required: true, description: 'work / hrl / guide' },
-          answer: { type: 'string', required: true, description: '学生的答案' },
+          answer: { type: 'string', required: true, description: '学生原文' },
           verdict: { type: 'string', required: true, description: 'ok / partial / wrong' },
         },
       },
+      hrl: {
+        type: 'object',
+        additionalProperties: false,
+        description: '答案优化的增量写入',
+        properties: {
+          input: {
+            type: 'object',
+            additionalProperties: false,
+            description: '这次打磨的是哪份答案',
+            properties: {
+              at: { type: 'string', description: 'ISO 时间，省略用当前时间' },
+              from: { type: 'string', description: 'work（从题库带的）或 pasted（学生当场贴的）' },
+              attemptAt: { type: 'string', description: '对应 work.attempts 里的 at' },
+              answer: { type: 'string', required: true, description: '原文' },
+            },
+          },
+          teacher: {
+            type: 'object',
+            additionalProperties: false,
+            description: '教师轨迹，一次写全',
+            properties: {
+              writtenAt: { type: 'string', description: 'ISO 时间，省略用当前时间' },
+              answer: { type: 'string', required: true, description: '教师版最终答案' },
+              note: { type: 'string', description: '按什么偏好写的，可省略' },
+              steps: {
+                type: 'array',
+                description: '按步拆开的全解',
+                items: {
+                  type: 'object',
+                  additionalProperties: false,
+                  properties: {
+                    index: { type: 'integer', required: true },
+                    body: { type: 'string', required: true, description: '这一步做什么' },
+                    reason: { type: 'string', required: true, description: '为什么能这么做' },
+                  },
+                },
+              },
+            },
+          },
+          step: {
+            type: 'object',
+            additionalProperties: false,
+            description: '一个小步的对比',
+            properties: {
+              index: { type: 'integer', required: true },
+              studentQuote: { type: 'string', description: '学生原句，逐字' },
+              teacherStep: { type: 'integer', description: '对应教师轨迹的 index' },
+              match: { type: 'string', required: true, description: 'same / partial / missing' },
+              chosen: { type: 'string', description: 'student / teacher / merged' },
+              mergedText: { type: 'string', description: 'chosen=merged 时学生自己重写的这步' },
+              chosenAt: { type: 'string', description: 'ISO 时间' },
+              note: { type: 'string', description: '为什么这么选' },
+            },
+          },
+          result: { type: 'string', description: '这条 pairing 逐条选完后拼出的解' },
+        },
+      },
+      handoff: {
+        type: 'object',
+        additionalProperties: false,
+        description: '给下一个模式的交接包',
+        properties: {
+          id: { type: 'string', description: '省略则自动生成' },
+          from: { type: 'string', required: true, description: 'work / guide / hrl / setup' },
+          to: { type: 'string', required: true, description: '目标模式' },
+          why: { type: 'string', required: true, description: '一句话，为什么换' },
+          state: { type: 'string', required: true, description: '这题到哪了' },
+          detail: {
+            type: 'object',
+            additionalProperties: false,
+            description: '三段散文，给下一个模式的你',
+            properties: {
+              lastWords: { type: 'string', description: '学生最后说了什么' },
+              blocker: { type: 'string', description: '卡点' },
+              nextStep: { type: 'string', description: '下一步从哪接' },
+            },
+          },
+        },
+      },
+      handoffConsume: { type: 'string', description: '接受这份交接的会话 id；空字符串表示撤销接收' },
       patch: { type: 'json', description: '自由字段浅合并' },
     },
     output: {
@@ -196,14 +288,67 @@ export function apply(ctx: Context, config: Config): void {
     },
     execute: async (args) => {
       try {
+        const now = new Date().toISOString()
+        const workAttempt: WorkAttemptInput | undefined = args.workAttempt === undefined
+          ? undefined
+          : { answer: args.workAttempt.answer, verdict: args.workAttempt.verdict }
+        let hrl: HrlUpdateInput | undefined
+        if (args.hrl !== undefined) {
+          const source = args.hrl
+          hrl = {}
+          if (source.input !== undefined) {
+            hrl.input = {
+              at: source.input.at ?? now,
+              from: (source.input.from ?? 'pasted') as 'work' | 'pasted',
+              answer: source.input.answer,
+              ...(source.input.attemptAt === undefined ? {} : { attemptAt: source.input.attemptAt }),
+            }
+          }
+          if (source.teacher !== undefined) {
+            hrl.teacher = {
+              writtenAt: source.teacher.writtenAt ?? now,
+              answer: source.teacher.answer,
+              steps: source.teacher.steps ?? [],
+              ...(source.teacher.note === undefined ? {} : { note: source.teacher.note }),
+            }
+          }
+          if (source.step !== undefined) {
+            const step = source.step
+            hrl.step = {
+              index: step.index,
+              match: step.match as PairingMatch,
+              ...(step.studentQuote === undefined ? {} : { studentQuote: step.studentQuote }),
+              ...(step.teacherStep === undefined ? {} : { teacherStep: step.teacherStep }),
+              ...(step.chosen === undefined ? {} : { chosen: step.chosen as PairingChoice }),
+              ...(step.mergedText === undefined ? {} : { mergedText: step.mergedText }),
+              ...(step.chosenAt === undefined ? {} : { chosenAt: step.chosenAt }),
+              ...(step.note === undefined ? {} : { note: step.note }),
+            }
+          }
+          if (source.result !== undefined) hrl.result = source.result
+        }
+        const handoff: HandoffInput | undefined = args.handoff === undefined
+          ? undefined
+          : {
+              from: args.handoff.from,
+              to: args.handoff.to,
+              why: args.handoff.why,
+              state: args.handoff.state,
+              ...(args.handoff.id === undefined ? {} : { id: args.handoff.id }),
+              ...(args.handoff.detail === undefined ? {} : { detail: args.handoff.detail }),
+            }
         const record = await updateProblem(directory, args.id, {
           ...(args.status === undefined ? {} : { status: args.status }),
           ...(args.guideOutcome === undefined ? {} : { guideOutcome: args.guideOutcome }),
           ...(args.whereStuck === undefined ? {} : { whereStuck: args.whereStuck }),
+          ...(args.guideResult === undefined ? {} : { guideResult: args.guideResult }),
           ...(args.insight === undefined ? {} : { insight: args.insight }),
           ...(args.reviewNextAt === undefined ? {} : { reviewNextAt: args.reviewNextAt }),
           ...(args.reviewInterval === undefined ? {} : { reviewInterval: args.reviewInterval }),
-          ...(args.attempt === undefined ? {} : { attempt: args.attempt }),
+          ...(workAttempt === undefined ? {} : { workAttempt }),
+          ...(hrl === undefined ? {} : { hrl }),
+          ...(handoff === undefined ? {} : { handoff }),
+          ...(args.handoffConsume === undefined ? {} : { handoffConsume: args.handoffConsume }),
           ...(args.patch === undefined ? {} : { patch: args.patch as Record<string, unknown> }),
         })
         return '已更新 ' + record.id + '：状态 ' + record.status + '，历史 ' + record.history.length + ' 条。'
@@ -216,7 +361,7 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'bank_stats',
     description: [
-      '题库概况：各状态计数、总数、最久没动的 5 道题。',
+      '题库概况：各状态计数、总数、待接交接数、最久没动的 5 道题。',
       '用在：学生问「我还有多少题没做」，或者你判断先带哪道题。',
     ].join('\n'),
     parameters: {},
@@ -230,6 +375,7 @@ export function apply(ctx: Context, config: Config): void {
         const stats = summarizeStats(records)
         const lines = [
           '总数：' + stats.total,
+          '待接交接：' + stats.pendingHandoffs,
           '按状态：' + (Object.keys(stats.byStatus).length === 0 ? '（空）' : Object.entries(stats.byStatus).map(([key, value]) => key + '=' + value).join('，')),
           '按科目：' + (Object.keys(stats.bySubject).length === 0 ? '（空）' : Object.entries(stats.bySubject).map(([key, value]) => key + '=' + value).join('，')),
           '最久没动：',

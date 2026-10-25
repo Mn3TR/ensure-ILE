@@ -11,6 +11,7 @@ import {
   problemPath,
   readProblem,
   slugSubject,
+  summarizeProblem,
   summarizeStats,
   updateProblem,
 } from '../src/store.ts'
@@ -89,7 +90,7 @@ describe('update', () => {
       guideOutcome: 'stuck',
       whereStuck: '第二问换元',
       insight: '先看重复结构',
-      attempt: { mode: 'guide', answer: '试了换元', verdict: 'partial' },
+      workAttempt: { answer: '试了换元', verdict: 'partial' },
       patch: { tags: ['函数'] },
       now: new Date('2026-10-24T11:00:00Z'),
     })
@@ -98,7 +99,8 @@ describe('update', () => {
     expect(updated.guide.sessions[0]?.outcome).toBe('stuck')
     expect(updated.guide.sessions[0]?.whereStuck).toBe('第二问换元')
     expect(updated.guide.insight).toBe('先看重复结构')
-    expect(updated.attempts).toHaveLength(1)
+    expect(updated.work.attempts).toHaveLength(1)
+    expect(updated.work.attempts[0]?.source).toBe('text')
     expect(updated.tags).toEqual(['函数'])
     expect(updated.updatedAt).toBe('2026-10-24T11:00:00.000Z')
     expect(updated.history.length).toBeGreaterThan(1)
@@ -126,5 +128,80 @@ describe('stats', () => {
     expect(stats.total).toBe(2)
     expect(stats.byStatus).toMatchObject({ new: 1, review: 1 })
     expect(stats.stalest[0]?.id).toContain('666666')
+  })
+})
+
+describe('answer optimization', () => {
+  it('writes the teacher trajectory, one step twice, then closes the pairing', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: 'one', subject: 'math', suffix: '888888' })
+    await updateProblem(dir, record.id, {
+      hrl: {
+        input: { at: '2026-10-25T00:00:00.000Z', from: 'work', answer: '我的解法' },
+        teacher: {
+          writtenAt: '2026-10-25T00:01:00.000Z',
+          answer: 'x=2',
+          steps: [{ index: 1, body: '移项', reason: '保持等价' }],
+        },
+      },
+    })
+    await updateProblem(dir, record.id, {
+      hrl: { step: { index: 1, studentQuote: '先移项', teacherStep: 1, match: 'partial' } },
+    })
+    const chosen = await updateProblem(dir, record.id, {
+      hrl: {
+        step: { index: 1, studentQuote: '先移项', teacherStep: 1, match: 'partial', chosen: 'merged', mergedText: '先移项再合并' },
+      },
+    })
+    expect(chosen.hrl?.pairings[0]?.steps).toHaveLength(1)
+    expect(chosen.hrl?.pairings[0]?.steps[0]?.mergedText).toBe('先移项再合并')
+
+    const closed = await updateProblem(dir, record.id, { hrl: { result: '先移项再合并' } })
+    expect(closed.hrl?.teacher?.steps).toHaveLength(1)
+    expect(closed.hrl?.pairings).toHaveLength(1)
+    expect(closed.hrl?.pairings[0]?.result).toBe('先移项再合并')
+    expect(closed.hrl?.input?.from).toBe('work')
+  })
+
+  it('refuses a result without an open pairing', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: 'one', subject: 'math', suffix: 'aaaaab' })
+    await expect(updateProblem(dir, record.id, { hrl: { result: 'x' } })).rejects.toThrow(BankError)
+  })
+})
+
+describe('handoff', () => {
+  it('writes, consumes, releases and surfaces in list and stats', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: 'one', subject: 'math', suffix: 'bbbbbc' })
+    const written = await updateProblem(dir, record.id, {
+      handoff: { from: 'work', to: 'guide', why: '讲不清', state: '第二步', detail: { nextStep: '从提问开始' } },
+    })
+    expect(written.handoff?.id).toMatch(/^hlt-/u)
+    expect(summarizeProblem(written)).toContain('-> guide 待接')
+    expect(summarizeStats([written]).pendingHandoffs).toBe(1)
+
+    const consumed = await updateProblem(dir, record.id, { handoffConsume: 'session-1' })
+    expect(consumed.handoff?.consumerSessionId).toBe('session-1')
+    expect(consumed.handoff?.consumedAt).toBeDefined()
+    expect(summarizeStats([consumed]).pendingHandoffs).toBe(0)
+    expect(summarizeProblem(consumed)).not.toContain('待接')
+
+    const released = await updateProblem(dir, record.id, { handoffConsume: '' })
+    expect(released.handoff?.consumedAt).toBeUndefined()
+    expect(summarizeStats([released]).pendingHandoffs).toBe(1)
+  })
+
+  it('replaces an unconsumed handoff and records the drop', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: 'one', subject: 'math', suffix: 'cccccd' })
+    await updateProblem(dir, record.id, { handoff: { from: 'work', to: 'guide', why: 'a', state: 'b' } })
+    const second = await updateProblem(dir, record.id, { handoff: { from: 'guide', to: 'hrl', why: 'c', state: 'd' } })
+    expect(second.handoff?.to).toBe('hrl')
+    expect(second.history.some(entry => entry.event.startsWith('handoff dropped'))).toBe(true)
+  })
+
+  it('keeps a v1 file unreadable instead of half-migrating it', () => {
+    expect(() => parseRecord({ schema: 1, id: 'x' })).toThrow(/schema 必须是 2/u)
   })
 })

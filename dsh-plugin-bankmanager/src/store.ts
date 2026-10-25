@@ -28,14 +28,90 @@ export interface GuideSession {
   endedAt?: string
   outcome?: GuideOutcome
   whereStuck?: string
+  /** What the learner wrote at the end of the session, verbatim. */
+  result?: string
 }
 
-/** One attempt at solving the problem. */
+/** One handed-in answer from a session where the learner worked alone. */
 export interface ProblemAttempt {
   at: string
-  mode: string
   answer: string
   verdict: string
+  source: 'text'
+}
+
+/** One step of the teacher's trajectory. */
+export interface TeacherStep {
+  index: number
+  body: string
+  reason: string
+}
+
+/** The teacher's own complete solution, written once per problem. */
+export interface TeacherTrajectory {
+  writtenAt: string
+  answer: string
+  /** Why it was written this way. Optional; fill it only when it is not obvious. */
+  note?: string
+  steps: TeacherStep[]
+}
+
+/** How one teacher step lines up with the learner's own words. */
+export const PAIRING_MATCHES = ['same', 'partial', 'missing'] as const
+export type PairingMatch = (typeof PAIRING_MATCHES)[number]
+
+/** Which side the learner kept for one step. */
+export const PAIRING_CHOICES = ['student', 'teacher', 'merged'] as const
+export type PairingChoice = (typeof PAIRING_CHOICES)[number]
+
+/** One aligned step of the learner's rollout against the teacher's trajectory. */
+export interface PairingStep {
+  index: number
+  /** The learner's own words, verbatim. Absent when the step is missing. */
+  studentQuote?: string
+  /** Index into the teacher's steps. */
+  teacherStep?: number
+  match: PairingMatch
+  chosen?: PairingChoice
+  /** The learner's rewrite, present only when `chosen` is `merged`. */
+  mergedText?: string
+  chosenAt?: string
+  note?: string
+}
+
+/** One pass of step-by-step A/B over one handed-in answer. */
+export interface Pairing {
+  at: string
+  attemptAt?: string
+  steps: PairingStep[]
+  /** The solution assembled from the choices; present once the pass closes. */
+  result?: string
+}
+
+/** The answer-optimization state, present once HRL touched this problem. */
+export interface HrlState {
+  input?: {
+    at: string
+    from: 'work' | 'pasted'
+    attemptAt?: string
+    answer: string
+  }
+  teacher?: TeacherTrajectory
+  pairings: Pairing[]
+}
+
+/** What one mode leaves for the next one. At most one may be unconsumed. */
+export interface Handoff {
+  id: string
+  at: string
+  from: string
+  to: string
+  why: string
+  state: string
+  detail?: { lastWords?: string; blocker?: string; nextStep?: string }
+  /** Set when a session accepted it; clear it to make the package selectable again. */
+  consumedAt?: string
+  consumerSessionId?: string
 }
 
 /** Review schedule state; the scheduler that fills it comes later. */
@@ -53,9 +129,9 @@ export interface HistoryEntry {
   detail?: string
 }
 
-/** A whole problem record. */
+/** A whole problem record. Each mode owns its own section. */
 export interface ProblemRecord {
-  schema: 1
+  schema: 2
   id: string
   subject: string
   tags: string[]
@@ -65,7 +141,9 @@ export interface ProblemRecord {
   createdAt: string
   updatedAt: string
   guide: { sessions: GuideSession[]; insight?: string }
-  attempts: ProblemAttempt[]
+  work: { attempts: ProblemAttempt[] }
+  hrl?: HrlState
+  handoff?: Handoff
   review: ReviewState
   history: HistoryEntry[]
 }
@@ -153,15 +231,21 @@ function asArray<T>(value: unknown, field: string): T[] {
 export function parseRecord(raw: unknown): ProblemRecord {
   if (typeof raw !== 'object' || raw === null) throw new BankError('题目文件不是对象', 'invalid-record')
   const value = raw as Record<string, unknown>
-  if (value.schema !== 1) throw new BankError('schema 必须是 1', 'invalid-record')
+  if (value.schema !== 2) throw new BankError('schema 必须是 2（v1 文件需要手工迁移）', 'invalid-record')
   const status = asString(value.status, 'status')
   if (!isProblemStatus(status)) throw new BankError('未知状态 ' + status, 'invalid-record')
   const guide = value.guide
   if (typeof guide !== 'object' || guide === null) throw new BankError('guide 必须是对象', 'invalid-record')
+  const work = value.work
+  if (typeof work !== 'object' || work === null) throw new BankError('work 必须是对象', 'invalid-record')
   const review = value.review
   if (typeof review !== 'object' || review === null) throw new BankError('review 必须是对象', 'invalid-record')
-  return {
-    schema: 1,
+  const hrl = value.hrl
+  if (hrl !== undefined && (typeof hrl !== 'object' || hrl === null)) throw new BankError('hrl 必须是对象', 'invalid-record')
+  const handoff = value.handoff
+  if (handoff !== undefined && (typeof handoff !== 'object' || handoff === null)) throw new BankError('handoff 必须是对象', 'invalid-record')
+  const record: ProblemRecord = {
+    schema: 2,
     id: asString(value.id, 'id'),
     subject: asString(value.subject, 'subject'),
     tags: asArray<string>(value.tags ?? [], 'tags'),
@@ -171,10 +255,13 @@ export function parseRecord(raw: unknown): ProblemRecord {
     createdAt: asString(value.createdAt, 'createdAt'),
     updatedAt: asString(value.updatedAt, 'updatedAt'),
     guide: guide as ProblemRecord['guide'],
-    attempts: asArray<ProblemAttempt>(value.attempts ?? [], 'attempts'),
+    work: work as ProblemRecord['work'],
     review: review as ProblemRecord['review'],
     history: asArray<HistoryEntry>(value.history ?? [], 'history'),
   }
+  if (hrl !== undefined) record.hrl = hrl as HrlState
+  if (handoff !== undefined) record.handoff = handoff as Handoff
+  return record
 }
 
 /** Read one problem, or throw a model-facing error. */
@@ -244,7 +331,7 @@ export async function createProblem(directory: string, input: CreateProblemInput
   }
   if (id.length === 0) throw new BankError('生成题目 id 失败，请重试', 'id-collision')
   const record: ProblemRecord = {
-    schema: 1,
+    schema: 2,
     id,
     subject,
     tags: input.tags ?? [],
@@ -254,7 +341,7 @@ export async function createProblem(directory: string, input: CreateProblemInput
     createdAt: at,
     updatedAt: at,
     guide: { sessions: [] },
-    attempts: [],
+    work: { attempts: [] },
     review: { count: 0, history: [] },
     history: [{ at, event: 'created' }],
   }
@@ -262,17 +349,121 @@ export async function createProblem(directory: string, input: CreateProblemInput
   return record
 }
 
+/** One handed-in answer from work mode. */
+export interface WorkAttemptInput {
+  answer: string
+  verdict: string
+}
+
+/** One incremental write into the answer-optimization section. */
+export interface HrlUpdateInput {
+  input?: HrlState['input']
+  teacher?: TeacherTrajectory
+  step?: PairingStep
+  result?: string
+}
+
+/** A handoff to write; the id is minted when absent. */
+export interface HandoffInput {
+  id?: string
+  from: string
+  to: string
+  why: string
+  state: string
+  detail?: Handoff['detail']
+}
+
 /** Fields a caller may change explicitly; everything else goes through `patch`. */
 export interface UpdateProblemInput {
   status?: string
   guideOutcome?: string
   whereStuck?: string
+  guideResult?: string
   insight?: string
   reviewNextAt?: string
   reviewInterval?: number
-  attempt?: { mode: string; answer: string; verdict: string }
+  workAttempt?: WorkAttemptInput
+  hrl?: HrlUpdateInput
+  handoff?: HandoffInput
+  /** Session id accepting the pending handoff; an empty string releases it. */
+  handoffConsume?: string
   patch?: Record<string, unknown>
   now?: Date
+}
+
+/** The last pairing still waiting for its result. */
+function openPairing(hrl: HrlState): Pairing | undefined {
+  for (let index = hrl.pairings.length - 1; index >= 0; index -= 1) {
+    const pairing = hrl.pairings[index]
+    if (pairing !== undefined && pairing.result === undefined) return pairing
+  }
+  return undefined
+}
+
+/** Apply one HRL write; steps land in the open pairing, which `result` closes. */
+function applyHrl(record: ProblemRecord, input: HrlUpdateInput, at: string): string[] {
+  const events: string[] = []
+  const hrl = record.hrl ?? (record.hrl = { pairings: [] })
+  if (input.input !== undefined) {
+    hrl.input = input.input
+    events.push('hrl input ' + input.input.from)
+  }
+  if (input.teacher !== undefined) {
+    hrl.teacher = input.teacher
+    events.push('hrl teacher ' + input.teacher.steps.length + ' steps')
+  }
+  if (input.step !== undefined) {
+    let pairing = openPairing(hrl)
+    if (pairing === undefined) {
+      pairing = { at, steps: [] }
+      hrl.pairings.push(pairing)
+    }
+    const step = input.step
+    const existing = pairing.steps.findIndex(entry => entry.index === step.index)
+    if (existing >= 0) pairing.steps[existing] = step
+    else pairing.steps.push(step)
+    pairing.steps.sort((left, right) => left.index - right.index)
+    events.push('hrl step ' + step.index + ' ' + step.match)
+  }
+  if (input.result !== undefined) {
+    const pairing = openPairing(hrl)
+    if (pairing === undefined) throw new BankError('没有进行中的对比，先写步骤再写结果', 'invalid-input')
+    pairing.result = input.result
+    events.push('hrl result')
+  }
+  return events
+}
+
+/** Write a handoff, dropping whatever unconsumed package it replaces. */
+function applyHandoff(record: ProblemRecord, input: HandoffInput, at: string): string[] {
+  const events: string[] = []
+  const previous = record.handoff
+  if (previous !== undefined && previous.consumedAt === undefined) events.push('handoff dropped ' + previous.id)
+  record.handoff = {
+    id: input.id ?? 'hlt-' + randomBytes(3).toString('hex'),
+    at,
+    from: input.from,
+    to: input.to,
+    why: input.why,
+    state: input.state,
+    ...(input.detail === undefined ? {} : { detail: input.detail }),
+  }
+  events.push('handoff -> ' + input.to)
+  return events
+}
+
+/** Mark the handoff accepted, or clear that mark so the package is selectable again. */
+function consumeHandoff(record: ProblemRecord, sessionId: string, at: string): string[] {
+  const handoff = record.handoff
+  if (handoff === undefined) throw new BankError('题库里没有待接收的交接', 'invalid-input')
+  if (sessionId.length === 0) {
+    delete handoff.consumedAt
+    delete handoff.consumerSessionId
+    return ['handoff released']
+  }
+  handoff.consumedAt = at
+  handoff.consumerSessionId = sessionId
+  return ['handoff consumed by ' + sessionId]
 }
 
 /**
@@ -307,13 +498,28 @@ export async function updateProblem(directory: string, id: string, input: Update
       if (open === undefined) record.guide.sessions.push(session)
       events.push('guide ' + input.guideOutcome)
     }
+    if (input.guideResult !== undefined) {
+      const open = record.guide.sessions.find(session => session.endedAt === undefined)
+        ?? record.guide.sessions[record.guide.sessions.length - 1]
+      if (open === undefined) throw new BankError('没有可写入的引导会话', 'invalid-input')
+      open.result = input.guideResult
+      events.push('guide result')
+    }
     if (input.insight !== undefined) record.guide.insight = input.insight
     if (input.reviewNextAt !== undefined) record.review.nextAt = input.reviewNextAt
     if (input.reviewInterval !== undefined) record.review.interval = input.reviewInterval
-    if (input.attempt !== undefined) {
-      record.attempts.push({ at, mode: input.attempt.mode, answer: input.attempt.answer, verdict: input.attempt.verdict })
-      events.push('attempt ' + input.attempt.mode)
+    if (input.workAttempt !== undefined) {
+      record.work.attempts.push({
+        at,
+        answer: input.workAttempt.answer,
+        verdict: input.workAttempt.verdict,
+        source: 'text',
+      })
+      events.push('work attempt ' + input.workAttempt.verdict)
     }
+    if (input.hrl !== undefined) events.push(...applyHrl(record, input.hrl, at))
+    if (input.handoff !== undefined) events.push(...applyHandoff(record, input.handoff, at))
+    if (input.handoffConsume !== undefined) events.push(...consumeHandoff(record, input.handoffConsume, at))
     if (input.patch !== undefined) {
       for (const [key, value] of Object.entries(input.patch)) {
         if (key === 'schema' || key === 'id' || key === 'history') continue
@@ -328,10 +534,18 @@ export async function updateProblem(directory: string, id: string, input: Update
   })
 }
 
-/** One-line summary used by `bank_list`. */
+/** True when this problem carries a handoff no session has accepted yet. */
+export function hasPendingHandoff(record: ProblemRecord): boolean {
+  return record.handoff !== undefined && record.handoff.consumedAt === undefined
+}
+
+/** One-line summary used by `bank_list`; a pending handoff is named so the list can offer it. */
 export function summarizeProblem(record: ProblemRecord): string {
   const statement = record.statement.replace(/\s+/gu, ' ').slice(0, 40)
-  return [record.id, record.status, record.subject, record.createdAt.slice(0, 10), statement].join(' | ')
+  const pending = hasPendingHandoff(record) && record.handoff !== undefined
+    ? ' -> ' + record.handoff.to + ' 待接'
+    : ''
+  return [record.id, record.status, record.subject, record.createdAt.slice(0, 10), statement].join(' | ') + pending
 }
 
 /** Counts and the stalest problems. */
@@ -339,6 +553,8 @@ export interface BankStats {
   total: number
   byStatus: Record<string, number>
   bySubject: Record<string, number>
+  /** Problems whose handoff no session has accepted yet. */
+  pendingHandoffs: number
   stalest: { id: string; status: string; updatedAt: string }[]
 }
 
@@ -350,13 +566,15 @@ export interface BankStats {
 export function summarizeStats(records: ProblemRecord[], limit = 5): BankStats {
   const byStatus: Record<string, number> = {}
   const bySubject: Record<string, number> = {}
+  let pendingHandoffs = 0
   for (const record of records) {
     byStatus[record.status] = (byStatus[record.status] ?? 0) + 1
     bySubject[record.subject] = (bySubject[record.subject] ?? 0) + 1
+    if (hasPendingHandoff(record)) pendingHandoffs += 1
   }
   const stalest = [...records]
     .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
     .slice(0, limit)
     .map(record => ({ id: record.id, status: record.status, updatedAt: record.updatedAt }))
-  return { total: records.length, byStatus, bySubject, stalest }
+  return { total: records.length, byStatus, bySubject, pendingHandoffs, stalest }
 }
