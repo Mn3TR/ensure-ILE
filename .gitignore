@@ -16,5 +16,6 @@ dsh-plugin-desktop/lib/
 .ensure-ile/
 .dsh-ops/
 .dsh-ops-update-*.lock
+.codegraph/
 dsh-plugin-desktop/.desktop-build/
 .dhdl/
