@@ -141,18 +141,32 @@ new ──> guide ──> review ──> mastered
 
 EnSure Lab / 因需。包名 `dsh-plugin-bankmanager`。它多半也不是 agent preset，而是 Host 侧服务 + 界面入口，这条待定。
 
-## 浏览器半边：交接卡片
+## 浏览器半边：交接卡片与接续入口
 
 `src/client/` 是这个插件的浏览器面，构建产出 `lib/client.js`，按上游客户端插件的装载协议包成
 `window.__ModuleLoader__.load({ id, factory })`（React 与 `@deepseek-ai/*` 全部交给宿主模块表）。
 
-它只做一件事：认领 `tool.call.toolview` 的 `bank_resume` 键，把那次工具调用的结果 JSON 画成一张卡片——
-题干（宋体）、学生上次的原话（楷体）、下一步、一个「接着做」按钮。模型改字段时卡片静默不渲染，
-退回通用工具行，不会把会话渲染炸掉。
+两个注册点：
 
-- 构建：`yarn workspace dsh-plugin-bankmanager build:client`
+- `tool.call.toolview` 的 `bank_resume` 键 → **交接卡片**：题干（宋体）、学生上次的原话（楷体）、
+  下一步、一个「接着做」按钮。模型改字段时卡片静默不渲染，退回通用工具行，不会把会话渲染炸掉。
+- `conversation.hero.options` 的 `ile-resume` → **空白会话首页的接续入口**：列出待接的交接，
+  点一下只把「接着上次那道题：<id>（<状态>）」填进输入框——不替学生发，输入框原样由他改。
+
+「接着做」不是复制了事：`sessions.create({ agentPreset })` 按交接里的 `to` 开新会话（`guide` /
+`work` / `hrl`，也认中文显示名），`uiWorkspace.openSession` 跳过去，再用
+`conversation.input.requestDraftInitialization` 把上面那句塞进输入框；同一道交接记进
+`localStorage`，重复点击是跳回那个会话，不再新开。卡片与首页入口都靠 `session.create` 前的列表
+查询 + 这条记忆做幂等（`consumedAt` 失败只在卡片上提示，不假装成功）。
+
+宿主侧配套一条 HTTP 路由 `/bank/api`（`src/api.ts`，与 `dsh-plugin-memory` 的面板同一套路）：
+`handoff.pending` 列出待接、`handoff.consume` 标成已被某个会话接走。信任围栏同 `/api`：
+只认 loopback / `trustedHosts`、拒绝 cross-site。路由缺席（headless profile 没有 `webServer`）
+时插件照常工作，只是首页入口不会出现。
+
+- 构建：`yarn workspace dsh-plugin-bankmanager build:client`（devDependencies 里的 `vite`）
 - 数据模型：`src/client/handoff-model.ts`（纯函数，有单测）
-- 样式：运行时注入一次 `<style>`，类名前缀 `.ile-handoff`，随 effect 清理
+- 样式：运行时注入一次 `<style>`，类名前缀 `.ile-handoff` / `.ile-resume`，随 effect 清理
 
 **已知限制**：客户端构建面看不到原生窗口的字体文件，卡片里的楷体在本机会回退成宋体；
-「接着做」目前只把「接着上次那道题：<id>」复制到剪贴板，还不直接建会话（待办 #7 的剩余部分）。
+首页入口的待接列表是挂载时取一次，不随别的会话改动实时刷新（切会话/重开空白会话才更新）。

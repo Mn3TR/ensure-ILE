@@ -4,10 +4,15 @@ import { readHandoffView, resumePrompt, type HandoffView } from './handoff-model
 /** 工具结果块里我们认得的形状；卡片只读文本，不认图片或结构化块。 */
 interface TextBlock { readonly type: string; readonly text?: string }
 
+/** 「接着做」的三种结局：新会话开好并认领、开好但没认领、开不了。 */
+export type ResumeOutcome = 'opened' | 'opened-unconsumed' | 'failed'
+
 /** 卡片收到的工具调用阶段数据；结构来自 `tool.call.toolview` 的 owner props。 */
 export interface HandoffCardProps {
   readonly phase: 'preparing' | 'start' | 'result'
   readonly block?: unknown
+  /** 注册时注入：开一个新会话，把这题填成学生这次要发的那句话。 */
+  readonly resume?: (view: HandoffView) => Promise<ResumeOutcome>
 }
 
 function textOf(block: unknown): string | undefined {
@@ -24,22 +29,54 @@ function textOf(block: unknown): string | undefined {
 }
 
 /** 交接卡片：在聊天里替模型把「上次停在哪」摊开，学生一眼看见就能接着做。 */
-export function HandoffCard({ phase, block }: HandoffCardProps) {
+export function HandoffCard({ phase, block, resume }: HandoffCardProps) {
   if (phase !== 'result') return null
   const text = textOf(block)
   const view = text === undefined ? undefined : readHandoffView(text)
   if (view === undefined) return null
-  return <HandoffBody view={view} />
+  return <HandoffBody view={view} resume={resume} />
 }
 
-function HandoffBody({ view }: { readonly view: HandoffView }) {
-  const [copied, setCopied] = useState(false)
+type CardState = 'idle' | 'busy' | ResumeOutcome | 'copied'
+
+const HINT: Record<CardState, string> = {
+  idle: '一个按钮：开个新会话，题干直接进输入框。',
+  busy: '正在开…',
+  opened: '新会话开好了，题干在输入框里，按回车发出去。',
+  'opened-unconsumed': '新会话开好了；这题还会出现在「待接」里，等下再点一次也行。',
+  failed: '开不了新会话，先复制这句话过去。',
+  copied: '已复制，新会话里直接发。',
+}
+
+const LABEL: Record<CardState, string> = {
+  idle: '接着做',
+  busy: '正在开…',
+  opened: '已开新会话',
+  'opened-unconsumed': '已开新会话',
+  failed: '复制这句',
+  copied: '已复制',
+}
+
+function HandoffBody({ view, resume }: { readonly view: HandoffView; readonly resume?: HandoffCardProps['resume'] }) {
+  const [state, setState] = useState<CardState>('idle')
   const copy = () => {
-    const text = resumePrompt(view)
-    void navigator.clipboard?.writeText(text).then(() => {
-      setCopied(true)
-      window.setTimeout(() => { setCopied(false) }, 2400)
-    }).catch(() => { setCopied(false) })
+    void navigator.clipboard?.writeText(resumePrompt(view)).then(() => {
+      setState('copied')
+      window.setTimeout(() => { setState('idle') }, 2400)
+    }).catch(() => { setState('idle') })
+  }
+  const act = async () => {
+    if (state === 'busy') return
+    if (resume === undefined || state === 'failed') {
+      copy()
+      return
+    }
+    setState('busy')
+    try {
+      setState(await resume(view))
+    } catch {
+      setState('failed')
+    }
   }
   return <div className="ile-handoff" data-ile-handoff={view.id}>
     <div className="ile-handoff__kicker">
@@ -56,12 +93,10 @@ function HandoffBody({ view }: { readonly view: HandoffView }) {
       <span className="ile-handoff__label">卡在</span>{view.blocker}
     </p> : null}
     <div className="ile-handoff__row">
-      <button type="button" className="ile-handoff__button" onClick={copy}>
-        {copied ? '已复制' : '接着做'}
+      <button type="button" className="ile-handoff__button" onClick={() => { void act() }} disabled={state === 'busy'}>
+        {LABEL[state]}
       </button>
-      <span className="ile-handoff__hint">
-        {copied ? '开个新会话，选「引导模式」，把这句话发出去。' : '复制这句话，新会话里直接发。'}
-      </span>
+      <span className="ile-handoff__hint">{HINT[state]}</span>
     </div>
   </div>
 }

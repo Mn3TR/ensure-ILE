@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { readHandoffView, resumePrompt } from '../src/client/handoff-model.ts'
+import {
+  presetForMode,
+  readHandoffView,
+  readPendingHandoffs,
+  resumePrompt,
+  resumeSentence,
+  resumeText,
+} from '../src/client/handoff-model.ts'
 
 const resume = JSON.stringify({
   id: '20261025-math-2d1ed2',
@@ -41,5 +48,34 @@ describe('handoff card model', () => {
 
   it('builds the sentence a new session can send', () => {
     expect(resumePrompt(readHandoffView(resume)!)).toBe('接着上次那道题：20261025-math-2d1ed2')
+  })
+
+  it('carries the status into the sentence the student sends', () => {
+    expect(resumeText(readHandoffView(resume)!)).toBe('接着上次那道题：20261025-math-2d1ed2（guide）')
+    expect(resumeSentence('x')).toBe('接着上次那道题：x')
+    expect(resumeSentence('x', '  ')).toBe('接着上次那道题：x')
+  })
+
+  it('maps a handoff mode to its preset, Chinese display names included', () => {
+    expect(presetForMode('guide')).toBe('guide')
+    expect(presetForMode(' 独立做题 ')).toBe('work')
+    expect(presetForMode('HRL')).toBe('hrl')
+    expect(presetForMode('答案优化')).toBe('hrl')
+    expect(presetForMode('schedule')).toBeUndefined()
+    expect(presetForMode(undefined)).toBeUndefined()
+  })
+
+  it('reads the pending rows the hero entry draws chips from', () => {
+    const rows = readPendingHandoffs([
+      { id: 'p1', statement: '求值域', status: 'guide', handoff: { to: 'guide' } },
+      { id: 'p2', statement: '配平' },
+      { id: 'p3' },
+      'nonsense',
+    ])
+    expect(rows).toEqual([
+      { id: 'p1', statement: '求值域', status: 'guide', to: 'guide' },
+      { id: 'p2', statement: '配平', status: undefined, to: undefined },
+    ])
+    expect(readPendingHandoffs({ items: [] })).toEqual([])
   })
 })

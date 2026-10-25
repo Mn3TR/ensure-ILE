@@ -68,3 +68,59 @@ export function readHandoffView(text: string): HandoffView | undefined {
 export function resumePrompt(view: HandoffView): string {
   return `接着上次那道题：${view.id}`
 }
+
+/** 学生这次真正发出去的那句话；带状态，模型一眼看见这题到哪一步。 */
+export function resumeSentence(id: string, status?: string): string {
+  return status === undefined || status.trim() === ''
+    ? `接着上次那道题：${id}`
+    : `接着上次那道题：${id}（${status}）`
+}
+
+/** 卡片「接着做」塞进新会话的那句话。 */
+export function resumeText(view: HandoffView): string {
+  return resumeSentence(view.id, view.status)
+}
+
+/** 交接包里的模式名 → 预设 id。认模型写的中文显示名；不认识的交回 Host 默认。 */
+export function presetForMode(mode: string | undefined): string | undefined {
+  if (mode === undefined) return undefined
+  const key = mode.trim().toLowerCase()
+  if (key === 'guide' || key === '引导模式') return 'guide'
+  if (key === 'work' || key === '独立做题') return 'work'
+  if (key === 'hrl' || key === '答案优化') return 'hrl'
+  if (key === 'setup' || key === '开学') return 'setup'
+  return undefined
+}
+
+/** `/bank/api` 的待接行，只留首页入口要用的字段。 */
+export interface PendingHandoff {
+  readonly id: string
+  readonly statement: string
+  readonly status: string | undefined
+  readonly to: string | undefined
+}
+
+/**
+ * 解析 `handoff.pending` 的返回值；形状不对的行直接丢，不抛。
+ * @param value - route 返回的 value（数组）。
+ * @returns 能画出来的待接行。
+ */
+export function readPendingHandoffs(value: unknown): PendingHandoff[] {
+  if (!Array.isArray(value)) return []
+  const rows: PendingHandoff[] = []
+  for (const item of value) {
+    const root = record(item)
+    if (root === undefined) continue
+    const id = asText(root.id)
+    const statement = asText(root.statement)
+    if (id === undefined || statement === undefined) continue
+    const handoff = record(root.handoff)
+    rows.push({
+      id,
+      statement,
+      status: asText(root.status),
+      to: handoff === undefined ? undefined : asText(handoff.to),
+    })
+  }
+  return rows
+}

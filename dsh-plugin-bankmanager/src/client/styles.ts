@@ -30,16 +30,28 @@ const CSS = `
   padding: 0 12px; height: 28px; cursor: pointer;
 }
 .ile-handoff__button:focus-visible { outline: 2px solid #24436B; outline-offset: 2px; }
+.ile-handoff__button:disabled { opacity: 0.6; cursor: progress; }
 .ile-handoff__hint { font-size: 12px; line-height: 20px; opacity: 0.62; }
 .ile-handoff__muted { font-size: 13px; line-height: 20px; opacity: 0.62; }
+.ile-resume { display: flex; flex-wrap: wrap; gap: 8px; }
+.ile-resume__chip {
+  font: 500 12px/1 inherit; color: #24436B; background: #EAEFF5;
+  border: 1px solid #D5D7D2; border-radius: 999px;
+  padding: 0 10px; height: 26px; cursor: pointer;
+}
+.ile-resume__chip:hover { border-color: #24436B; }
+.ile-resume__chip:focus-visible { outline: 2px solid #24436B; outline-offset: 2px; }
 @media (prefers-color-scheme: dark) {
   .ile-handoff { border-left-color: #86ABD6; }
   .ile-handoff__button { color: #10161F; background: #86ABD6; }
   .ile-handoff__button:focus-visible { outline-color: #86ABD6; }
+  .ile-resume__chip { color: #C6D8EE; background: #1E2836; border-color: #2A3441; }
+  .ile-resume__chip:hover { border-color: #86ABD6; }
+  .ile-resume__chip:focus-visible { outline-color: #86ABD6; }
 }
 `;
 
-/** 注入卡片样式，返回移除函数。 */
+/** 注入卡片与首页入口的样式，返回移除函数。 */
 export function installHandoffStyles(): () => void {
   const element = document.createElement('style')
   element.textContent = CSS

@@ -15,6 +15,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-tools'
+import { mountBankApi } from './api.ts'
 import {
   BankError,
   createProblem,
@@ -37,8 +38,8 @@ import {
 /** Cordis plugin name. */
 export const name = 'plugin-bankmanager'
 
-/** Services used by this row. */
-export const inject = ['tools']
+/** Services used by this row: the tool registry, plus the web pair the browser channel rides on. */
+export const inject = ['tools', 'webServer', 'webStartup']
 
 /** Runtime schema for the bank row. */
 export const Config = z.object({
@@ -71,6 +72,8 @@ export function apply(ctx: Context, config: Config): void {
   const directory = config.directory !== undefined && config.directory.length > 0
     ? config.directory
     : defaultBankDirectory()
+
+  mountBankApi(ctx, directory)
 
   ctx.tools.register(defineTool({
     name: 'bank_add',

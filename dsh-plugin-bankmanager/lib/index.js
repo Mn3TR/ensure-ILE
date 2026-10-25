@@ -498,11 +498,215 @@ function summarizeStats(records, limit = 5) {
 	};
 }
 //#endregion
+//#region src/api.ts
+/** Body size bound of one JSON request. */
+const MAX_BODY_BYTES = 65536;
+/** Route prefix owned by this plugin. */
+const ROUTE_PREFIX = "/bank/api";
+var BankApiError = class extends Error {
+	code;
+	status;
+	constructor(code, message, status = 400) {
+		super(message);
+		this.code = code;
+		this.status = status;
+		this.name = "BankApiError";
+	}
+};
+function writeJson(res, status, body) {
+	res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
+	res.end(JSON.stringify(body));
+}
+function writeError(res, error) {
+	if (error instanceof BankApiError) {
+		writeJson(res, error.status, {
+			ok: false,
+			error: {
+				code: error.code,
+				message: error.message
+			}
+		});
+		return;
+	}
+	if (error instanceof BankError) {
+		writeJson(res, 400, {
+			ok: false,
+			error: {
+				code: error.code,
+				message: error.message
+			}
+		});
+		return;
+	}
+	writeJson(res, 500, {
+		ok: false,
+		error: {
+			code: "internal",
+			message: error instanceof Error ? error.message : String(error)
+		}
+	});
+}
+async function readJsonBody(req) {
+	const chunks = [];
+	let total = 0;
+	for await (const chunk of req) {
+		const buffer = Buffer.from(chunk);
+		total += buffer.length;
+		if (total > MAX_BODY_BYTES) throw new BankApiError("bad-request", "request body too large");
+		chunks.push(buffer);
+	}
+	const text = Buffer.concat(chunks).toString("utf8");
+	if (text.trim() === "") return {};
+	try {
+		return JSON.parse(text);
+	} catch {
+		throw new BankApiError("bad-request", "request body is not valid JSON");
+	}
+}
+function header(headers, name) {
+	const value = headers[name];
+	return typeof value === "string" ? value : void 0;
+}
+function parseAuthority(authority) {
+	try {
+		return new URL("http://" + authority);
+	} catch {
+		return;
+	}
+}
+function isLoopbackHostname(hostname) {
+	if (hostname === "localhost" || hostname === "[::1]") return true;
+	const parts = hostname.split(".");
+	return parts.length === 4 && parts[0] === "127" && parts.every((part) => /^\d{1,3}$/u.test(part) && Number(part) <= 255);
+}
+/**
+* Whether one request may reach the plugin routes.
+* @param request - inbound request headers.
+* @param trustedHosts - hosts the Host already trusts for its own API.
+* @returns true for loopback or trusted authority, same-origin only.
+*/
+function isTrusted(request, trustedHosts) {
+	const host = header(request.headers, "host");
+	if (host === void 0) return false;
+	const hostUrl = parseAuthority(host);
+	if (hostUrl === void 0) return false;
+	if (!(isLoopbackHostname(hostUrl.hostname) || trustedHosts.some((entry) => {
+		const entryUrl = parseAuthority(entry);
+		return entryUrl !== void 0 && entryUrl.host === hostUrl.host;
+	}))) return false;
+	if (header(request.headers, "sec-fetch-site") === "cross-site") return false;
+	const origin = header(request.headers, "origin");
+	if (origin === void 0) return true;
+	try {
+		return new URL(origin).host === hostUrl.host;
+	} catch {
+		return false;
+	}
+}
+/**
+* Every problem whose handoff nobody accepted yet, newest first.
+* @param directory - bank directory.
+* @returns the card-shaped pending rows.
+*/
+function pendingRows(directory) {
+	const { records } = listProblems(directory);
+	const rows = [];
+	for (const entry of pendingHandoffs(records)) {
+		const record = records.find((candidate) => candidate.id === entry.id);
+		if (record === void 0) continue;
+		rows.push({
+			id: record.id,
+			subject: record.subject,
+			status: record.status,
+			statement: record.statement,
+			handoff: entry.handoff
+		});
+	}
+	return rows;
+}
+/**
+* Mount the browser data channel.
+* @param ctx - profile-root context.
+* @param directory - bank directory the client reads and writes through this route.
+*/
+function mountBankApi(ctx, directory) {
+	const host = ctx;
+	if (typeof host.get !== "function" || typeof host.effect !== "function") return;
+	const webServer = host.get("webServer");
+	const webStartup = host.get("webStartup");
+	if (webServer === void 0 || webStartup === void 0) return;
+	const api = {
+		"handoff.pending": () => pendingRows(directory),
+		"handoff.consume": async (payload) => {
+			const id = typeof payload.id === "string" ? payload.id : "";
+			const sessionId = typeof payload.sessionId === "string" ? payload.sessionId : "";
+			if (id === "") throw new BankApiError("bad-request", "missing or invalid \"id\"");
+			if (sessionId === "") throw new BankApiError("bad-request", "missing or invalid \"sessionId\"");
+			const record = await updateProblem(directory, id, { handoffConsume: sessionId });
+			return {
+				id: record.id,
+				consumedAt: record.handoff?.consumedAt ?? null,
+				consumerSessionId: record.handoff?.consumerSessionId ?? null
+			};
+		}
+	};
+	const fence = (req) => isTrusted(req, webStartup.trustedHosts);
+	host.effect(() => webServer.register({
+		kind: "prefix",
+		path: ROUTE_PREFIX,
+		handler: async (rawReq, rawRes) => {
+			const req = rawReq;
+			const res = rawRes;
+			if (!fence(req)) {
+				writeJson(res, 403, {
+					ok: false,
+					error: {
+						code: "forbidden",
+						message: "forbidden"
+					}
+				});
+				return;
+			}
+			if (req.method !== "POST") {
+				writeJson(res, 405, {
+					ok: false,
+					error: {
+						code: "method-error",
+						message: "method not allowed"
+					}
+				});
+				return;
+			}
+			const pathname = new URL(req.url ?? "/", "http://dsh.internal").pathname;
+			const method = pathname.startsWith("/bank/api/") ? pathname.slice(10) : void 0;
+			if (method === void 0 || method.includes("/")) {
+				writeError(res, new BankApiError("not-found", "unknown bank API method", 404));
+				return;
+			}
+			try {
+				const payload = await readJsonBody(req);
+				const handler = api[method];
+				if (handler === void 0) throw new BankApiError("not-found", "unknown bank API method \"" + method + "\"", 404);
+				writeJson(res, 200, {
+					ok: true,
+					value: await handler(payload ?? {})
+				});
+			} catch (error) {
+				writeError(res, error);
+			}
+		}
+	}), "dsh-plugin-bankmanager: /bank/api routes");
+}
+//#endregion
 //#region src/index.ts
 /** Cordis plugin name. */
 const name = "plugin-bankmanager";
-/** Services used by this row. */
-const inject = ["tools"];
+/** Services used by this row: the tool registry, plus the web pair the browser channel rides on. */
+const inject = [
+	"tools",
+	"webServer",
+	"webStartup"
+];
 /** Runtime schema for the bank row. */
 const Config = z.object({ 
 /** Absolute bank directory; empty means `<DSH_HOME>/bank/problems`. */
@@ -523,6 +727,7 @@ function json(value) {
 */
 function apply(ctx, config) {
 	const directory = config.directory !== void 0 && config.directory.length > 0 ? config.directory : defaultBankDirectory();
+	mountBankApi(ctx, directory);
 	ctx.tools.register(defineTool({
 		name: "bank_add",
 		description: [
