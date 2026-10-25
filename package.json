@@ -753,6 +753,7 @@
     "test": "yarn workspace dsh-plugin-desktop test",
     "test:bilingual-docs": "node --test scripts/bilingual-docs.test.mjs",
     "check:bilingual-docs": "yarn test:bilingual-docs && node scripts/verify-bilingual-docs.mjs",
+    "docs:record": "node scripts/record-bilingual-docs.mjs",
     "check:vendored-runtime": "node scripts/sync-vendored-runtime.mjs --check --channel stable",
     "check:layout": "node scripts/run-parallel.mjs \"node --test scripts/bilingual-docs.test.mjs scripts/inspector-compat.test.mjs scripts/export-app-icons.test.mjs\" \"node scripts/verify-bilingual-docs.mjs\" \"node scripts/sync-vendored-runtime.mjs --check --channel stable\" \"node scripts/export-app-icons.mjs --check\" \"node scripts/verify-layout.mjs\"",
     "check": "node scripts/run-parallel.mjs \"yarn check:layout\" \"yarn workspace dsh-community-fabric check\" && node scripts/run-parallel.mjs \"yarn workspace dsh-plugin-desktop check\"",
