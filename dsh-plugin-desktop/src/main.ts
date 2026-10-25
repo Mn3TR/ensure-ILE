@@ -11,7 +11,7 @@ import { formatUnexpectedHostExit, startIsolatedDesktopHost } from './host-proce
 import { app, crashReporter, safeStorage, session, shell } from 'electron'
 import { spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -2007,6 +2007,11 @@ function seedProfile(dataRoot: string, projectRoot: string): string {
       const destination = join(target, file)
       if (existsSync(source) && !existsSync(destination)) copyFileSync(source, destination)
     }
+    // A packaged build ships the profile's local packages beside the template;
+    // the seeded profile installs them offline from there.
+    const vendorSource = join(template, 'vendor')
+    const vendorTarget = join(target, 'vendor')
+    if (existsSync(vendorSource) && !existsSync(vendorTarget)) cpSync(vendorSource, vendorTarget, { recursive: true })
   }
   return target
 }

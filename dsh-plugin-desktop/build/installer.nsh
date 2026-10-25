@@ -70,11 +70,30 @@ Var pid
   dsh_installer_app_stopped:
 !macroend
 
+; ensure-ILE keeps learner data ($INSTDIR\.ensure-ile: problem bank, memory,
+; student profile) inside the application directory. Every overwrite install
+; first runs the previously installed uninstaller, which removes $INSTDIR
+; recursively. Park the data in $TEMP while the marker file exists and restore it
+; from customInstall. A plain uninstall carries no marker, so it still clears
+; everything, exactly as before.
+!macro customUnInstall
+  ${if} ${FileExists} "$TEMP\ensure-ILE-upgrade.flag"
+  ${andIf} ${FileExists} "$INSTDIR\.ensure-ile\*.*"
+    RMDir /r "$TEMP\ensure-ILE-data"
+    Rename "$INSTDIR\.ensure-ile" "$TEMP\ensure-ILE-data"
+  ${endIf}
+!macroend
+
 ; Override /S when an older updater (<= 2.0.18-next) launches an in-app update
 ; with ['/S', '--updated', '--force-run'], so the new installer still displays
 ; the visible extraction progress window.
 !macro customInit
   !ifndef BUILD_UNINSTALLER
+    ; Mark an overwrite install. The previously installed uninstaller parks
+    ; learner data instead of deleting it when this marker exists.
+    FileOpen $9 "$TEMP\ensure-ILE-upgrade.flag" w
+    FileClose $9
+
     ${if} ${isUpdated}
     ${andIf} ${isForceRun}
       SetSilent normal
@@ -102,6 +121,13 @@ Var pid
 ; the updated application and close the installer as soon as extraction finishes
 ; without stopping on the Finish wizard page.
 !macro customInstall
+  ; Put back the learner data the previous uninstaller parked for us.
+  Delete "$TEMP\ensure-ILE-upgrade.flag"
+  ${if} ${FileExists} "$TEMP\ensure-ILE-data\*.*"
+    RMDir /r "$INSTDIR\.ensure-ile"
+    Rename "$TEMP\ensure-ILE-data" "$INSTDIR\.ensure-ile"
+  ${endIf}
+
   ${if} ${isUpdated}
   ${andIf} ${isForceRun}
   ${andIfNot} ${Silent}
