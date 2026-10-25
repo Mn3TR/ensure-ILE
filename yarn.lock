@@ -11188,29 +11188,29 @@ __metadata:
 
 "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons::locator=dsh-plugin-guide%40workspace%3Adsh-plugin-guide":
   version: 0.1.0
-  resolution: "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons#../dsh-plugin-teaching-commons::hash=0317ae&locator=dsh-plugin-guide%40workspace%3Adsh-plugin-guide"
-  checksum: 10c0/7f8fe12366d66d0a591fd9d409ce9dd404f147d3831beac22272b9d75607723150f2876c443e745bac7833a8017bbfb02bff0a0a93dbce8c3257967b41afc92f
+  resolution: "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons#../dsh-plugin-teaching-commons::hash=b14845&locator=dsh-plugin-guide%40workspace%3Adsh-plugin-guide"
+  checksum: 10c0/742a131eb19b9bc2a0413f913b93b7c769c9123c0e69ffe4cba50d2bf6577afd5715bf0ce1436cdb2cf163070a99566e89ada8cdc9e1c098947781fa6046d832
   languageName: node
   linkType: hard
 
 "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons::locator=dsh-plugin-hrl%40workspace%3Adsh-plugin-hrl":
   version: 0.1.0
-  resolution: "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons#../dsh-plugin-teaching-commons::hash=0317ae&locator=dsh-plugin-hrl%40workspace%3Adsh-plugin-hrl"
-  checksum: 10c0/7f8fe12366d66d0a591fd9d409ce9dd404f147d3831beac22272b9d75607723150f2876c443e745bac7833a8017bbfb02bff0a0a93dbce8c3257967b41afc92f
+  resolution: "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons#../dsh-plugin-teaching-commons::hash=b14845&locator=dsh-plugin-hrl%40workspace%3Adsh-plugin-hrl"
+  checksum: 10c0/742a131eb19b9bc2a0413f913b93b7c769c9123c0e69ffe4cba50d2bf6577afd5715bf0ce1436cdb2cf163070a99566e89ada8cdc9e1c098947781fa6046d832
   languageName: node
   linkType: hard
 
 "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons::locator=dsh-plugin-setup%40workspace%3Adsh-plugin-setup":
   version: 0.1.0
-  resolution: "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons#../dsh-plugin-teaching-commons::hash=0317ae&locator=dsh-plugin-setup%40workspace%3Adsh-plugin-setup"
-  checksum: 10c0/7f8fe12366d66d0a591fd9d409ce9dd404f147d3831beac22272b9d75607723150f2876c443e745bac7833a8017bbfb02bff0a0a93dbce8c3257967b41afc92f
+  resolution: "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons#../dsh-plugin-teaching-commons::hash=b14845&locator=dsh-plugin-setup%40workspace%3Adsh-plugin-setup"
+  checksum: 10c0/742a131eb19b9bc2a0413f913b93b7c769c9123c0e69ffe4cba50d2bf6577afd5715bf0ce1436cdb2cf163070a99566e89ada8cdc9e1c098947781fa6046d832
   languageName: node
   linkType: hard
 
 "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons::locator=dsh-plugin-work%40workspace%3Adsh-plugin-work":
   version: 0.1.0
-  resolution: "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons#../dsh-plugin-teaching-commons::hash=0317ae&locator=dsh-plugin-work%40workspace%3Adsh-plugin-work"
-  checksum: 10c0/7f8fe12366d66d0a591fd9d409ce9dd404f147d3831beac22272b9d75607723150f2876c443e745bac7833a8017bbfb02bff0a0a93dbce8c3257967b41afc92f
+  resolution: "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons#../dsh-plugin-teaching-commons::hash=b14845&locator=dsh-plugin-work%40workspace%3Adsh-plugin-work"
+  checksum: 10c0/742a131eb19b9bc2a0413f913b93b7c769c9123c0e69ffe4cba50d2bf6577afd5715bf0ce1436cdb2cf163070a99566e89ada8cdc9e1c098947781fa6046d832
   languageName: node
   linkType: hard
 
