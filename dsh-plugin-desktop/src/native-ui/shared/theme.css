@@ -3,8 +3,40 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter/wght.css";
 
+/*
+ * ensure-ILE 的视觉层：演算纸。
+ *
+ * 三种笔迹分工，身份不靠气泡和头像：
+ *   宋体   = 印刷体（题干、教材原文、教师版）
+ *   楷体   = 手写（学生说过的话、他自己重写的那一句）
+ *   黑体   = 界面本身
+ *
+ * 颜色只编码状态，不编码身份：
+ *   墨蓝 primary   = 主操作与「我」的语气
+ *   朱批 destructive = 判错、卡住（不做装饰）
+ *   印章青 seal    = 通过、已确认、mastered
+ *
+ * 圆角按层级递增：纸面直角、按钮 8px、弹层 12px。
+ */
+
+/* 子集化属于修改，OFL 的保留字体名条款不允许继续叫「霞鹜」/「Source」，
+ * 所以这里用自有名字；许可证原文在同目录。 */
+@font-face {
+  font-family: "ILE Kai";
+  src: url("../assets/fonts/lxgw-wenkai-subset.woff2") format("woff2");
+  font-display: swap;
+}
+@font-face {
+  font-family: "ILE Song";
+  src: url("../assets/fonts/source-han-serif-subset.woff2") format("woff2");
+  font-display: swap;
+}
+
 @theme inline {
-  --font-sans: "Inter Variable", sans-serif;
+  --font-sans: "Inter Variable", -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --font-song: "ILE Song", SimSun, serif;
+  --font-kai: "ILE Kai", "Kaiti SC", KaiTi, "楷体", serif;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -17,50 +49,59 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-seal: var(--seal);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --radius: 0.625rem;
+  --background: #FBFBF9;
+  --foreground: #17191B;
+  --card: #FFFFFF;
+  --card-foreground: #17191B;
+  --popover: #FFFFFF;
+  --popover-foreground: #17191B;
+  --primary: #24436B;
+  --primary-foreground: #FBFBF9;
+  --secondary: #EFF0EB;
+  --secondary-foreground: #17191B;
+  --muted: #F1F2EE;
+  --muted-foreground: #6F7571;
+  --accent: #EAEFF5;
+  --accent-foreground: #24436B;
+  --destructive: #B4392C;
+  --seal: #2E6659;
+  --border: #DDDFDA;
+  --input: #D5D7D2;
+  --ring: #24436B;
+  --radius: 0.5rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+    --background: #15171A;
+    --foreground: #E8E6E1;
+    --card: #1B1E22;
+    --card-foreground: #E8E6E1;
+    --popover: #1B1E22;
+    --popover-foreground: #E8E6E1;
+    --primary: #86ABD6;
+    --primary-foreground: #10161F;
+    --secondary: #23272C;
+    --secondary-foreground: #E8E6E1;
+    --muted: #22262B;
+    --muted-foreground: #A9ACA7;
+    --accent: #1E2836;
+    --accent-foreground: #86ABD6;
+    --destructive: #D9695E;
+    --seal: #6DAE9C;
+    --border: #2A2E33;
+    --input: #33383D;
+    --ring: #86ABD6;
   }
 }
 
@@ -71,7 +112,16 @@
   html.dshDesktopDialogDocument,
   html.dshDesktopDialogDocument body,
   html.dshDesktopDialogDocument #root { height: auto; min-height: 0; }
-  body { @apply bg-background text-foreground font-sans; margin: 0; min-width: 320px; overflow: hidden; }
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-size: 14px;
+    line-height: 22px;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+    min-width: 320px;
+    overflow: hidden;
+  }
   .base-ui-disable-scrollbar,
   [data-slot="scroll-area-viewport"] { scrollbar-width: none; }
   .base-ui-disable-scrollbar::-webkit-scrollbar,

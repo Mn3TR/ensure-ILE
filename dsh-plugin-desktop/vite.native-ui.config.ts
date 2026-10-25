@@ -21,6 +21,7 @@ export default defineConfig({
       input: {
         'compatibility-chrome': resolve(uiRoot, 'compatibility-chrome.html'),
         'desktop-dialog': resolve(uiRoot, 'desktop-dialog.html'),
+        gallery: resolve(uiRoot, 'gallery.html'),
         recovery: resolve(uiRoot, 'recovery.html'),
         'profile-create': resolve(uiRoot, 'profile-create.html'),
         'profile-selector': resolve(uiRoot, 'profile-selector.html'),

@@ -628,3 +628,17 @@ the package names, versions, and licenses for transparency.
 | yoctocolors | 2.2.0 | MIT |
 | zod | 4.4.3 | MIT |
 > Notice-required licenses in use: LGPL-3.0-or-later. Their license texts ship inside node_modules; see the package LICENSE files for the full terms.
+
+## Bundled fonts
+
+The Desktop web surfaces ship two subsetted CJK faces as WOFF2 under
+`src/native-ui/assets/fonts/`. Subsetting is a modification, so both families are
+renamed and do not use their upstream reserved names.
+
+| Font | Version | License | Modified |
+| --- | --- | --- | --- |
+| LXGW WenKai (霞鹜文楷) | v1.530 | SIL OFL 1.1 | Subset to GB2312 + math/Greek symbols as `ILE Kai` |
+| Source Han Serif SC (思源宋体) | 2.003R | SIL OFL 1.1 | Subset to the same charset as `ILE Song` |
+
+License texts: `src/native-ui/assets/fonts/LICENSE-LXGWWenKai.txt` and
+`src/native-ui/assets/fonts/LICENSE-SourceHanSerif.txt`.

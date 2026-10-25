@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ensure-ILE · 演算纸 视觉稿</title>
+<style>
+@font-face {
+  font-family: "ILE Kai";
+  src: url("./fonts/LXGWWenKai-subset.woff2") format("woff2");
+  font-display: block;
+}
+:root {
+  --paper: #FBFBF9;
+  --paper-2: #F4F5F2;
+  --ink: #17191B;
+  --ink-2: #4B504E;
+  --pencil: #6F7571;
+  --line: #DDDFDA;
+  --grid: rgba(23, 25, 27, 0.06);
+  --blue: #24436B;
+  --blue-wash: #EAEFF5;
+  --red: #B4392C;
+  --seal: #2E6659;
+  --font-ui: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-song: "Source Han Serif SC", "Noto Serif SC", "Songti SC", SimSun, serif;
+  --font-kai: "ILE Kai", "Kaiti SC", KaiTi, STKaiti, "楷体", serif;
+  --r-btn: 8px;
+}
+html[data-theme="dark"] {
+  --paper: #15171A;
+  --paper-2: #1B1E22;
+  --ink: #E8E6E1;
+  --ink-2: #ACAFA9;
+  --pencil: #8A8F8C;
+  --line: #2A2E33;
+  --grid: rgba(232, 230, 225, 0.05);
+  --blue: #86ABD6;
+  --blue-wash: #1E2836;
+  --red: #D9695E;
+  --seal: #6DAE9C;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--paper); color: var(--ink); }
+body { font: 16px/28px var(--font-ui); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 720px; margin: 0 auto; padding: 56px 28px 96px; }
+
+/* ---------- 页头 ---------- */
+.brand {
+  font-size: 13px; line-height: 20px; color: var(--pencil);
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+}
+.brand b { font-weight: 600; color: var(--ink-2); }
+h1 {
+  font-family: var(--font-song); font-size: 26px; line-height: 40px;
+  font-weight: 600; margin: 20px 0 6px;
+}
+.lede { font-size: 16px; line-height: 28px; color: var(--ink-2); margin: 0; }
+.lede em { font-style: normal; font-family: var(--font-kai); font-size: 17px; }
+
+/* ---------- 分节 ---------- */
+section { margin-top: 56px; }
+.sec-title {
+  font-size: 15px; line-height: 24px; font-weight: 600; color: var(--ink);
+  margin: 0 0 4px; display: flex; align-items: baseline; gap: 10px;
+}
+.sec-title span { font-weight: 400; font-size: 13px; color: var(--pencil); }
+.sec-note { font-size: 13px; line-height: 22px; color: var(--pencil); margin: 0 0 24px; }
+hr.rule { border: 0; border-top: 1px solid var(--line); margin: 56px 0 0; }
+
+/* ---------- 一、聊天 ---------- */
+.chat { border-left: 1px solid var(--line); padding-left: 24px; }
+.msg { font-size: 16px; line-height: 28px; margin: 0 0 18px; max-width: 34em; }
+.msg.mine { color: var(--ink-2); }
+.msg .who { font-size: 13px; line-height: 20px; color: var(--pencil); display: block; margin-bottom: 2px; }
+
+.leaf {
+  border-left: 1.5px solid var(--blue);
+  padding: 18px 20px 20px;
+  background: var(--paper-2);
+  margin: 26px 0 0;
+  max-width: 560px;
+}
+.leaf .kicker { font-size: 12px; line-height: 18px; color: var(--pencil); }
+.leaf .kicker b { color: var(--blue); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.statement { font-family: var(--font-song); font-size: 17px; line-height: 30px; margin: 8px 0 14px; }
+.statement p { margin: 0; }
+.defn { display: grid; grid-template-columns: 3.9em 1fr; }
+.defn span { white-space: nowrap; }
+.defn .cond { white-space: normal; }
+
+.quote { font-family: var(--font-kai); font-size: 16px; line-height: 28px; color: var(--ink-2); margin: 0 0 12px; }
+.nudge { font-size: 15px; line-height: 26px; margin: 0 0 18px; }
+.href { font-family: var(--font-ui); font-size: 13px; line-height: 20px; color: var(--pencil); }
+
+.actions { display: flex; align-items: center; gap: 18px; }
+.btn {
+  font: 500 14px/1 var(--font-ui); color: #fff; background: var(--blue);
+  border: 1px solid transparent; border-radius: var(--r-btn);
+  padding: 0 14px; height: 32px; cursor: pointer;
+}
+html[data-theme="dark"] .btn { color: #10161F; }
+.text-btn {
+  font: 400 14px/1 var(--font-ui); color: var(--ink-2);
+  background: none; border: 0; padding: 0 2px; height: 32px; cursor: pointer;
+}
+.text-btn:hover { color: var(--ink); }
+.ghost {
+  font: 400 13px/1 var(--font-ui); color: var(--pencil); background: none;
+  border: 0; padding: 0; cursor: pointer;
+}
+.ghost:hover { color: var(--ink-2); }
+.btn:focus-visible, .text-btn:focus-visible, .pick:focus-visible, .ghost:focus-visible, .change:focus-visible {
+  outline: 2px solid var(--blue); outline-offset: 2px;
+}
+
+/* ---------- 二、逐小步 ---------- */
+.step { border-left: 1.5px solid var(--line); padding: 2px 0 2px 20px; margin-bottom: 26px; }
+.step.on { border-left-color: var(--blue); }
+.step-idx {
+  font: 600 12px/18px var(--font-ui); font-variant-numeric: tabular-nums;
+  color: var(--pencil); display: block; margin-bottom: 10px;
+}
+.step.on .step-idx { color: var(--blue); }
+.hand { font-family: var(--font-kai); font-size: 17px; line-height: 30px; margin: 0 0 6px; }
+.said { font-family: var(--font-song); font-size: 16px; line-height: 30px; color: var(--ink-2); margin: 0 0 14px; }
+.said .href { margin-left: 6px; }
+.picks { display: flex; gap: 8px; flex-wrap: wrap; }
+.pick {
+  font: 400 14px/1 var(--font-ui); color: var(--ink-2); background: none;
+  border: 1px solid var(--line); border-radius: var(--r-btn);
+  height: 32px; padding: 0 14px; cursor: pointer;
+}
+.pick:hover { border-color: var(--pencil); color: var(--ink); }
+.pick[aria-pressed="true"] { color: var(--blue); border-color: var(--blue); background: var(--blue-wash); }
+.merged {
+  display: none; margin-top: 14px; border: 1px solid var(--line); border-radius: 2px;
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px; background-position: -1px -1px;
+  padding: 12px 14px; min-height: 88px;
+}
+.merged.show { display: block; }
+.merged p { font-family: var(--font-kai); font-size: 16px; line-height: 24px; color: var(--pencil); margin: 0; }
+
+/* ---------- 三、设置 ---------- */
+.panel { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin: 0; }
+.row { display: grid; grid-template-columns: 96px 1fr; gap: 20px; padding: 16px 2px; align-items: baseline; }
+.row + .row { border-top: 1px solid var(--line); }
+.row dt { font-size: 14px; line-height: 24px; color: var(--pencil); margin: 0; }
+.row dd { margin: 0; font-size: 15px; line-height: 24px; font-variant-numeric: tabular-nums; }
+.change {
+  font: 400 13px/20px var(--font-ui); color: var(--blue); text-decoration: none;
+  margin-left: 10px; border: 0; background: none; cursor: pointer; padding: 0;
+}
+.change:hover { text-decoration: underline; }
+.tag {
+  display: inline-block; font-size: 12px; line-height: 18px; color: var(--seal);
+  border: 1px solid currentColor; border-radius: 2px; padding: 0 5px; margin-left: 8px;
+  vertical-align: 1px; font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 规格 ---------- */
+.spec { display: grid; grid-template-columns: 1fr 1fr; gap: 32px 40px; }
+.spec h3 { font: 600 13px/20px var(--font-ui); color: var(--pencil); margin: 0 0 12px; }
+.sw { display: flex; align-items: center; gap: 10px; font-size: 13px; line-height: 20px; color: var(--ink-2); margin-bottom: 8px; }
+.sw i { width: 18px; height: 18px; border-radius: 2px; border: 1px solid var(--line); flex: none; }
+.type-sample { margin-bottom: 12px; }
+.type-sample small { font-size: 12px; line-height: 18px; color: var(--pencil); display: block; }
+
+@media (max-width: 640px) {
+  .wrap { padding: 36px 20px 72px; }
+  .spec { grid-template-columns: 1fr; }
+  .row { grid-template-columns: 1fr; gap: 4px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="brand">
+    <b>ensure-ILE</b>
+    <button class="ghost" id="theme" type="button">切到暗色</button>
+  </div>
+
+  <h1>演算纸</h1>
+  <p class="lede">题目用宋体，和课本一样；引他的话用楷体，那是手写；界面用系统黑体。<em>红只用来判。</em></p>
+
+  <section>
+    <h2 class="sec-title">一、聊天里的交接卡片 <span>做题 → 引导，中间那张纸</span></h2>
+    <p class="sec-note">左边那条墨蓝细线是纸的边，不加卡片阴影。题干原样保留课本排版。</p>
+
+    <div class="chat">
+      <p class="msg"><span class="who">你</span>这题我算到 x³ − x − 2 = 0 就停了。</p>
+      <p class="msg mine"><span class="who">独立做题</span>停在这里可以。先说清楚：你确定这个方程没有有理根吗？</p>
+
+      <div class="leaf">
+        <div class="kicker">接着上次的题 · <b>20261025-math-2d1ed2</b></div>
+        <div class="statement">
+          <p>设函数 g(x) = x³ − 2（x ∈ R），</p>
+          <div class="defn">
+            <span>f(x) =</span><span>{ g(x) + x + 4，<span class="cond">x &lt; g(x)；</span></span>
+            <span></span><span>{ g(x) − x，<span class="cond">x ≥ g(x)。</span></span>
+          </div>
+          <p>求 f(x) 的值域。</p>
+        </div>
+        <p class="quote"><span class="href">你上次停在</span>　「试了 x = 1 是 −2、x = 2 是 4，所以根在 1 和 2 之间。」</p>
+        <p class="nudge"><span class="href">下一步</span>　先把这个根夹到两位小数，再回头看 g(x) − x 那一支。</p>
+        <div class="actions">
+          <button class="btn" type="button">接着做</button>
+          <button class="text-btn" type="button">先放一边</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2 class="sec-title">二、逐小步 <span>答案优化，一轮只比一步</span></h2>
+    <p class="sec-note">两种笔迹并排站着。选「合」才出现方格演算区——那是他自己写的。</p>
+
+    <div class="step on">
+      <span class="step-idx">第 2 步</span>
+      <p class="hand">「x &lt; g(x) 就是 x³ − x − 2 &gt; 0，也就是 x &gt; 1.52 左右。」</p>
+      <p class="said"><span class="tag">这一步对</span>　把 x &lt; g(x) 化成 x³ − x − 2 &gt; 0，思路对。差在最后一句——「1.52 左右」还是猜的。教师版：先证明 φ(x) = x³ − x − 2 在 R 上单调增，只有一个根；再用 φ(1.5) = −0.125、φ(1.6) = 0.696 把它夹住。</p>
+      <div class="picks" role="group" aria-label="选哪一版">
+        <button class="pick" type="button" aria-pressed="false">用你的</button>
+        <button class="pick" type="button" aria-pressed="true">用教师的</button>
+        <button class="pick" type="button" aria-pressed="false">合起来重写</button>
+      </div>
+      <div class="merged" id="merged">
+        <p>在这里用自己的话把这一步重写一遍。写不完整就写你卡住的那半句。</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2 class="sec-title">三、学习设置 <span>原生窗口，开学问话的落点</span></h2>
+    <p class="sec-note">四个固定栏目，写进 profile 里，每轮会话都读得到。</p>
+
+    <dl class="panel">
+      <div class="row"><dt>年级</dt><dd>高一 · 人教版<span class="tag">已确认</span></dd></div>
+      <div class="row"><dt>课表</dt><dd>周一至周五，22:40 到家<button class="change" type="button">改</button></dd></div>
+      <div class="row"><dt>作息</dt><dd>23:00 开始，24:00 睡，6:30 起<button class="change" type="button">改</button></dd></div>
+      <div class="row"><dt>偏好</dt><dd>讲思路，别直接给答案<button class="change" type="button">改</button></dd></div>
+    </dl>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <h2 class="sec-title">色与字 <span>其余全部不动</span></h2>
+    <div class="spec">
+      <div>
+        <h3>色（只编码状态，不编码身份）</h3>
+        <div class="sw"><i style="background:#FBFBF9"></i>纸 #FBFBF9</div>
+        <div class="sw"><i style="background:#17191B"></i>墨 #17191B</div>
+        <div class="sw"><i style="background:#24436B"></i>墨蓝 · 主色与「我」的语气 #24436B</div>
+        <div class="sw"><i style="background:#B4392C"></i>朱批 · 判错与卡住 #B4392C</div>
+        <div class="sw"><i style="background:#2E6659"></i>印章青 · 通过 #2E6659</div>
+      </div>
+      <div>
+        <h3>字</h3>
+        <div class="type-sample"><small>题干 · 宋体 17/30</small><span style="font-family:var(--font-song);font-size:17px;line-height:30px">求 f(x) 的值域。</span></div>
+        <div class="type-sample"><small>学生原话 · 楷体 16/28</small><span style="font-family:var(--font-kai);font-size:16px;line-height:28px">根在 1 和 2 之间。</span></div>
+        <div class="type-sample"><small>界面 · 系统黑体 14/22</small><span style="font-size:14px;line-height:22px">下一步：夹到两位小数。</span></div>
+        <p style="font-size:13px;line-height:22px;color:var(--pencil);margin:14px 0 0">楷体是打包的霞鹜文楷（OFL），按 GB2312 加数学符号子集化，1.6MB / 7549 字。系统 KaiTi 在 Electron 里匹配不到，只能打包。</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  const root = document.documentElement;
+  const btn = document.getElementById('theme');
+  const dark = () => window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const label = () => { btn.textContent = root.dataset.theme === 'dark' ? '切到亮色' : '切到暗色'; };
+  root.dataset.theme = dark() ? 'dark' : 'light';
+  label();
+  btn.addEventListener('click', () => {
+    root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    label();
+  });
+
+  const merged = document.getElementById('merged');
+  for (const pick of document.querySelectorAll('.pick')) {
+    pick.addEventListener('click', () => {
+      for (const other of document.querySelectorAll('.pick')) other.setAttribute('aria-pressed', 'false');
+      pick.setAttribute('aria-pressed', 'true');
+      merged.classList.toggle('show', pick.textContent.includes('合'));
+    });
+  }
+</script>
+</body>
+</html>
