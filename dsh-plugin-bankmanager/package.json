@@ -7,7 +7,8 @@
   "type": "module",
   "main": "./lib/index.js",
   "exports": {
-    ".": "./lib/index.js"
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js"
   },
   "files": [
     "lib",
@@ -16,13 +17,18 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": []
     }
   },
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "verify": "node scripts/verify-bank.mjs"
+    "verify": "node scripts/verify-bank.mjs",
+    "build:client": "vite build --config vite.client.config.ts"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.5",
@@ -47,6 +53,7 @@
     "@types/node": "^22.20.0",
     "tsdown": "0.22.2",
     "typescript": "6.0.3",
+    "vite": "8.2.1",
     "vitest": "4.1.8"
   }
 }

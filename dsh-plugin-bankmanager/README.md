@@ -140,3 +140,19 @@ new ──> guide ──> review ──> mastered
 ## 组织
 
 EnSure Lab / 因需。包名 `dsh-plugin-bankmanager`。它多半也不是 agent preset，而是 Host 侧服务 + 界面入口，这条待定。
+
+## 浏览器半边：交接卡片
+
+`src/client/` 是这个插件的浏览器面，构建产出 `lib/client.js`，按上游客户端插件的装载协议包成
+`window.__ModuleLoader__.load({ id, factory })`（React 与 `@deepseek-ai/*` 全部交给宿主模块表）。
+
+它只做一件事：认领 `tool.call.toolview` 的 `bank_resume` 键，把那次工具调用的结果 JSON 画成一张卡片——
+题干（宋体）、学生上次的原话（楷体）、下一步、一个「接着做」按钮。模型改字段时卡片静默不渲染，
+退回通用工具行，不会把会话渲染炸掉。
+
+- 构建：`yarn workspace dsh-plugin-bankmanager build:client`
+- 数据模型：`src/client/handoff-model.ts`（纯函数，有单测）
+- 样式：运行时注入一次 `<style>`，类名前缀 `.ile-handoff`，随 effect 清理
+
+**已知限制**：客户端构建面看不到原生窗口的字体文件，卡片里的楷体在本机会回退成宋体；
+「接着做」目前只把「接着上次那道题：<id>」复制到剪贴板，还不直接建会话（待办 #7 的剩余部分）。

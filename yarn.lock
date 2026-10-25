@@ -10844,6 +10844,7 @@ __metadata:
     "@types/node": "npm:^22.20.0"
     tsdown: "npm:0.22.2"
     typescript: "npm:6.0.3"
+    vite: "npm:8.2.1"
     vitest: "npm:4.1.8"
   peerDependencies:
     "@deepseek-ai/cordis": 4.0.5
