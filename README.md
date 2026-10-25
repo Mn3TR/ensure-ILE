@@ -7,6 +7,8 @@
 > - 现在的产品形态：一个 agent preset，叫 **引导模式**。见 [`dsh-plugin-guide/](dsh-plugin-guide/)。
 > - 开工前读 [`AGENTS.md`](AGENTS.md)。
 >
+> **EnSure Lab / 因需**（因=原因、需=需要，即「每一步都要说得清为什么」）。包名统一 `dsh-plugin-` 前缀。
+>
 > 下面是上游 README，保留作为底座说明。
 
 ---

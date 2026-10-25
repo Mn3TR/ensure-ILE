@@ -169,7 +169,9 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'bank_update',
     description: [
-      '更新一道题。显式字段：status、guideOutcome（solved / stuck / abandoned）、whereStuck、guideResult、insight、reviewNextAt、reviewInterval。',
+      '更新一道题。显式字段：status、guideOutcome（solved / stuck / abandoned）、whereStuck、guideResult、insight、reviewNextAt、reviewInterval、reviewPassed。',
+      '判过（status 变 review）会自动排第一次复习；之后每复习一次用 reviewPassed 报结果：true 升一档 1/3/7/14/30/60/120 天，false 回第一档，爬到最后一档自动 mastered。',
+      'affect（frustrated / neutral / excited）与 effectiveHint（confirm / position / feature / structure / result）记这一轮的学生状态和哪个档的视角有效，写进当前引导会话。',
       'workAttempt：交一次卷——answer 原文 + verdict（ok / partial / wrong）。只放学生独立做的卷；引导里做出来的写 guideResult。',
       'hrl：答案优化的增量写入，四段都可选，按 input → teacher → step → result 的顺序应用。',
       '  input 是这次在打磨哪份答案；teacher 是教师轨迹（一次写全，按学生偏好写）；',
@@ -191,6 +193,9 @@ export function apply(ctx: Context, config: Config): void {
       insight: { type: 'string', description: '这道题的关键转折，写给以后的自己' },
       reviewNextAt: { type: 'string', description: '下次复习时间（ISO 8601）' },
       reviewInterval: { type: 'integer', description: '复习间隔（天）' },
+      reviewPassed: { type: 'boolean', description: '一次复习的结果：true 升一档（1/3/7/14/30/60/120 天），false 回第一档' },
+      affect: { type: 'string', description: '这一轮学生的状态：frustrated / neutral / excited' },
+      effectiveHint: { type: 'string', description: '这一轮哪个档的视角有效：confirm / position / feature / structure / result' },
       workAttempt: {
         type: 'object',
         additionalProperties: false,
@@ -345,6 +350,9 @@ export function apply(ctx: Context, config: Config): void {
           ...(args.insight === undefined ? {} : { insight: args.insight }),
           ...(args.reviewNextAt === undefined ? {} : { reviewNextAt: args.reviewNextAt }),
           ...(args.reviewInterval === undefined ? {} : { reviewInterval: args.reviewInterval }),
+          ...(args.reviewPassed === undefined ? {} : { reviewPassed: args.reviewPassed }),
+          ...(args.affect === undefined ? {} : { affect: args.affect }),
+          ...(args.effectiveHint === undefined ? {} : { effectiveHint: args.effectiveHint }),
           ...(workAttempt === undefined ? {} : { workAttempt }),
           ...(hrl === undefined ? {} : { hrl }),
           ...(handoff === undefined ? {} : { handoff }),

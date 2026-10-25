@@ -29,6 +29,8 @@ if (workspace.packageManager !== 'yarn@4.18.0') {
 if (JSON.stringify(workspace.workspaces) !== JSON.stringify([
   'dsh-plugin-teaching-commons',
   'dsh-plugin-setup',
+  'dsh-plugin-work',
+  'dsh-plugin-hrl',
   'dsh-plugin-guide',
   'dsh-plugin-bankmanager',
   'dsh-plugin-memory',

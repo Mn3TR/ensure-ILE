@@ -10,6 +10,8 @@
   "workspaces": [
     "dsh-plugin-teaching-commons",
     "dsh-plugin-setup",
+    "dsh-plugin-work",
+    "dsh-plugin-hrl",
     "dsh-plugin-guide",
     "dsh-plugin-bankmanager",
     "dsh-plugin-memory",

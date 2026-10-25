@@ -8,6 +8,8 @@
         "@deepseek-ai/dsh-web-app",
         "dsh-plugin-setup",
         "dsh-plugin-guide",
+        "dsh-plugin-work",
+        "dsh-plugin-hrl",
         "dsh-plugin-bankmanager",
         "dsh-plugin-memory"
       ]
@@ -18,6 +20,8 @@
     "dsh-plugin-bankmanager": "file:../../../../dsh-plugin-bankmanager",
     "dsh-plugin-memory": "file:../../../../dsh-plugin-memory",
     "dsh-plugin-teaching-commons": "file:../../../../dsh-plugin-teaching-commons",
-    "dsh-plugin-setup": "file:../../../../dsh-plugin-setup"
+    "dsh-plugin-setup": "file:../../../../dsh-plugin-setup",
+    "dsh-plugin-work": "file:../../../../dsh-plugin-work",
+    "dsh-plugin-hrl": "file:../../../../dsh-plugin-hrl"
   }
 }

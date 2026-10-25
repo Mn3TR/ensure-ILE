@@ -9,6 +9,7 @@
 
 import { formatUnexpectedHostExit, startIsolatedDesktopHost } from './host-process.ts'
 import { app, crashReporter, safeStorage, session, shell } from 'electron'
+import { spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -1992,15 +1993,49 @@ function resolveProjectRoot(): string {
  * existing profile is never overwritten, so settings a learner changes through
  * the UI survive restarts; delete the profile directory to pick up new defaults.
  */
-function seedProfile(dataRoot: string, projectRoot: string): void {
-  const template = join(projectRoot, 'profiles', 'ensure-ile')
-  if (!existsSync(template)) return
+function seedProfile(dataRoot: string, projectRoot: string): string {
+  // A packaged build ships the definition as an extra resource; a checkout reads
+  // it from the repository root.
+  const template = app.isPackaged
+    ? join(process.resourcesPath, 'profiles', 'ensure-ile')
+    : join(projectRoot, 'profiles', 'ensure-ile')
   const target = join(dataRoot, 'home', 'profiles', 'desktop')
   mkdirSync(target, { recursive: true })
-  for (const file of ['package.json', 'cordis.patch.yml', 'pnpm-workspace.yaml']) {
-    const source = join(template, file)
-    const destination = join(target, file)
-    if (existsSync(source) && !existsSync(destination)) copyFileSync(source, destination)
+  if (existsSync(template)) {
+    for (const file of ['package.json', 'cordis.patch.yml', 'pnpm-workspace.yaml']) {
+      const source = join(template, file)
+      const destination = join(target, file)
+      if (existsSync(source) && !existsSync(destination)) copyFileSync(source, destination)
+    }
+  }
+  return target
+}
+
+/**
+ * Install the seeded profile's packages once. Everything ensure-ILE links is a
+ * local `file:` package with no registry dependency, so the bundled pnpm can do
+ * this offline; an existing node_modules means an earlier run already did.
+ */
+function materializeSeededProfile(profileDir: string): void {
+  if (existsSync(join(profileDir, 'node_modules'))) return
+  if (!existsSync(join(profileDir, 'package.json'))) return
+  let pnpmBinPath: string
+  try {
+    pnpmBinPath = packagedDependencyPath(import.meta.url, 'pnpm/bin/pnpm.mjs')
+  } catch (error) {
+    console.error(`${BIN_NAME}: cannot locate the bundled pnpm: ${String(error)}`)
+    return
+  }
+  if (!existsSync(pnpmBinPath)) return
+  const result = spawnSync(process.execPath, [pnpmBinPath, 'install', '--offline', '--no-frozen-lockfile'], {
+    cwd: profileDir,
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', CI: 'true' },
+    stdio: 'ignore',
+    windowsHide: true,
+    timeout: 300_000,
+  })
+  if (result.status !== 0) {
+    console.error(`${BIN_NAME}: profile dependency install exited with ${String(result.status ?? result.signal)}`)
   }
 }
 
@@ -2056,7 +2091,8 @@ async function run(): Promise<void> {
   // build never reads or writes the installed copy's data. The environment is
   // assigned before start(), which is where the Host child inherits it.
   const dataRoot = resolveDataRoot()
-  seedProfile(dataRoot, resolveProjectRoot())
+  const profileDir = seedProfile(dataRoot, resolveProjectRoot())
+  materializeSeededProfile(profileDir)
   process.env.DSH_HOME ??= join(dataRoot, 'home')
   // ensure-ILE: start() reads this and refuses to fall back to a shared ~/.dsh. It is a
   // separate variable from DSH_HOME because DSH_HOME is also the name the installed

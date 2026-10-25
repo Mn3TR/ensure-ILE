@@ -29,6 +29,33 @@ const GUIDE_OUTCOMES = [
 	"stuck",
 	"abandoned"
 ];
+/** How the learner seemed during one session. */
+const AFFECTS = [
+	"frustrated",
+	"neutral",
+	"excited"
+];
+/**
+* The five rungs of guide.md's hint ladder, lightest first. Recorded per session
+* so the next guide knows what actually moved this learner.
+*/
+const HINT_LEVELS = [
+	"confirm",
+	"position",
+	"feature",
+	"structure",
+	"result"
+];
+/** Fixed review intervals in days; the scheduler walks this ladder. */
+const REVIEW_LADDER = [
+	1,
+	3,
+	7,
+	14,
+	30,
+	60,
+	120
+];
 /** Failure with a stable code so tools can explain themselves. */
 var BankError = class extends Error {
 	code;
@@ -214,6 +241,13 @@ async function createProblem(directory, input) {
 	});
 	return record;
 }
+/** One rung up the review ladder; the last rung repeats. */
+function nextInterval(current) {
+	if (current === void 0) return REVIEW_LADDER[0];
+	const index = REVIEW_LADDER.indexOf(current);
+	if (index < 0) return REVIEW_LADDER[0];
+	return REVIEW_LADDER[Math.min(index + 1, REVIEW_LADDER.length - 1)];
+}
 /** The last pairing still waiting for its result. */
 function openPairing(hrl) {
 	for (let index = hrl.pairings.length - 1; index >= 0; index -= 1) {
@@ -298,7 +332,8 @@ async function updateProblem(directory, id, input) {
 	const file = problemPath(directory, id);
 	return withFileLock(file, async () => {
 		const record = readProblem(directory, id);
-		const at = (input.now ?? /* @__PURE__ */ new Date()).toISOString();
+		const now = input.now ?? /* @__PURE__ */ new Date();
+		const at = now.toISOString();
 		const events = [];
 		if (input.status !== void 0) {
 			if (!isProblemStatus(input.status)) throw new BankError("未知状态 " + input.status, "invalid-input");
@@ -324,8 +359,42 @@ async function updateProblem(directory, id, input) {
 			events.push("guide result");
 		}
 		if (input.insight !== void 0) record.guide.insight = input.insight;
+		if (input.affect !== void 0 || input.effectiveHint !== void 0) {
+			let open = record.guide.sessions.find((session) => session.endedAt === void 0) ?? record.guide.sessions[record.guide.sessions.length - 1];
+			if (open === void 0) {
+				open = { startedAt: at };
+				record.guide.sessions.push(open);
+				events.push("guide session opened");
+			}
+			if (input.affect !== void 0) {
+				if (!AFFECTS.includes(input.affect)) throw new BankError("未知情绪 " + input.affect, "invalid-input");
+				open.affect = input.affect;
+				events.push("affect " + input.affect);
+			}
+			if (input.effectiveHint !== void 0) {
+				if (!HINT_LEVELS.includes(input.effectiveHint)) throw new BankError("未知视角档位 " + input.effectiveHint, "invalid-input");
+				open.effectiveHint = input.effectiveHint;
+				events.push("effectiveHint " + input.effectiveHint);
+			}
+		}
 		if (input.reviewNextAt !== void 0) record.review.nextAt = input.reviewNextAt;
 		if (input.reviewInterval !== void 0) record.review.interval = input.reviewInterval;
+		if (input.reviewPassed !== void 0) {
+			const step = input.reviewPassed ? nextInterval(record.review.interval) : REVIEW_LADDER[0];
+			record.review.interval = step;
+			record.review.count = input.reviewPassed ? record.review.count + 1 : 0;
+			record.review.nextAt = new Date(now.getTime() + step * 864e5).toISOString();
+			record.review.history.push(at + " " + (input.reviewPassed ? "pass" : "fail") + " +" + step + "d");
+			events.push("review " + (input.reviewPassed ? "pass" : "fail") + " +" + step + "d");
+			if (input.reviewPassed && step === REVIEW_LADDER[REVIEW_LADDER.length - 1]) {
+				record.status = "mastered";
+				events.push("status -> mastered");
+			}
+		} else if (record.status === "review" && record.review.nextAt === void 0) {
+			record.review.interval = REVIEW_LADDER[0];
+			record.review.nextAt = new Date(now.getTime() + REVIEW_LADDER[0] * 864e5).toISOString();
+			events.push("review scheduled +" + REVIEW_LADDER[0] + "d");
+		}
 		if (input.workAttempt !== void 0) {
 			record.work.attempts.push({
 				at,
@@ -549,7 +618,9 @@ function apply(ctx, config) {
 	ctx.tools.register(defineTool({
 		name: "bank_update",
 		description: [
-			"更新一道题。显式字段：status、guideOutcome（solved / stuck / abandoned）、whereStuck、guideResult、insight、reviewNextAt、reviewInterval。",
+			"更新一道题。显式字段：status、guideOutcome（solved / stuck / abandoned）、whereStuck、guideResult、insight、reviewNextAt、reviewInterval、reviewPassed。",
+			"判过（status 变 review）会自动排第一次复习；之后每复习一次用 reviewPassed 报结果：true 升一档 1/3/7/14/30/60/120 天，false 回第一档，爬到最后一档自动 mastered。",
+			"affect（frustrated / neutral / excited）与 effectiveHint（confirm / position / feature / structure / result）记这一轮的学生状态和哪个档的视角有效，写进当前引导会话。",
 			"workAttempt：交一次卷——answer 原文 + verdict（ok / partial / wrong）。只放学生独立做的卷；引导里做出来的写 guideResult。",
 			"hrl：答案优化的增量写入，四段都可选，按 input → teacher → step → result 的顺序应用。",
 			"  input 是这次在打磨哪份答案；teacher 是教师轨迹（一次写全，按学生偏好写）；",
@@ -595,6 +666,18 @@ function apply(ctx, config) {
 			reviewInterval: {
 				type: "integer",
 				description: "复习间隔（天）"
+			},
+			reviewPassed: {
+				type: "boolean",
+				description: "一次复习的结果：true 升一档（1/3/7/14/30/60/120 天），false 回第一档"
+			},
+			affect: {
+				type: "string",
+				description: "这一轮学生的状态：frustrated / neutral / excited"
+			},
+			effectiveHint: {
+				type: "string",
+				description: "这一轮哪个档的视角有效：confirm / position / feature / structure / result"
 			},
 			workAttempt: {
 				type: "object",
@@ -852,6 +935,9 @@ function apply(ctx, config) {
 					...args.insight === void 0 ? {} : { insight: args.insight },
 					...args.reviewNextAt === void 0 ? {} : { reviewNextAt: args.reviewNextAt },
 					...args.reviewInterval === void 0 ? {} : { reviewInterval: args.reviewInterval },
+					...args.reviewPassed === void 0 ? {} : { reviewPassed: args.reviewPassed },
+					...args.affect === void 0 ? {} : { affect: args.affect },
+					...args.effectiveHint === void 0 ? {} : { effectiveHint: args.effectiveHint },
 					...workAttempt === void 0 ? {} : { workAttempt },
 					...hrl === void 0 ? {} : { hrl },
 					...handoff === void 0 ? {} : { handoff },

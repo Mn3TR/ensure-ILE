@@ -509,6 +509,12 @@
     "npmRebuild": false,
     "dmg": {
       "icon": "build/app-icon.icns"
-    }
+    },
+    "extraResources": [
+      {
+        "from": "../profiles/ensure-ile",
+        "to": "profiles/ensure-ile"
+      }
+    ]
   }
 }

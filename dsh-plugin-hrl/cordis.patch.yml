@@ -1,0 +1,11 @@
+# ensure-ILE HRL bundle patch: one insert over the profile root.
+- insert:
+    - id: hrl-preset
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: hrl
+        name: 答案优化
+        description: 他已经有答案了，一步一对地看教师轨迹，自己决定留哪边
+        order: 55
+        plugins:
+          - name: dsh-plugin-hrl

@@ -1,3 +1,11 @@
+> **ensure-ILE** is a fork of [DSH Desktop](https://github.com/anywhere-labs/dsh-desktop), built by **EnSure Lab / 因需** — *every step has to say why*.
+>
+> Everything added on top of the upstream desktop lives in this repository's own packages (`dsh-plugin-*`); `deepseek-harness/` stays a pinned, unmodified submodule.
+>
+> The upstream README follows, kept as the base-layer reference.
+
+---
+
 <p align="center">
   <a href="https://dshdesktop.cn"><img src="assets/desktop-hero-en.png" alt="ensure-ILE, an open-source desktop client built on DeepSeek Harness" width="100%"></a>
 </p>

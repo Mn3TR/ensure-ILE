@@ -30,7 +30,25 @@ export interface GuideSession {
   whereStuck?: string
   /** What the learner wrote at the end of the session, verbatim. */
   result?: string
+  /** How the learner came across this session; the cheapest learner signal we keep. */
+  affect?: Affect
+  /** Which rung of the hint ladder actually moved him. */
+  effectiveHint?: HintLevel
 }
+
+/** How the learner seemed during one session. */
+export const AFFECTS = ['frustrated', 'neutral', 'excited'] as const
+export type Affect = (typeof AFFECTS)[number]
+
+/**
+ * The five rungs of guide.md's hint ladder, lightest first. Recorded per session
+ * so the next guide knows what actually moved this learner.
+ */
+export const HINT_LEVELS = ['confirm', 'position', 'feature', 'structure', 'result'] as const
+export type HintLevel = (typeof HINT_LEVELS)[number]
+
+/** Fixed review intervals in days; the scheduler walks this ladder. */
+export const REVIEW_LADDER = [1, 3, 7, 14, 30, 60, 120] as const
 
 /** One handed-in answer from a session where the learner worked alone. */
 export interface ProblemAttempt {
@@ -382,6 +400,10 @@ export interface UpdateProblemInput {
   insight?: string
   reviewNextAt?: string
   reviewInterval?: number
+  /** A review sitting: true walks one rung up, false resets to the first. */
+  reviewPassed?: boolean
+  affect?: string
+  effectiveHint?: string
   workAttempt?: WorkAttemptInput
   hrl?: HrlUpdateInput
   handoff?: HandoffInput
@@ -389,6 +411,14 @@ export interface UpdateProblemInput {
   handoffConsume?: string
   patch?: Record<string, unknown>
   now?: Date
+}
+
+/** One rung up the review ladder; the last rung repeats. */
+function nextInterval(current: number | undefined): number {
+  if (current === undefined) return REVIEW_LADDER[0]
+  const index = REVIEW_LADDER.indexOf(current as never)
+  if (index < 0) return REVIEW_LADDER[0]
+  return REVIEW_LADDER[Math.min(index + 1, REVIEW_LADDER.length - 1)] as number
 }
 
 /** The last pairing still waiting for its result. */
@@ -506,8 +536,50 @@ export async function updateProblem(directory: string, id: string, input: Update
       events.push('guide result')
     }
     if (input.insight !== undefined) record.guide.insight = input.insight
+    if (input.affect !== undefined || input.effectiveHint !== undefined) {
+      // Signals are written mid-session, usually before the session has an
+      // outcome, so open one rather than refusing the write.
+      let open = record.guide.sessions.find(session => session.endedAt === undefined)
+        ?? record.guide.sessions[record.guide.sessions.length - 1]
+      if (open === undefined) {
+        open = { startedAt: at }
+        record.guide.sessions.push(open)
+        events.push('guide session opened')
+      }
+      if (input.affect !== undefined) {
+        if (!(AFFECTS as readonly string[]).includes(input.affect)) {
+          throw new BankError('未知情绪 ' + input.affect, 'invalid-input')
+        }
+        open.affect = input.affect as Affect
+        events.push('affect ' + input.affect)
+      }
+      if (input.effectiveHint !== undefined) {
+        if (!(HINT_LEVELS as readonly string[]).includes(input.effectiveHint)) {
+          throw new BankError('未知视角档位 ' + input.effectiveHint, 'invalid-input')
+        }
+        open.effectiveHint = input.effectiveHint as HintLevel
+        events.push('effectiveHint ' + input.effectiveHint)
+      }
+    }
     if (input.reviewNextAt !== undefined) record.review.nextAt = input.reviewNextAt
     if (input.reviewInterval !== undefined) record.review.interval = input.reviewInterval
+    if (input.reviewPassed !== undefined) {
+      const step = input.reviewPassed ? nextInterval(record.review.interval) : REVIEW_LADDER[0]
+      record.review.interval = step
+      record.review.count = input.reviewPassed ? record.review.count + 1 : 0
+      record.review.nextAt = new Date(now.getTime() + step * 86_400_000).toISOString()
+      record.review.history.push(at + ' ' + (input.reviewPassed ? 'pass' : 'fail') + ' +' + step + 'd')
+      events.push('review ' + (input.reviewPassed ? 'pass' : 'fail') + ' +' + step + 'd')
+      if (input.reviewPassed && step === REVIEW_LADDER[REVIEW_LADDER.length - 1]) {
+        record.status = 'mastered'
+        events.push('status -> mastered')
+      }
+    } else if (record.status === 'review' && record.review.nextAt === undefined) {
+      // Entering review schedules the first sitting; the ladder then walks itself.
+      record.review.interval = REVIEW_LADDER[0]
+      record.review.nextAt = new Date(now.getTime() + REVIEW_LADDER[0] * 86_400_000).toISOString()
+      events.push('review scheduled +' + REVIEW_LADDER[0] + 'd')
+    }
     if (input.workAttempt !== undefined) {
       record.work.attempts.push({
         at,

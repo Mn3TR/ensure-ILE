@@ -205,3 +205,56 @@ describe('handoff', () => {
     expect(() => parseRecord({ schema: 1, id: 'x' })).toThrow(/schema 必须是 2/u)
   })
 })
+
+describe('review ladder', () => {
+  it('schedules the first sitting when a problem enters review', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: 'one', subject: 'math', now: new Date('2026-10-25T00:00:00Z'), suffix: 'ddddde' })
+    const updated = await updateProblem(dir, record.id, { status: 'review', now: new Date('2026-10-25T00:00:00Z') })
+    expect(updated.review.interval).toBe(1)
+    expect(updated.review.nextAt).toBe('2026-10-26T00:00:00.000Z')
+  })
+
+  it('walks up the ladder and reaches mastered on the last rung', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: 'one', subject: 'math', suffix: 'eeeeef' })
+    await updateProblem(dir, record.id, { status: 'review', now: new Date('2026-10-25T00:00:00Z') })
+    const rungs: number[] = []
+    let current = record.id
+    for (let i = 0; i < 7; i += 1) {
+      const next = await updateProblem(dir, current, { reviewPassed: true, now: new Date('2026-10-25T00:00:00Z') })
+      rungs.push(next.review.interval as number)
+      current = next.id
+    }
+    expect(rungs).toEqual([3, 7, 14, 30, 60, 120, 120])
+    const last = await updateProblem(dir, record.id, {})
+    expect(last.status).toBe('mastered')
+  })
+
+  it('resets to the first rung on a failed review', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: 'one', subject: 'math', suffix: 'ffffff' })
+    await updateProblem(dir, record.id, { status: 'review', now: new Date('2026-10-25T00:00:00Z') })
+    await updateProblem(dir, record.id, { reviewPassed: true, now: new Date('2026-10-25T00:00:00Z') })
+    const failed = await updateProblem(dir, record.id, { reviewPassed: false, now: new Date('2026-10-25T00:00:00Z') })
+    expect(failed.review.interval).toBe(1)
+    expect(failed.review.count).toBe(0)
+    expect(failed.status).toBe('review')
+  })
+})
+
+describe('learner signals', () => {
+  it('writes affect and effectiveHint onto the open guide session', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: 'one', subject: 'math', suffix: 'aaaab1' })
+    await updateProblem(dir, record.id, { status: 'guide', affect: 'frustrated', effectiveHint: 'feature' })
+    const state = await updateProblem(dir, record.id, { guideOutcome: 'stuck' })
+    expect(state.guide.sessions[0]?.affect).toBe('frustrated')
+    expect(state.guide.sessions[0]?.effectiveHint).toBe('feature')
+  })
+  it('refuses an unknown affect', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: 'one', subject: 'math', suffix: 'bbbcc2' })
+    await expect(updateProblem(dir, record.id, { affect: 'angry' })).rejects.toThrow(BankError)
+  })
+})
