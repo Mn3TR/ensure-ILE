@@ -92,7 +92,7 @@ bank schema v2.1（2026-10-25 已实现，按模式分块）：
 
 规划待办（`handoff` 字段、`guide.sessions[].result`、`mergedText`、`teacher.note` 都是这一轮新增的）。
 
-**验证现状**（2026-10-24 复验）：`check:layout`、`typecheck`、桌面包 `build`、`verify:loader` 通过；`dsh-plugin-bankmanager` 15 个单测 + 挂载 smoke、`dsh-plugin-memory` 185 个单测全过；profile 用 `pnpm install --offline` 能离线装好 guide / bank / memory 三个本地包。桌面包单测仍是 Windows 平台基线 26 个失败（module-resolution 15、linux-artifacts 5、compatibility-shell 2、desktop-runtime-environment 2、electron-runtime 1、recovery-plugin-uninstall 1）；改名后 `update-download` 多出过 3 个，已修；2026-10-24 全量复跑确认就是这 26 个、同六个文件。`corepack yarn check` 与 `dist:win` 仍未跑过。
+**验证现状**（2026-10-25 复验）：`check:layout`、`typecheck`、桌面包 `build`、`verify:loader` 通过；`dsh-plugin-bankmanager` 20 个单测（schema v2.1）+ 挂载 smoke、`dsh-plugin-memory` 185 个单测、`dsh-plugin-teaching-commons` 构建与类型检查全过；profile 用 `pnpm install --offline` 能离线装好 guide / bank / memory / teaching-commons 四个本地包。桌面包单测仍是 Windows 平台基线 26 个失败（module-resolution 15、linux-artifacts 5、compatibility-shell 2、desktop-runtime-environment 2、electron-runtime 1、recovery-plugin-uninstall 1）；改名后 `update-download` 多出过 3 个，已修；2026-10-24 全量复跑确认就是这 26 个、同六个文件。`corepack yarn check` 与 `dist:win` 仍未跑过。
 
 **提交**：`272a34c` 删 Beta/Next → `d9dfdba` 删社区市场+AA 并把 hrll 改名 guide → `bc5a422` 三个占位骨架 → `a24d2c9` 记忆 → `c784397` 状态 → `4c56d90` 记忆快照 → `6b6760d` 删 Next 交接与 `_deprecated` → `380caf4` 删 retired bundle 兼容层 → `abf2025` 砍 preset + 删 Python 载荷 → `4e9546a` dshmarket 补丁挪 1.67.0 → `170edcc` 把插件市场从构建里删掉 → `3198d10` 全仓改名 ensure-ILE（产品名、appId、数据根、环境变量、根包名）→ `32a5bc7` guide 出壳（自带 bundle patch）→ `46db1cd` 题库插件 → `b196533` memory fork 接进 profile。
 
