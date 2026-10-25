@@ -11095,7 +11095,7 @@ __metadata:
     "@deepseek-ai/dsh-tools": "npm:^0.2.1-rc.2"
     "@deepseek-ai/schemastery": "npm:^3.18.5"
     "@types/node": "npm:^22.20.0"
-    dsh-plugin-teaching-commons: "file:../dsh-plugin-teaching-commons"
+    dsh-plugin-teaching-commons: "link:../dsh-plugin-teaching-commons"
     tsdown: "npm:0.22.2"
     typescript: "npm:6.0.3"
   peerDependencies:
@@ -11115,7 +11115,7 @@ __metadata:
     "@deepseek-ai/dsh-tools": "npm:^0.2.1-rc.2"
     "@deepseek-ai/schemastery": "npm:^3.18.5"
     "@types/node": "npm:^22.20.0"
-    dsh-plugin-teaching-commons: "file:../dsh-plugin-teaching-commons"
+    dsh-plugin-teaching-commons: "link:../dsh-plugin-teaching-commons"
     tsdown: "npm:0.22.2"
     typescript: "npm:6.0.3"
     vitest: "npm:^4.1.8"
@@ -11174,7 +11174,7 @@ __metadata:
     "@deepseek-ai/dsh-tools": "npm:^0.2.1-rc.2"
     "@deepseek-ai/schemastery": "npm:^3.18.5"
     "@types/node": "npm:^22.20.0"
-    dsh-plugin-teaching-commons: "file:../dsh-plugin-teaching-commons"
+    dsh-plugin-teaching-commons: "link:../dsh-plugin-teaching-commons"
     tsdown: "npm:0.22.2"
     typescript: "npm:6.0.3"
     vitest: "npm:^4.1.8"
@@ -11186,33 +11186,29 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons::locator=dsh-plugin-guide%40workspace%3Adsh-plugin-guide":
-  version: 0.1.0
-  resolution: "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons#../dsh-plugin-teaching-commons::hash=b14845&locator=dsh-plugin-guide%40workspace%3Adsh-plugin-guide"
-  checksum: 10c0/742a131eb19b9bc2a0413f913b93b7c769c9123c0e69ffe4cba50d2bf6577afd5715bf0ce1436cdb2cf163070a99566e89ada8cdc9e1c098947781fa6046d832
+"dsh-plugin-teaching-commons@link:../dsh-plugin-teaching-commons::locator=dsh-plugin-guide%40workspace%3Adsh-plugin-guide":
+  version: 0.0.0-use.local
+  resolution: "dsh-plugin-teaching-commons@link:../dsh-plugin-teaching-commons::locator=dsh-plugin-guide%40workspace%3Adsh-plugin-guide"
   languageName: node
-  linkType: hard
+  linkType: soft
 
-"dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons::locator=dsh-plugin-hrl%40workspace%3Adsh-plugin-hrl":
-  version: 0.1.0
-  resolution: "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons#../dsh-plugin-teaching-commons::hash=b14845&locator=dsh-plugin-hrl%40workspace%3Adsh-plugin-hrl"
-  checksum: 10c0/742a131eb19b9bc2a0413f913b93b7c769c9123c0e69ffe4cba50d2bf6577afd5715bf0ce1436cdb2cf163070a99566e89ada8cdc9e1c098947781fa6046d832
+"dsh-plugin-teaching-commons@link:../dsh-plugin-teaching-commons::locator=dsh-plugin-hrl%40workspace%3Adsh-plugin-hrl":
+  version: 0.0.0-use.local
+  resolution: "dsh-plugin-teaching-commons@link:../dsh-plugin-teaching-commons::locator=dsh-plugin-hrl%40workspace%3Adsh-plugin-hrl"
   languageName: node
-  linkType: hard
+  linkType: soft
 
-"dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons::locator=dsh-plugin-setup%40workspace%3Adsh-plugin-setup":
-  version: 0.1.0
-  resolution: "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons#../dsh-plugin-teaching-commons::hash=b14845&locator=dsh-plugin-setup%40workspace%3Adsh-plugin-setup"
-  checksum: 10c0/742a131eb19b9bc2a0413f913b93b7c769c9123c0e69ffe4cba50d2bf6577afd5715bf0ce1436cdb2cf163070a99566e89ada8cdc9e1c098947781fa6046d832
+"dsh-plugin-teaching-commons@link:../dsh-plugin-teaching-commons::locator=dsh-plugin-setup%40workspace%3Adsh-plugin-setup":
+  version: 0.0.0-use.local
+  resolution: "dsh-plugin-teaching-commons@link:../dsh-plugin-teaching-commons::locator=dsh-plugin-setup%40workspace%3Adsh-plugin-setup"
   languageName: node
-  linkType: hard
+  linkType: soft
 
-"dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons::locator=dsh-plugin-work%40workspace%3Adsh-plugin-work":
-  version: 0.1.0
-  resolution: "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons#../dsh-plugin-teaching-commons::hash=b14845&locator=dsh-plugin-work%40workspace%3Adsh-plugin-work"
-  checksum: 10c0/742a131eb19b9bc2a0413f913b93b7c769c9123c0e69ffe4cba50d2bf6577afd5715bf0ce1436cdb2cf163070a99566e89ada8cdc9e1c098947781fa6046d832
+"dsh-plugin-teaching-commons@link:../dsh-plugin-teaching-commons::locator=dsh-plugin-work%40workspace%3Adsh-plugin-work":
+  version: 0.0.0-use.local
+  resolution: "dsh-plugin-teaching-commons@link:../dsh-plugin-teaching-commons::locator=dsh-plugin-work%40workspace%3Adsh-plugin-work"
   languageName: node
-  linkType: hard
+  linkType: soft
 
 "dsh-plugin-teaching-commons@workspace:dsh-plugin-teaching-commons":
   version: 0.0.0-use.local
@@ -11234,7 +11230,7 @@ __metadata:
     "@deepseek-ai/dsh-tools": "npm:^0.2.1-rc.2"
     "@deepseek-ai/schemastery": "npm:^3.18.5"
     "@types/node": "npm:^22.20.0"
-    dsh-plugin-teaching-commons: "file:../dsh-plugin-teaching-commons"
+    dsh-plugin-teaching-commons: "link:../dsh-plugin-teaching-commons"
     tsdown: "npm:0.22.2"
     typescript: "npm:6.0.3"
     vitest: "npm:^4.1.8"

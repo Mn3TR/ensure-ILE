@@ -29,7 +29,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "dsh-plugin-teaching-commons": "file:../dsh-plugin-teaching-commons"
+    "dsh-plugin-teaching-commons": "link:../dsh-plugin-teaching-commons"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.5",
