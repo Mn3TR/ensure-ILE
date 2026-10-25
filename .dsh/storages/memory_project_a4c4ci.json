@@ -81,7 +81,7 @@
         "namespace": "project",
         "status": "approved",
         "injected": false,
-        "hitCount": 4,
+        "hitCount": 5,
         "source": "agent",
         "content": "DHDL 状态快照（2026-10-21 23:35，供新会话接手）：\n- 仓库 E:\\Projects\\DHDL，工作区干净。提交：272a34c 删 Beta/Next → d9dfdba 删社区市场 dsh-community-market 与 vendor/agents-anywhere（含全部 AA 接线），并把 dsh-plugin-hrll 改名 dsh-plugin-guide → bc5a422 三个占位骨架 → a24d2c9 记忆。未 push。\n- 3 个 workspace：`dsh-plugin-desktop`（上游壳 2.0.18 + DHDL 改动）、`dsh-plugin-guide`（guide 模式：整份替换系统提示 + read_note；预设 id `guide`、显示「引导模式」、是默认预设）、`dsh-community-fabric`（纯文档）。占位目录（只有 README、无 package.json）：`dsh-plugin-hrl`（HRL 模式：学生已有答案→优化）、`dsh-plugin-schedule`、`dsh-plugin-bankmanager`。\n- 组织名：EnSure Lab / 因需（因=原因、需=需要），包名统一 dsh-plugin- 前缀、不用 scope。\n- 启动：`Start-Process dsh-plugin-desktop\\node_modules\\electron\\dist\\electron.exe dsh-plugin-desktop\\lib\\main.js`；数据在 .dhdl/；冷启动首屏约 30 秒；`DHDL_SETUP=full` 看 7 屏向导。\n- 验证：check:layout、typecheck、build 通过；桌面单测 26 失败（Windows 平台基线：module-resolution 15、linux-artifacts 5、compatibility-shell 2、desktop-runtime-environment 2、electron-runtime 1、recovery-plugin-uninstall 1）；全量 yarn check 与 dist:win 未跑。\n- 待办优先级：① 真机跑一题验证 guide；② seedProfile 后自动 pnpm install；③ HRL 模式定稿（优化程度/AB 对比采偏好/学科备注/退回 guide/入口）；④ work 模式骨架；⑤ schedule 与 bankmanager 落地；⑥ 修 Windows 单测、全量 check、dist:win；⑦ 清 .dhdl 旧 agentPreset: hrll-guide 会话；⑧ README 补 EnSure Lab 署名。\n- 坑：profile-setup/<hash>/state.json.pending 必须精确 `pending\\n`；billion-context 0.1.202 有 0.1.203 关键更新（升级需重启 dsh）。",
         "keywords": [
@@ -104,7 +104,7 @@
         ],
         "createdAt": 1792596851840,
         "updatedAt": 1792596851840,
-        "lastUsedAt": 1792767247255
+        "lastUsedAt": 1792878545981
       },
       "f3609485-6d71-47e2-a7e3-be5fbfc0945c": {
         "namespace": "project",
@@ -131,6 +131,7 @@
         "namespace": "project",
         "status": "approved",
         "injected": false,
+        "hitCount": 1,
         "source": "agent",
         "content": "DHDL 的记忆层：`@max-null/dsh-memory`（上游 github.com/Max-Null/dsh-memory）在 2026-10-23 按李的要求 **fork 成仓库里的 `dsh-plugin-memory/`**，基线是上游 tag v0.18.0（此前 profile 用的是 npm 0.15.1）。fork 的目的：把它从「模型自己的记忆」改成「这个学生的记忆」（工具描述、提示段、命名空间语义、注入策略都要换口径）。\n- 当前状态：源码已入仓、包名已改 `dsh-plugin-memory`、版本 `0.18.0-dhdl.1`；**尚未注册 workspace、未构建、profile 仍依赖 npm 0.15.1**。\n- 接入要注意：`client.js` 里 client id 还写死 `@max-null/dsh-memory`，重跑 `build-client.mjs` 才能和包名对上；上游 peer 依赖是 0.2.x 系列。\n- 同步上游只搬需要的改动，不合并历史：流程写在 `dsh-plugin-memory/UPSTREAM.md`（含未合清单）。",
         "keywords": [
@@ -145,7 +146,8 @@
           "upstream.md"
         ],
         "createdAt": 1792769623778,
-        "updatedAt": 1792769623778
+        "updatedAt": 1792769623778,
+        "lastUsedAt": 1792878545981
       },
       "e6e9305d-3b4b-4680-b99c-3386bd70032c": {
         "namespace": "project",
@@ -169,6 +171,31 @@
         ],
         "createdAt": 1792852356278,
         "updatedAt": 1792852356278
+      },
+      "1269a9c7-7e5a-4e72-8d5a-73a374961f72": {
+        "namespace": "project",
+        "status": "approved",
+        "injected": false,
+        "source": "agent",
+        "injectedAuto": false,
+        "content": "ensure-ILE（原 DHDL）2026-10-25 定稿的「模式与交接」架构，全文记在仓库 AGENTS.md 的「模式与交接」一节（含 schema v2.1）。要点：\n- 模式=预设，切换=新会话。select 只认空会话（agent-preset/locked，lastTurn>0 即锁）；模型切不了自己的模式；recompose() 不写日志不更新投影，别用。\n- 否决「一个预设内换提示词」：DeepSeek flash 的 systemPromptUpdate='in-history' 让提示词可追加且不破前缀缓存，但 flash 的 toolUpdate='addition-only'（只能加不能删工具），按模式换工具集做不到。\n- 跨会话只靠 bank+memory，零注入；交接用 bank 里的 handoff，靠提示词让模型开场先 bank_list。卡片由客户端 session.create（sessionId 由 handoff.id 派生）实现幂等。\n- OOBE = 独立 setup 预设 + <DSH_HOME>/setup.json 字段级进度。\n- A/B：教师轨迹一次写全，逐小步 student/teacher/merged（merged 存学生重写的 mergedText），每 3 步 flush。\n- 四个预设都 complete:true → 安全边界/说话方式/题库规则要抽共享提示词包，否则重复四份。\n出处：2026-10-25 一轮 grilling（Q1–Q35），关键结论都由 deepseek-harness 源码核对（文件:行见 AGENTS.md）。",
+        "keywords": [
+          "ensure-ile",
+          "dhdl",
+          "模式",
+          "预设",
+          "handoff",
+          "交接",
+          "schema v2.1",
+          "hrl",
+          "a/b",
+          "work",
+          "setup",
+          "oobe",
+          "grilling"
+        ],
+        "createdAt": 1792886493276,
+        "updatedAt": 1792886493276
       }
     }
   }
