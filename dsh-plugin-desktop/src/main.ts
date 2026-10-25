@@ -1997,7 +1997,7 @@ function seedProfile(dataRoot: string, projectRoot: string): string {
   // A packaged build ships the definition as an extra resource; a checkout reads
   // it from the repository root.
   const template = app.isPackaged
-    ? join(process.resourcesPath, 'profiles', 'ensure-ile')
+    ? join(app.getAppPath(), 'profiles', 'ensure-ile')
     : join(projectRoot, 'profiles', 'ensure-ile')
   const target = join(dataRoot, 'home', 'profiles', 'desktop')
   mkdirSync(target, { recursive: true })

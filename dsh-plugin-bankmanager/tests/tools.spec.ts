@@ -48,6 +48,19 @@ describe('bank tools', () => {
     expect(stats).toContain('review=1')
   })
 
+
+  it('resumes a pending handoff by listing it and by id', async () => {
+    const dir = bank()
+    const tool = toolsFor(dir)
+    const added = await tool('bank_add').execute({ statement: '求导', subject: 'math' }, exec)
+    const id = /已建题：([a-z0-9-]+)/u.exec(added)?.[1]
+    await tool('bank_update').execute({ id, handoff: { from: 'work', to: 'guide', why: '讲不清', state: '第二步' } }, exec)
+    const listed = await tool('bank_resume').execute({}, exec)
+    expect(listed).toContain('work -> guide')
+    const resumed = await tool('bank_resume').execute({ id }, exec)
+    expect(JSON.parse(resumed).handoff.to).toBe('guide')
+    expect(JSON.parse(resumed).statement).toBe('求导')
+  })
   it('answers a missing problem instead of throwing', async () => {
     const tool = toolsFor(bank())
     const shown = await tool('bank_show').execute({ id: '20261024-math-abcdef' }, exec)

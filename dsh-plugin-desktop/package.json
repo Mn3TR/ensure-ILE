@@ -119,7 +119,7 @@
     }
   },
   "scripts": {
-    "build": "node scripts/clean.mjs && node ../scripts/run-parallel.mjs \"tsdown\" \"vite build --config vite.client.config.ts\" \"vite build --config vite.native-ui.config.ts\" \"tsc -p tsconfig.json --emitDeclarationOnly\" \"tsc -p tsconfig.client.json --emitDeclarationOnly\"",
+    "build": "node scripts/clean.mjs && node scripts/prepare-profile.mjs && node ../scripts/run-parallel.mjs \"tsdown\" \"vite build --config vite.client.config.ts\" \"vite build --config vite.native-ui.config.ts\" \"tsc -p tsconfig.json --emitDeclarationOnly\" \"tsc -p tsconfig.client.json --emitDeclarationOnly\"",
     "typecheck": "node ../scripts/run-parallel.mjs \"tsc -p tsconfig.native-ui.json --noEmit\" \"tsc -p tsconfig.tests.json --noEmit\" \"tsc -p tsconfig.tests.client.json --noEmit\"",
     "test": "vitest run",
     "verify:closure": "node --test scripts/runtime-closure.spec.mjs && node scripts/verify-runtime-closure.mjs",
@@ -405,6 +405,7 @@
       "cordis.patch.yml",
       "lib/**",
       "package.json",
+      "profiles/**",
       "!node_modules/node-pty/build/**",
       "!node_modules/fs-ext/build/**"
     ],
@@ -509,12 +510,6 @@
     "npmRebuild": false,
     "dmg": {
       "icon": "build/app-icon.icns"
-    },
-    "extraResources": [
-      {
-        "from": "../profiles/ensure-ile",
-        "to": "profiles/ensure-ile"
-      }
-    ]
+    }
   }
 }

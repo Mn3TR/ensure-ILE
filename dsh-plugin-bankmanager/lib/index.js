@@ -428,6 +428,36 @@ async function updateProblem(directory, id, input) {
 function hasPendingHandoff(record) {
 	return record.handoff !== void 0 && record.handoff.consumedAt === void 0;
 }
+/**
+* Every problem carrying a handoff nobody accepted yet.
+* @param records - readable records.
+* @returns the id and package of each pending handoff, newest first.
+*/
+function pendingHandoffs(records) {
+	return records.filter(hasPendingHandoff).map((record) => ({
+		id: record.id,
+		handoff: record.handoff
+	})).sort((left, right) => right.handoff.at.localeCompare(left.handoff.at));
+}
+/**
+* Build the resume package for one problem.
+* @param record - the problem.
+* @returns statement, handoff, insight and the last answer, nothing else.
+*/
+function resumeView(record) {
+	const session = record.guide.sessions[record.guide.sessions.length - 1];
+	const attempt = record.work.attempts[record.work.attempts.length - 1];
+	return {
+		id: record.id,
+		statement: record.statement,
+		subject: record.subject,
+		status: record.status,
+		...record.guide.insight === void 0 ? {} : { insight: record.guide.insight },
+		...record.handoff === void 0 ? {} : { handoff: record.handoff },
+		...attempt === void 0 ? {} : { lastAttempt: attempt },
+		...session?.result === void 0 ? {} : { guideResult: session.result }
+	};
+}
 /** One-line summary used by `bank_list`; a pending handoff is named so the list can offer it. */
 function summarizeProblem(record) {
 	const statement = record.statement.replace(/\s+/gu, " ").slice(0, 40);
@@ -945,6 +975,41 @@ function apply(ctx, config) {
 					...args.patch === void 0 ? {} : { patch: args.patch }
 				});
 				return "已更新 " + record.id + "：状态 " + record.status + "，历史 " + record.history.length + " 条。";
+			} catch (error) {
+				return explain(error);
+			}
+		}
+	}));
+	ctx.tools.register(defineTool({
+		name: "bank_resume",
+		description: [
+			"接上一道题。不给 id：列出所有待接的交接（谁留的、留给谁、为什么、这题到哪了）。",
+			"给 id：直接返回那道题的题干、交接包、insight 和最后一次作答——学生说「接着上次那道题」时用这个，别让他重讲题干。",
+			"新会话开场先不带 id 调一次，看不到「待接」就说明没有要接的。"
+		].join("\n"),
+		parameters: { id: {
+			type: "string",
+			description: "题目 id；省略则只列待接交接"
+		} },
+		output: {
+			schema: { type: "string" },
+			render: (_args, value) => [{
+				type: "text",
+				text: value
+			}]
+		},
+		execute: async (args) => {
+			try {
+				if (args.id === void 0 || args.id.length === 0) {
+					const { records } = listProblems(directory);
+					const pending = pendingHandoffs(records);
+					if (pending.length === 0) return "没有待接的交接。";
+					return pending.map((entry) => {
+						const handoff = entry.handoff;
+						return "- " + entry.id + "：" + handoff.from + " -> " + handoff.to + "｜" + handoff.why + "｜" + handoff.state;
+					}).join("\n");
+				}
+				return json(resumeView(readProblem(directory, args.id)));
 			} catch (error) {
 				return explain(error);
 			}

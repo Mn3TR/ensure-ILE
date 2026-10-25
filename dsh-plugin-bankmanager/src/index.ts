@@ -20,7 +20,9 @@ import {
   createProblem,
   defaultBankDirectory,
   listProblems,
+  pendingHandoffs,
   readProblem,
+  resumeView,
   summarizeProblem,
   summarizeStats,
   updateProblem,
@@ -360,6 +362,39 @@ export function apply(ctx: Context, config: Config): void {
           ...(args.patch === undefined ? {} : { patch: args.patch as Record<string, unknown> }),
         })
         return '已更新 ' + record.id + '：状态 ' + record.status + '，历史 ' + record.history.length + ' 条。'
+      } catch (error) {
+        return explain(error)
+      }
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'bank_resume',
+    description: [
+      '接上一道题。不给 id：列出所有待接的交接（谁留的、留给谁、为什么、这题到哪了）。',
+      '给 id：直接返回那道题的题干、交接包、insight 和最后一次作答——学生说「接着上次那道题」时用这个，别让他重讲题干。',
+      '新会话开场先不带 id 调一次，看不到「待接」就说明没有要接的。',
+    ].join('\n'),
+    parameters: {
+      id: { type: 'string', description: '题目 id；省略则只列待接交接' },
+    },
+    output: {
+      schema: { type: 'string' },
+      render: (_args, value) => [{ type: 'text', text: value }],
+    },
+    execute: async (args) => {
+      try {
+        if (args.id === undefined || args.id.length === 0) {
+          const { records } = listProblems(directory)
+          const pending = pendingHandoffs(records)
+          if (pending.length === 0) return '没有待接的交接。'
+          return pending.map(entry => {
+            const handoff = entry.handoff
+            return '- ' + entry.id + '：' + handoff.from + ' -> ' + handoff.to
+              + '｜' + handoff.why + '｜' + handoff.state
+          }).join('\n')
+        }
+        return json(resumeView(readProblem(directory, args.id)))
       } catch (error) {
         return explain(error)
       }

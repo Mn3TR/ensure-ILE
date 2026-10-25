@@ -848,6 +848,7 @@ describe('published package surface', () => {
       'cordis.patch.yml',
       'lib/**',
       'package.json',
+      'profiles/**',
       '!node_modules/node-pty/build/**',
       '!node_modules/fs-ext/build/**',
     ])

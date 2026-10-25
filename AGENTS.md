@@ -108,14 +108,14 @@ bank schema v2.1（2026-10-25 已实现，按模式分块）：
 6. ✅ `dsh-plugin-hrl`（2026-10-25）：预设 `hrl`「答案优化」，教师轨迹一次写全 + 逐小步 A/B（`student/teacher/merged`，merged 正文必须学生自己写）。
 7. **交接卡片**（client 插件，最重）：工具 + 卡片 slot + `session.create` 幂等。它之前先靠提示词让学生自己开新会话。
 8. ✅ **memory 的 `profile_*`**（2026-10-25）：`<DSH_HOME>/profile/{grade,schedule,rhythm,preference}.md` 四个固定栏目，`profile_read` 读一个或全部、`profile_write` 写一个（空内容等于删除）；**不进检索、不占注入预算**。memory 自述从 12 个工具改成 14 个，189 个单测全过。
-9. ✅ **钩子入口（题库侧）**：`bank_list` 行尾标 `-> guide 待接`，`bank_stats` 有「待接交接：N」。聊天首页那个入口归第 10 条。
+9. ✅ **钩子入口（题库侧）**：`bank_list` 行尾标 `-> guide 待接`，`bank_stats` 有「待接交接：N」，另有 `bank_resume`（2026-10-25 加）：不带 id 列出待接交接，带 id 直接返回题干 + 交接包 + insight + 最后一次作答。聊天首页那个入口归第 10 条。
 10. **接续 UI**（语义已定）：不点接续时 prompt 原样；点接续就把上次那道题（带状态）当成学生这次发的消息。
 11. ✅ **固定档复习**（2026-10-25）：`REVIEW_LADDER = [1,3,7,14,30,60,120]`；进 `review` 自动排第一次，`reviewPassed: true` 升一档、`false` 回第一档，爬到最后一档自动 `mastered`。
 12. ✅ **画像字段**（2026-10-25）：`guide.sessions[]` 加 `affect`（frustrated/neutral/excited）与 `effectiveHint`（confirm/position/feature/structure/result），`bank_update` 可直接写，没开会话就自动开一个。**进题不进 memory**。
-13. ✅ **打包链路**（2026-10-25）：`seedProfile()` 走 `app.isPackaged ? resourcesPath : 仓库根` 的模板路径；`build.extraResources` 把 `profiles/ensure-ile` 随包发出；`materializeSeededProfile()` 在 node_modules 缺失时用内置 pnpm 跑 `install --offline --no-frozen-lockfile`。**只在开发态验过 typecheck + build，打包产物没试过。**
+13. ✅ **打包链路**（2026-10-25）：`seedProfile()` 打包时读 `app.getAppPath()/profiles/ensure-ile`、开发时读仓库根；`scripts/prepare-profile.mjs` 在 `build` 开头把仓库模板镜像进 `dsh-plugin-desktop/profiles/`（gitignore），`build.files` 加 `profiles/**`——**不能用 `build.extraResources`**，上游 `tests/package.spec.ts` 明确禁止顶层 extraResources；`materializeSeededProfile()` 在 node_modules 缺失时用内置 pnpm 跑 `install --offline --no-frozen-lockfile`。**只在开发态验过，打包产物没试过。**
 14. **独立 Evaluator**（廉价模型按五条硬规则校验上一轮回复：给动作了吗、含答案了吗、一次两个视角了吗、超两句话了吗、空表扬了吗）：等第一条效果数据，别现在做。
 15. **教材锚定**：工作区里没有任何教材文件（2026-10-25 查过），等网校讲义到手。
-16. 修 Windows 单测（26 个基线）、跑全量 `yarn check`、试 `dist:win`。
+16. 修 Windows 单测（26 个基线）、跑全量 `yarn check`、试 `dist:win`。**2026-10-25 复跑：139 个测试文件 / 1794 个用例，27 失败**——其中 `tests/package.spec.ts` 那 1 个是这次打包改动引入的，已修（改成 `build.files` 镜像方案），现在回到 **26 个基线**（module-resolution 15、verify-linux-artifacts 5、compatibility-shell 2、desktop-runtime-environment 2、electron-runtime 1、recovery-plugin-uninstall 1）。这 26 个是 Windows 平台既有失败，未动；全量 `yarn check` 与 `dist:win` 仍未跑。
 17. ✅ README 署名（2026-10-25）：中英两份都加了 EnSure Lab / 因需 与「每一步都要说得清为什么」，`README.i18n.yaml` 的哈希同步更新，bilingual gate 通过。
 18. 图片链路（拍照发题 → 模型看得见 → 存进题库的 `attachments`）：李 2026-10-23 明确「之后搞」，暂缓。
 19. ✅ 「明确不做」已经写成独立一节（见下）。

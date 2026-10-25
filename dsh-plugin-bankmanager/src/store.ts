@@ -611,6 +611,50 @@ export function hasPendingHandoff(record: ProblemRecord): boolean {
   return record.handoff !== undefined && record.handoff.consumedAt === undefined
 }
 
+/**
+ * Every problem carrying a handoff nobody accepted yet.
+ * @param records - readable records.
+ * @returns the id and package of each pending handoff, newest first.
+ */
+export function pendingHandoffs(records: ProblemRecord[]): { id: string; handoff: Handoff }[] {
+  return records
+    .filter(hasPendingHandoff)
+    .map(record => ({ id: record.id, handoff: record.handoff as Handoff }))
+    .sort((left, right) => right.handoff.at.localeCompare(left.handoff.at))
+}
+
+/** The part of one problem the next mode needs to pick it up. */
+export interface ResumeView {
+  id: string
+  statement: string
+  subject: string
+  status: ProblemStatus
+  insight?: string
+  handoff?: Handoff
+  lastAttempt?: ProblemAttempt
+  guideResult?: string
+}
+
+/**
+ * Build the resume package for one problem.
+ * @param record - the problem.
+ * @returns statement, handoff, insight and the last answer, nothing else.
+ */
+export function resumeView(record: ProblemRecord): ResumeView {
+  const session = record.guide.sessions[record.guide.sessions.length - 1]
+  const attempt = record.work.attempts[record.work.attempts.length - 1]
+  return {
+    id: record.id,
+    statement: record.statement,
+    subject: record.subject,
+    status: record.status,
+    ...(record.guide.insight === undefined ? {} : { insight: record.guide.insight }),
+    ...(record.handoff === undefined ? {} : { handoff: record.handoff }),
+    ...(attempt === undefined ? {} : { lastAttempt: attempt }),
+    ...(session?.result === undefined ? {} : { guideResult: session.result }),
+  }
+}
+
 /** One-line summary used by `bank_list`; a pending handoff is named so the list can offer it. */
 export function summarizeProblem(record: ProblemRecord): string {
   const statement = record.statement.replace(/\s+/gu, ' ').slice(0, 40)

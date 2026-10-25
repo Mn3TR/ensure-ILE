@@ -11,6 +11,8 @@ import {
   problemPath,
   readProblem,
   slugSubject,
+  pendingHandoffs,
+  resumeView,
   summarizeProblem,
   summarizeStats,
   updateProblem,
@@ -256,5 +258,34 @@ describe('learner signals', () => {
     const dir = bank()
     const record = await createProblem(dir, { statement: 'one', subject: 'math', suffix: 'bbbcc2' })
     await expect(updateProblem(dir, record.id, { affect: 'angry' })).rejects.toThrow(BankError)
+  })
+})
+describe('resume', () => {
+  it('lists only unconsumed handoffs, newest first', async () => {
+    const dir = bank()
+    const first = await createProblem(dir, { statement: 'one', subject: 'math', now: new Date('2026-10-25T00:00:00Z'), suffix: 'aa11bb' })
+    const second = await createProblem(dir, { statement: 'two', subject: 'math', now: new Date('2026-10-25T00:01:00Z'), suffix: 'cc22dd' })
+    await updateProblem(dir, first.id, { handoff: { from: 'work', to: 'guide', why: '讲不清', state: '第二步' }, now: new Date('2026-10-25T00:02:00Z') })
+    await updateProblem(dir, second.id, { handoff: { from: 'guide', to: 'hrl', why: '改', state: '第三步' }, now: new Date('2026-10-25T00:03:00Z') })
+    const pending = pendingHandoffs(listProblems(dir).records)
+    expect(pending.map(entry => entry.id)).toEqual([second.id, first.id])
+    await updateProblem(dir, first.id, { handoffConsume: 'session-9' })
+    expect(pendingHandoffs(listProblems(dir).records).map(entry => entry.id)).toEqual([second.id])
+  })
+
+  it('builds a resume view with statement, handoff, insight and last attempt', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: 'first', subject: 'math', suffix: 'ee33ff' })
+    await updateProblem(dir, record.id, {
+      status: 'guide',
+      insight: '先看重复结构',
+      workAttempt: { answer: '我写了一半', verdict: 'partial' },
+      handoff: { from: 'work', to: 'guide', why: '讲不清', state: '第二步' },
+    })
+    const view = resumeView(readProblem(dir, record.id))
+    expect(view.statement).toBe('first')
+    expect(view.insight).toBe('先看重复结构')
+    expect(view.lastAttempt?.answer).toBe('我写了一半')
+    expect(view.handoff?.to).toBe('guide')
   })
 })
