@@ -18,6 +18,7 @@ import type { MemoryConfig, MemoryHit, MemoryRecord } from './engine.ts'
 import { MemoryGateway } from './remote.ts'
 import { runMemoryBackup } from './backup.ts'
 import { ANCHOR_KINDS } from './anchors.ts'
+import { PROFILE_FILES, isProfileFileName, readProfile, readProfileFile, writeProfileFile } from './profile-files.ts'
 import type { MemoryAnchor } from './anchors.ts'
 import { mountMemoryApi } from './routes.ts'
 import { SELF_DESCRIPTION } from './self.ts'
@@ -900,6 +901,48 @@ export async function apply(ctx: Context, config?: MemoryConfig): Promise<void> 
       return memory.sweep(execProjectCwd(exec))
     },
     presentCall: () => present('Sweep memory', 'other', 'read-only'),
+  }))
+
+  // 学生档案的固定栏目：和记忆分开——只按名字读写，不进检索、不占每轮注入预算。
+  ctx.tools.register(defineTool({
+    name: registered('profile_read'),
+    description: '读学生档案的固定栏目（grade 年级 / schedule 课表 / rhythm 作息 / preference 解题偏好）。不传 name 就读全部。这些不是记忆条目：不参与检索，也不占每轮注入预算。',
+    parameters: {
+      name: { type: 'string', description: '栏目名：grade / schedule / rhythm / preference；省略则读全部' },
+    },
+    output: {
+      schema: { type: 'string' },
+      render: (_args, value) => [{ type: 'text', text: value }],
+    },
+    execute: async (args) => {
+      const wanted = args.name === undefined ? '' : String(args.name).trim().toLowerCase()
+      if (wanted.length > 0) {
+        if (!isProfileFileName(wanted)) return '没有这个档案栏目：' + wanted + '。可用的有：' + PROFILE_FILES.join('、') + '。'
+        return readProfileFile(wanted) ?? '（还没填）'
+      }
+      const all = readProfile()
+      return PROFILE_FILES.map(column => '## ' + column + '\n' + (all[column] ?? '（还没填）')).join('\n\n')
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: registered('profile_write'),
+    description: '写学生档案的一个固定栏目。content 传空字符串等于删掉这一栏。这些不是记忆：不进检索、不占注入预算。',
+    parameters: {
+      name: { type: 'string', required: true, description: '栏目名：grade / schedule / rhythm / preference' },
+      content: { type: 'string', required: true, description: '正文；空字符串表示删除这一栏' },
+    },
+    output: {
+      schema: { type: 'string' },
+      render: (_args, value) => [{ type: 'text', text: value }],
+    },
+    execute: async (args) => {
+      const wanted = String(args.name).trim().toLowerCase()
+      if (!isProfileFileName(wanted)) return '没有这个档案栏目：' + wanted + '。可用的有：' + PROFILE_FILES.join('、') + '。'
+      const content = String(args.content)
+      writeProfileFile(wanted, content)
+      return content.trim().length === 0 ? '已清空 ' + wanted + '。' : '已更新 ' + wanted + '。'
+    },
   }))
 
   // 定时备份（2026-10-18 事故后新增）：只读复制，绝不走引擎的写入路径。

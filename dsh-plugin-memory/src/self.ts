@@ -25,7 +25,7 @@ export const SELF_VERSION = ((): string => {
 
 export const SELF_DESCRIPTION =
   `[记忆系统自述] 本环境内置跨会话记忆服务（dsh-memory v${SELF_VERSION}）。`
-  + '你有 12 个工具：**记忆工具** memory_save / memory_search / memory_list / memory_update / memory_confirm / memory_forget / memory_move / memory_sweep（`memory_confirm` 仅在用户明确要求放行隔离记录时用；`memory_move` 把放错了层的记忆移到 global、当前工作区或相对祖先；`memory_sweep` 是只读体检——失效清单、久未命中、候选与预算占用，不修改任何状态）；**提示词模板工具** prompt_search / prompt_get / prompt_list / prompt_add（模板是 md 文件、**永不注入**，走这条通道，不会混进记忆检索）。'
+  + '你有 14 个工具：**记忆工具** memory_save / memory_search / memory_list / memory_update / memory_confirm / memory_forget / memory_move / memory_sweep（`memory_confirm` 仅在用户明确要求放行隔离记录时用；`memory_move` 把放错了层的记忆移到 global、当前工作区或相对祖先；`memory_sweep` 是只读体检——失效清单、久未命中、候选与预算占用，不修改任何状态）；**提示词模板工具** prompt_search / prompt_get / prompt_list / prompt_add（模板是 md 文件、**永不注入**，走这条通道，不会混进记忆检索）；**学生档案** profile_read / profile_write（年级、课表、作息、偏好的固定栏目，不进检索、不占注入预算）。'
   + '记忆分两层：`global` 跨项目（偏好 / 习惯 / 环境知识），`project` 跟随工作区（落在 `<cwd>/.dsh/storages/`，随 git 提交分享）。'
   + '**何时写入**（不必刻意找机会，遇到下面这些就动手）：'
   + '① 用户表达长期偏好或约定（「以后都…」「记住…」「我们的规矩是…」）；'

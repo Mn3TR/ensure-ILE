@@ -24,7 +24,7 @@
 - `dsh-plugin-memory/`：`@max-null/dsh-memory` v0.18.0 的 fork（包名 `dsh-plugin-memory`，已注册 workspace、已接 profile，zod 打包内联）；同步规则见 `dsh-plugin-memory/UPSTREAM.md`。
 - 占位（只有 README，无 `package.json`、未进 workspaces）：`dsh-plugin-hrl/`（HRL 模式：学生已有答案→优化）、`dsh-plugin-schedule/`（课表+进度→明天讲什么/今日预习复习）、`dsh-plugin-work/`（work 模式：学生独立做→交答案→判卷，判不过转 guide）。
 - 已删：Beta/Next 变体、`dsh-community-market/`、`vendor/agents-anywhere/`（含全部 AA 接线）；2026-10-22 又删了 `_deprecated/`（上游 0.1.x 归档）、Next 交接提示（`next-transition-notice` 与 `docs/stable-next-transition`）、`upstream.json` 的 beta channel，以及旧 profile 的 retired bundle 兼容层（`RETIRED_BUNDLES`/`RETIRED_ROW_IDS`——ensure-ILE 的 profile 都在 `.ensure-ile` 里新种，永远不读旧 profile，2026-10-22 李确认后删）；插件市场整个从构建里拿掉（`dshmarket` 依赖、`.yarn/patches/dshmarket-*.patch`、`scripts/prepare-dsh-market.mjs`、三个 market 脚本与 `market:prepare` 的全部调用点、`dshmarket-compat.spec.ts`），学生装不了插件也不需要装。
-- 能力面与载荷（2026-10-22 精简）：web-app 关掉了 base 的工具行、工具只由 preset 挂载，所以 `preset-standard` 禁掉后学生只能开 guide；guide 会话实际有 19 个工具：`read_note` + base 残留的 `working_directory` + `bank_*`×5 + `memory_*`×8 + `prompt_*`×4（`ask_user_question` 只在 standard/ptc/cordis 预设里挂，guide 没有）；打包只带 Node+pnpm 载荷，实测 109MB（原 265MB），Python 解释器、Office 技能和 `load_workspace_dependencies` 一起删了，`desktop-office.ts` 已不存在。
+- 能力面与载荷（2026-10-22 精简）：web-app 关掉了 base 的工具行、工具只由 preset 挂载，所以 `preset-standard` 禁掉后学生只能开 guide；guide 会话实际有 21 个工具：`read_note` + base 残留的 `working_directory` + `bank_*`×5 + `memory_*`×8 + `prompt_*`×4 + `profile_*`×2（`ask_user_question` 只在 standard/ptc/cordis 预设里挂，guide 没有）；打包只带 Node+pnpm 载荷，实测 109MB（原 265MB），Python 解释器、Office 技能和 `load_workspace_dependencies` 一起删了，`desktop-office.ts` 已不存在。
 
 **能跑**：`Start-Process dsh-plugin-desktop\node_modules\electron\dist\electron.exe dsh-plugin-desktop\lib\main.js`，composer 预设默认「引导模式」；`ENSURE_ILE_SETUP=full` 可看完整 7 屏向导。
 **数据隔离**：`run()` 把 `DSH_HOME`/`ENSURE_ILE_HOME`/`DSH_AGENTS_HOME`/`userData` 全放 `.ensure-ile/`；`seedProfile()` 复制 `profiles/ensure-ile/` 的 `package.json`、`cordis.patch.yml` 与 `pnpm-workspace.yaml`，**不装依赖**——清掉 `.ensure-ile` 后要手动在 `.ensure-ile/home/profiles/desktop` 跑一次 `pnpm install --offline`（五个本地包都是 `file:` 链接、零注册表依赖，离线可装；加包后要在 profile 里 `CI=true pnpm install --offline --no-frozen-lockfile`）。**会话工作区也在数据根里**：`workspace-controller` 的 `documentsDirectory` 被 patch 成 `!!js dshHomePath('..')`，默认工作区因此落在 `.ensure-ile/deepseek-harness/default-workspace`（上游把叶子目录名写死成 `deepseek-harness/default-workspace`，所以拿不到更短的 `.ensure-ile/workspace`）。
@@ -107,7 +107,7 @@ bank schema v2.1（2026-10-25 已实现，按模式分块）：
 5. ✅ `dsh-plugin-work`（2026-10-25）：预设 `work`「独立做题」，提示词 common+bank+work.md，`read_note` 只给判卷用；判两件事、重交只给一次、讲不清回 guide 并写 handoff。
 6. ✅ `dsh-plugin-hrl`（2026-10-25）：预设 `hrl`「答案优化」，教师轨迹一次写全 + 逐小步 A/B（`student/teacher/merged`，merged 正文必须学生自己写）。
 7. **交接卡片**（client 插件，最重）：工具 + 卡片 slot + `session.create` 幂等。它之前先靠提示词让学生自己开新会话。
-8. **memory 的 `profile_*`**：课表/节奏/年级各一个固定文件，不进检索、不占注入预算。
+8. ✅ **memory 的 `profile_*`**（2026-10-25）：`<DSH_HOME>/profile/{grade,schedule,rhythm,preference}.md` 四个固定栏目，`profile_read` 读一个或全部、`profile_write` 写一个（空内容等于删除）；**不进检索、不占注入预算**。memory 自述从 12 个工具改成 14 个，189 个单测全过。
 9. ✅ **钩子入口（题库侧）**：`bank_list` 行尾标 `-> guide 待接`，`bank_stats` 有「待接交接：N」。聊天首页那个入口归第 10 条。
 10. **接续 UI**（语义已定）：不点接续时 prompt 原样；点接续就把上次那道题（带状态）当成学生这次发的消息。
 11. ✅ **固定档复习**（2026-10-25）：`REVIEW_LADDER = [1,3,7,14,30,60,120]`；进 `review` 自动排第一次，`reviewPassed: true` 升一档、`false` 回第一档，爬到最后一档自动 `mastered`。

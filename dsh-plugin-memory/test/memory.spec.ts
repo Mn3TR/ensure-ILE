@@ -46,7 +46,7 @@ describe('dsh-memory plugin', () => {
     // 工具清单漏列的守卫（0.10.0 曾漏掉 prompt_* 系列、0.12.0 补了 memory_sweep）：
     // 自述是模型行为的实际控制器，清单陈旧等于它按一份不存在的工具面行事。
     expect(self?.text).toContain('memory_sweep')
-    expect(self?.text).toContain('12 个工具')
+    expect(self?.text).toContain('14 个工具')
 
     await fiber.dispose()
     expect(ctx.tools.get('memory_save')).toBeUndefined()
