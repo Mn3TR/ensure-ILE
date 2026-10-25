@@ -1,16 +1,16 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import z from "@deepseek-ai/schemastery";
 import { defineTool } from "@deepseek-ai/dsh-tools";
+import { composePrompt, readNote } from "dsh-plugin-teaching-commons";
 //#region src/index.ts
 /**
 * Guide persona for ensure-ILE.
 *
-* One row, two jobs: replace the agent's system prompt with the guide document,
-* and expose `read_note` so the guide can pull the per-subject notes it tells
-* itself to read. The document is read from disk at mount time so editing
-* `prompts/guide.md` needs no rebuild.
+* One row, two jobs: replace the agent's system prompt with the shared teaching
+* fragments plus the guide document, and expose `read_note` so the guide can
+* pull the per-subject notes it tells itself to read. Both are read from disk at
+* mount time, so editing them needs no rebuild.
 * @module dsh-plugin-guide
 */
 /** Cordis plugin name. */
@@ -24,26 +24,13 @@ promptFile: z.string().default("") });
 /** The system-prompt section the guide occupies. */
 const GUIDE_SECTION = "guide";
 const DEFAULT_PROMPT_FILE = fileURLToPath(new URL("../prompts/guide.md", import.meta.url));
-const NOTES_DIR = fileURLToPath(new URL("../skills/", import.meta.url));
-/**
-* Read one subject note, or explain which names exist.
-* @param note - subject key supplied by the model.
-* @returns the note body, or a model-facing error sentence.
-*/
-function readNote(note) {
-	const key = note.trim().toLowerCase();
-	if (!/^[a-z]+$/.test(key)) return `备注名只能是小写字母：收到的是 ${JSON.stringify(note)}。`;
-	const file = join(NOTES_DIR, `${key}.md`);
-	if (!existsSync(file)) return `没有 ${key} 这个科目的备注。可用的有：${["math", "arts"].filter((candidate) => existsSync(join(NOTES_DIR, `${candidate}.md`))).join("、")}。`;
-	return readFileSync(file, "utf8");
-}
 /**
 * Mount the guide persona and its note reader on this scope.
 * @param ctx - an agent scope context; the preset mounts this row per session.
 * @param config - where the guide document lives.
 */
 function apply(ctx, config) {
-	const text = readFileSync(config.promptFile !== void 0 && config.promptFile.length > 0 ? config.promptFile : DEFAULT_PROMPT_FILE, "utf8");
+	const text = composePrompt(["common", "bank"], readFileSync(config.promptFile !== void 0 && config.promptFile.length > 0 ? config.promptFile : DEFAULT_PROMPT_FILE, "utf8"));
 	ctx.effect(() => ctx.systemPrompt.section({
 		name: GUIDE_SECTION,
 		order: 0,

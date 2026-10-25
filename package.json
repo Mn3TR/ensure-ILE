@@ -8,6 +8,7 @@
     "node": "^22.19.0 || >=24.0.0"
   },
   "workspaces": [
+    "dsh-plugin-teaching-commons",
     "dsh-plugin-guide",
     "dsh-plugin-bankmanager",
     "dsh-plugin-memory",

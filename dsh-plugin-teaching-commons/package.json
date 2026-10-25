@@ -1,0 +1,32 @@
+{
+  "name": "dsh-plugin-teaching-commons",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared teaching text for ensure-ILE modes: safety rules, voice, bank usage, subject notes",
+  "license": "MIT",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    }
+  },
+  "files": [
+    "lib",
+    "prompts",
+    "skills"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "tsdown": "0.22.2",
+    "typescript": "6.0.3",
+    "vitest": "^4.1.8"
+  },
+  "types": "./lib/types/index.d.ts"
+}

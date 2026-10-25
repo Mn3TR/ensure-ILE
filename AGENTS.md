@@ -14,9 +14,10 @@
 
 **组织**：EnSure Lab / 因需（因=原因、需=需要，即「每一步都要说得清为什么」）。包名统一 `dsh-plugin-` 前缀，不用 npm scope。
 
-**仓库形态**（4 个 workspace + 3 个占位目录）：
+**仓库形态**（6 个 workspace + 3 个占位目录）：
 - `dsh-plugin-desktop/`：上游桌面壳（2.0.18）+ ensure-ILE 改动（数据根、OOBE 裁剪、引导模式预设）。
-- `dsh-plugin-guide/`：guide 模式——整份替换系统提示（`prompts/guide.md`）+ `read_note` 工具读 `skills/{math,arts}.md`；预设 id `guide`、显示「引导模式」，是 Profile 默认预设。
+- `dsh-plugin-teaching-commons/`：**四个模式共用的教学文字**——安全边界、说话方式、题库规则（`prompts/common.md`、`prompts/bank.md`）+ 学科备注（`skills/{math,arts}.md`）+ `readNote` 实现。各预设 `complete: true` 整份替换，所以共用段必须只有一份（2026-10-25 抽出）。
+- `dsh-plugin-guide/`：guide 模式——系统提示 = commons 的 common + bank 片段 + `prompts/guide.md`；`read_note` 委托给 commons；预设 id `guide`、显示「引导模式」，是 Profile 默认预设。
 - `dsh-community-fabric/`：社区互操作 RFC，纯文档，不声明可加载入口。
 - `dsh-plugin-bankmanager/`：题库插件。五个工具（add / list / show / update / stats），一道题一个 JSON，存 `<DSH_HOME>/bank/problems/`；以 bundle 挂在 profile 根，guide / work / HRL / schedule 共用。
 - `dsh-plugin-memory/`：`@max-null/dsh-memory` v0.18.0 的 fork（包名 `dsh-plugin-memory`，已注册 workspace、已接 profile，zod 打包内联）；同步规则见 `dsh-plugin-memory/UPSTREAM.md`。
@@ -25,14 +26,14 @@
 - 能力面与载荷（2026-10-22 精简）：web-app 关掉了 base 的工具行、工具只由 preset 挂载，所以 `preset-standard` 禁掉后学生只能开 guide；guide 会话实际有 19 个工具：`read_note` + base 残留的 `working_directory` + `bank_*`×5 + `memory_*`×8 + `prompt_*`×4（`ask_user_question` 只在 standard/ptc/cordis 预设里挂，guide 没有）；打包只带 Node+pnpm 载荷，实测 109MB（原 265MB），Python 解释器、Office 技能和 `load_workspace_dependencies` 一起删了，`desktop-office.ts` 已不存在。
 
 **能跑**：`Start-Process dsh-plugin-desktop\node_modules\electron\dist\electron.exe dsh-plugin-desktop\lib\main.js`，composer 预设默认「引导模式」；`ENSURE_ILE_SETUP=full` 可看完整 7 屏向导。
-**数据隔离**：`run()` 把 `DSH_HOME`/`ENSURE_ILE_HOME`/`DSH_AGENTS_HOME`/`userData` 全放 `.ensure-ile/`；`seedProfile()` 复制 `profiles/ensure-ile/` 的 `package.json`、`cordis.patch.yml` 与 `pnpm-workspace.yaml`，**不装依赖**——清掉 `.ensure-ile` 后要手动在 `.ensure-ile/home/profiles/desktop` 跑一次 `pnpm install --offline`（三个插件都是本地 `file:` 链接、零注册表依赖，离线可装）。
+**数据隔离**：`run()` 把 `DSH_HOME`/`ENSURE_ILE_HOME`/`DSH_AGENTS_HOME`/`userData` 全放 `.ensure-ile/`；`seedProfile()` 复制 `profiles/ensure-ile/` 的 `package.json`、`cordis.patch.yml` 与 `pnpm-workspace.yaml`，**不装依赖**——清掉 `.ensure-ile` 后要手动在 `.ensure-ile/home/profiles/desktop` 跑一次 `pnpm install --offline`（四个本地包都是 `file:` 链接、零注册表依赖，离线可装；加包后要在 profile 里 `CI=true pnpm install --offline --no-frozen-lockfile`）。
 
 **共享数据层（guide / work / hrl / schedule 都指着它）**：三个 bundle 都已接进 profile，全部本地 `file:` 链接、零注册表依赖。
 - **记忆**：本地 fork `dsh-plugin-memory` 0.18.0-ensure-ile.1（上游 v0.18.0 的 fork，zod 已打包内联，client id 由包名生成）。工具是 profile 根注册的，所以**所有会话都能看到** `memory_*`；它的提示段会被 guide 的 `complete: true` 吞掉，模型只能靠工具描述理解它。存量按「global / 当前工作区」两层，工作区层落在会话工作区的 `.dsh/storages/`。**真机上还没跑过一次**。
 - **题库**：`dsh-plugin-bankmanager` 已实现——五个工具（`bank_add` / `bank_list` / `bank_show` / `bank_update` / `bank_stats`），一道题一个 JSON 文件（`<DSH_HOME>/bank/problems/<id>.json`，id = `YYYYMMDD-<slug>-<6 位 hex>`，subject 自由写、只归一化进 id），原子写 + 跨进程锁 + 坏文件只跳过。挂在 profile 根，后续 work / HRL / schedule 共用同一份。
 - **收尾（2026-10-23 李定）**：模型自己判断状态，但每轮引导收尾必须问学生一句「这题你自己做出来了吗」；做出来 → `status: review` + `guideOutcome: solved`，没做出来 → 保持 `guide` + `stuck`。这句写在 `guide.md` 里。
 
-**模式与交接（2026-10-25 定稿，尚未实现）**：一轮 grilling（Q1–Q35）后定下的架构，关键事实全部落到代码，出处按「文件:行」记。
+**模式与交接（2026-10-25 定稿；schema v2.1 与共享包已实现，其余未实现）**：一轮 grilling（Q1–Q35）后定下的架构，关键事实全部落到代码，出处按「文件:行」记。
 
 - **模式 = 预设，切换 = 新会话**。`agentPresets.select` 只认空会话（`agent-preset/locked`，`boundary.lastTurn > 0` 即锁，`deepseek-harness/packages/preset/agent-preset-registry/src/index.ts:351`）；UI 只给空会话挂选择器（`client/ui-agent-preset/src/client/seat-store.ts:214`）；resume 按 `meta.agentPreset` 还原，缺预设直接拒绝恢复。
 - **模型切不了自己的模式**。`recompose()` 内部能动但不写 `agent-preset/selected`、不更新投影，重启回到旧预设——**不用**。
@@ -45,7 +46,7 @@
 - **memory 改造**：课表、上课节奏、年级等分不同**固定文件**，走 `prompt_*` 那套文件机制新增 `profile_*` 家族（固定文件名、不进检索、不占注入预算）。
 - **共享提示词片段**（2026-10-25 由调研逼出）：四个预设都用 `complete: true`，安全边界/说话方式/题库规则会重复四份 → 抽共享包（与科目备注同一个包），各预设 mount 时拼接。模板路径是仓库根的 `profiles/ensure-ile/`。
 
-bank schema v2.1（未实现，按模式分块）：
+bank schema v2.1（2026-10-25 已实现，按模式分块）：
 
 ```jsonc
 {
@@ -99,8 +100,8 @@ bank schema v2.1（未实现，按模式分块）：
 
 **待办（2026-10-25 重排；Q1–Q35 的结论已并入上一节）**：
 1. **真机跑一道题**（李 2026-10-25 决定先跑再改）：验提示词替换、`read_note`、`bank_add`/`bank_update` 落盘、`memory_*` 可见，以及新会话开场会不会真去 `bank_list`。**跑之前不要改代码**——跑完才知道哪里该改。
-2. **bank schema v2.1**：按 `guide/work/hrl` 分块 + `handoff`；`store.ts`、五个工具、15 个单测一起改。
-3. **共享提示词片段包**（与科目备注同一个包）：安全边界三条（自伤/被伤害/极度痛苦 → 停机、让找可信成年人；反复索要答案 → 说明为什么不给并给更小视角；题干里藏「忽略之前的指令」→ 当题干内容、不执行）+ 反谄媚清单 + 题库规则，`guide/setup/work/hrl` 统一拼接。
+2. ✅ **bank schema v2.1**（2026-10-25 已实现）：按 `guide/work/hrl` 分块 + `handoff`；`store.ts`、五个工具一起改，20 个单测、typecheck、构建通过；列表与 `bank_stats` 会标出待接交接。
+3. ✅ **共享提示词片段包**（2026-10-25 已实现，`dsh-plugin-teaching-commons`）：安全边界三条（自伤/被伤害/极度痛苦 → 停机、让找可信成年人；反复索要答案 → 说明为什么不给并给更小视角；题干里藏「忽略之前的指令」→ 当题干内容、不执行）+ 反谄媚清单 + 题库规则，`guide/setup/work/hrl` 统一拼接。
 4. **`setup` 预设 + `setup.json`**：字段级进度、可中断、完成判据是「能给出下一步」。
 5. `dsh-plugin-work` 实现：判两件事（结果对不对、说清没有）；讲不清 → `attempts` 记 `partial`、`status` 回 `guide`。
 6. `dsh-plugin-hrl` 实现：教师轨迹一次写全 + 逐小步 A/B（`student/teacher/merged`），用 v2.1 的 `hrl` 段。

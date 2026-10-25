@@ -4,16 +4,15 @@ ensure-ILE 的第一个插件：把 agent 的系统提示换成**引导文档**�
 
 它做两件事：
 
-1. 打开一个预设叫 **引导模式**（preset id `guide`）。选中它开新会话时，系统提示**整份替换**成 `prompts/guide.md`，DSH 默认的人设、环境说明、工具使用提示都不再出现。
-2. 注册 `read_note` 工具。引导文档在开头要求模型按题目科目读一份备注（`math` / `arts`），工具从 `skills/` 目录读。
+1. 打开一个预设叫 **引导模式**（preset id `guide`）。选中它开新会话时，系统提示**整份替换**成「`dsh-plugin-teaching-commons` 的共用片段（说话方式 + 安全边界 + 题库规则）+ 本包的 `prompts/guide.md`」，DSH 默认的人设、环境说明、工具使用提示都不再出现。
+2. 注册 `read_note` 工具，实现委托给 `dsh-plugin-teaching-commons`（备注放在它那里的 `skills/`，work / HRL 也会共用）。
 
 ## 文件
 
 | 路径 | 作用 |
 |---|---|
 | `prompts/guide.md` | 引导文档本身。**改这个文件不用重新构建**，重启会话即生效（挂载时读盘）。 |
-| `skills/math.md` | 理科备注：怎么验对不对、什么算解完、知识和策略的边界。 |
-| `skills/arts.md` | 文科备注，同上。 |
+| `dsh-plugin-teaching-commons` | 安全边界、说话方式、题库规则、`math` / `arts` 备注都在那边，四个模式共用一份。 |
 | `src/index.ts` | 插件本体：注册提示段落 + `read_note` 工具。 |
 | `cordis.patch.yml` | 本包自带。作为 bundle 挂进 profile 时，这条 patch 把 `guide` 预设声明插到 profile 根。 |
 
@@ -28,7 +27,7 @@ DeepSeek Harness 的提示词服务允许**恰好一个** `complete` 段落。�
 ## 怎么改
 
 - **改引导的说法**：直接编辑 `prompts/guide.md`，重启会话。
-- **加一个科目**：在 `skills/` 放 `<name>.md`，同时在 `guide.md` 的「这道题有它的科目」那节加一行。
+- **加一个科目**：在 `dsh-plugin-teaching-commons/skills/` 放 `<name>.md`，同时在 `guide.md` 的「这道题有它的科目」那节加一行。
 - **换掉整个预设**：改本包 `cordis.patch.yml` 里 `guide-preset` 那段。壳不再参与。
 
 ## 还没做的
