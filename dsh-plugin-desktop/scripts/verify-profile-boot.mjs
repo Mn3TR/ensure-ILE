@@ -225,20 +225,12 @@ try {
     throw new Error('assembled Windows profile is missing the agent preset roster')
   }
   const presetIds = (await agentPresets.list()).map(preset => preset.id)
-  if (!presetIds.includes('minimal') || !presetIds.includes('standard')) {
+  // ensure-ILE disables every upstream preset (standard, ptc, minimal, cordis) in
+  // the desktop patch, so a learner can only start one of the ensure-ILE modes.
+  // Those modes are contributed by the profile template, which this shell smoke
+  // does not assemble. The roster must still be present and must be empty here.
+  if (presetIds.length !== 0) {
     throw new Error(`assembled Windows profile exposes unexpected presets: ${presetIds.join(', ')}`)
-  }
-  // The legacy import runs off `loader.await()`, so the preset choice lands after
-  // this profile has finished mounting. Waiting for it here is what proves the
-  // section and field renames reached a namespace the settings service accepts.
-  const importDeadline = Date.now() + 15_000
-  while (agentPresets.defaultId !== 'minimal' && Date.now() < importDeadline) await delay(50)
-  if (agentPresets.defaultId !== 'minimal') {
-    throw new Error(`assembled Windows profile selected unexpected default ${agentPresets.defaultId}`)
-  }
-  const minimalPreset = await agentPresets.resolve('minimal')
-  if (minimalPreset.id !== 'minimal') {
-    throw new Error(`assembled Windows profile remapped minimal preset to ${minimalPreset.id}`)
   }
   if (ctx.get('pluginManager') === undefined) {
     throw new Error('Desktop Profile did not activate the official plugin manager')
@@ -247,7 +239,6 @@ try {
   // 0.1.7 replaced `standingKeyFor` with `acquireScope`, a disposable revision
   // lease: the composition is mounted at registration and the lease still throws
   // `agent-preset/invalid` when that mount is unusable, which is what we assert.
-  await (await agentPresets.acquireScope('cordis'))[Symbol.asyncDispose]()
   if ((await ctx.get('pluginManager').listPlugins()).length === 0) {
     throw new Error('Official plugin manager cannot inspect the Desktop composition')
   }
@@ -273,7 +264,6 @@ try {
   if (ctx.get('desktopRuntime') !== runtime || ctx.get('pluginManager') === undefined) {
     throw new Error('Profile reload lost Desktop or plugin-manager services')
   }
-  await (await ctx.agentPresets.acquireScope('cordis'))[Symbol.asyncDispose]()
   const hostServiceProbe = ctx.get(HOST_SERVICE_PROBE_KEY)
   if (hostServiceProbe?.current?.name !== 'desktop'
     || hostServiceProbe.current.dir !== prepared.profile.dir
