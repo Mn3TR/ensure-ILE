@@ -38,8 +38,12 @@ import {
 /** Cordis plugin name. */
 export const name = 'plugin-bankmanager'
 
-/** Services used by this row: the tool registry, plus the web pair the browser channel rides on. */
-export const inject = ['tools', 'webServer', 'webStartup']
+/**
+ * Services used by this row. Only the tool registry is required: the browser channel's
+ * web pair (`webServer` / `webStartup`) arrives through a nested inject, so a profile
+ * without the web-app bundle still gets every tool instead of a permanently pending row.
+ */
+export const inject = ['tools']
 
 /** Runtime schema for the bank row. */
 export const Config = z.object({
@@ -73,7 +77,13 @@ export function apply(ctx: Context, config: Config): void {
     ? config.directory
     : defaultBankDirectory()
 
-  mountBankApi(ctx, directory)
+  // 浏览器通道：等服务出现再挂，缺席时（headless profile）这行照常只提供工具。
+  const scoped = ctx as unknown as {
+    inject?: (deps: string[], callback: (scoped: Context) => void) => unknown
+  }
+  if (typeof scoped.inject === 'function') {
+    scoped.inject(['webServer', 'webStartup'], (webCtx) => { mountBankApi(webCtx, directory) })
+  }
 
   ctx.tools.register(defineTool({
     name: 'bank_add',

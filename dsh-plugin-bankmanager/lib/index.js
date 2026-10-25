@@ -701,12 +701,12 @@ function mountBankApi(ctx, directory) {
 //#region src/index.ts
 /** Cordis plugin name. */
 const name = "plugin-bankmanager";
-/** Services used by this row: the tool registry, plus the web pair the browser channel rides on. */
-const inject = [
-	"tools",
-	"webServer",
-	"webStartup"
-];
+/**
+* Services used by this row. Only the tool registry is required: the browser channel's
+* web pair (`webServer` / `webStartup`) arrives through a nested inject, so a profile
+* without the web-app bundle still gets every tool instead of a permanently pending row.
+*/
+const inject = ["tools"];
 /** Runtime schema for the bank row. */
 const Config = z.object({ 
 /** Absolute bank directory; empty means `<DSH_HOME>/bank/problems`. */
@@ -727,7 +727,10 @@ function json(value) {
 */
 function apply(ctx, config) {
 	const directory = config.directory !== void 0 && config.directory.length > 0 ? config.directory : defaultBankDirectory();
-	mountBankApi(ctx, directory);
+	const scoped = ctx;
+	if (typeof scoped.inject === "function") scoped.inject(["webServer", "webStartup"], (webCtx) => {
+		mountBankApi(webCtx, directory);
+	});
 	ctx.tools.register(defineTool({
 		name: "bank_add",
 		description: [
