@@ -6,6 +6,7 @@
       "bundles": [
         "@deepseek-ai/dsh-base",
         "@deepseek-ai/dsh-web-app",
+        "dsh-plugin-setup",
         "dsh-plugin-guide",
         "dsh-plugin-bankmanager",
         "dsh-plugin-memory"
@@ -16,6 +17,7 @@
     "dsh-plugin-guide": "file:../../../../dsh-plugin-guide",
     "dsh-plugin-bankmanager": "file:../../../../dsh-plugin-bankmanager",
     "dsh-plugin-memory": "file:../../../../dsh-plugin-memory",
-    "dsh-plugin-teaching-commons": "file:../../../../dsh-plugin-teaching-commons"
+    "dsh-plugin-teaching-commons": "file:../../../../dsh-plugin-teaching-commons",
+    "dsh-plugin-setup": "file:../../../../dsh-plugin-setup"
   }
 }

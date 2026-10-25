@@ -11144,10 +11144,38 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"dsh-plugin-setup@workspace:dsh-plugin-setup":
+  version: 0.0.0-use.local
+  resolution: "dsh-plugin-setup@workspace:dsh-plugin-setup"
+  dependencies:
+    "@deepseek-ai/cordis": "npm:4.0.5"
+    "@deepseek-ai/dsh-system-prompt": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-tools": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/schemastery": "npm:^3.18.5"
+    "@types/node": "npm:^22.20.0"
+    dsh-plugin-teaching-commons: "file:../dsh-plugin-teaching-commons"
+    tsdown: "npm:0.22.2"
+    typescript: "npm:6.0.3"
+    vitest: "npm:^4.1.8"
+  peerDependencies:
+    "@deepseek-ai/cordis": 4.0.5
+    "@deepseek-ai/dsh-system-prompt": ^0.2.1-rc.2
+    "@deepseek-ai/dsh-tools": ^0.2.1-rc.2
+    "@deepseek-ai/schemastery": ^3.18.5
+  languageName: unknown
+  linkType: soft
+
 "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons::locator=dsh-plugin-guide%40workspace%3Adsh-plugin-guide":
   version: 0.1.0
-  resolution: "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons#../dsh-plugin-teaching-commons::hash=d654bb&locator=dsh-plugin-guide%40workspace%3Adsh-plugin-guide"
-  checksum: 10c0/382e10d30c5929693d151c8686ce587ecf558409cdbff62d5418a21e7ed5da711fbb96e840f27c6e1c9a803d9c091ca8d38d66f7fc38246190003d422f1ae718
+  resolution: "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons#../dsh-plugin-teaching-commons::hash=0317ae&locator=dsh-plugin-guide%40workspace%3Adsh-plugin-guide"
+  checksum: 10c0/7f8fe12366d66d0a591fd9d409ce9dd404f147d3831beac22272b9d75607723150f2876c443e745bac7833a8017bbfb02bff0a0a93dbce8c3257967b41afc92f
+  languageName: node
+  linkType: hard
+
+"dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons::locator=dsh-plugin-setup%40workspace%3Adsh-plugin-setup":
+  version: 0.1.0
+  resolution: "dsh-plugin-teaching-commons@file:../dsh-plugin-teaching-commons#../dsh-plugin-teaching-commons::hash=0317ae&locator=dsh-plugin-setup%40workspace%3Adsh-plugin-setup"
+  checksum: 10c0/7f8fe12366d66d0a591fd9d409ce9dd404f147d3831beac22272b9d75607723150f2876c443e745bac7833a8017bbfb02bff0a0a93dbce8c3257967b41afc92f
   languageName: node
   linkType: hard
 

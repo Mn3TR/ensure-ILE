@@ -9,6 +9,7 @@
   },
   "workspaces": [
     "dsh-plugin-teaching-commons",
+    "dsh-plugin-setup",
     "dsh-plugin-guide",
     "dsh-plugin-bankmanager",
     "dsh-plugin-memory",

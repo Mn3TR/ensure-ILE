@@ -29,3 +29,12 @@
 - id: agent-preset-registry
   config:
     default: guide
+
+# ensure-ILE owns every file it writes, the session working directory included.
+# The Web bundle creates the first-use Workspace under the OS Documents folder;
+# pointing that lookup at the data root instead keeps the workspace (and the
+# memory project layer that hangs off it) inside .ensure-ile.
+- id: workspace-controller
+  config:
+    documentsDirectory: !!js dshHomePath('..')
+

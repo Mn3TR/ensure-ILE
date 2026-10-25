@@ -38,6 +38,13 @@ function apply(ctx, config) {
 		complete: true
 	}), "guide.section()");
 	ctx.systemPrompt.suppressRuntimeContext();
+	ctx.effect(() => ctx.systemPrompt.context({
+		name: "working-directory:current",
+		order: ctx.systemPrompt.getContextOrder("WORKING_DIRECTORY"),
+		required: true,
+		interpolate: false,
+		text: ""
+	}), "guide.hideCwdContext()");
 	ctx.effect(() => ctx.tools.register(defineTool({
 		name: "read_note",
 		description: "读取一个科目的引导备注。开始引导前，按题目科目调用一次。",

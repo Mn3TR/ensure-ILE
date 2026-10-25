@@ -61,6 +61,19 @@ export function apply(ctx: Context, config: Config): void {
   // The guide speaks to one learner about one problem; date and cwd are noise.
   ctx.systemPrompt.suppressRuntimeContext()
 
+  // The harness contributes a *required* cwd snapshot, which
+  // suppressRuntimeContext() is not allowed to drop — it arrived as a user-role
+  // message in the first real run. A learner solving one problem has no use for
+  // it, so shadow it in this scope with empty text: an empty rendering
+  // contributes no message at all.
+  ctx.effect(() => ctx.systemPrompt.context({
+    name: 'working-directory:current',
+    order: ctx.systemPrompt.getContextOrder('WORKING_DIRECTORY'),
+    required: true,
+    interpolate: false,
+    text: '',
+  }), 'guide.hideCwdContext()')
+
   ctx.effect(() => ctx.tools.register(defineTool({
     name: 'read_note',
     description: '读取一个科目的引导备注。开始引导前，按题目科目调用一次。',
