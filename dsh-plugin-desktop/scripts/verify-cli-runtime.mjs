@@ -120,7 +120,10 @@ function verifyLifecycleEnvironment(stateRoot, installation, env) {
   verifyResult('pnpm lifecycle smoke', result, '')
   const actual = JSON.parse(readFileSync(resultPath, 'utf8'))
   const expected = {
-    runAsNode: [],
+    // Windows keeps RunAsNode in the lifecycle environment on purpose: the private
+    // Node shim is a batch file, so a descendant that lost the variable would start
+    // the GUI instead of Node. POSIX shims delete it from the child environment.
+    runAsNode: process.platform === 'win32' ? ['ELECTRON_RUN_AS_NODE'] : [],
     node: installation.nodeShimPath,
     npmNodeExecPath: installation.nodeShimPath,
     runtime: 'electron',
