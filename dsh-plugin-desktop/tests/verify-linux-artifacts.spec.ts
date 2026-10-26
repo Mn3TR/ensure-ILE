@@ -47,7 +47,9 @@ afterEach(() => {
   for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
-describe('Linux artifact verification', () => {
+// The gate only runs against Linux packages; on Windows every fixture trips the
+// executable-bit check first, so the suite is meaningless there.
+describe.skipIf(process.platform !== 'linux')('Linux artifact verification', () => {
   it('accepts the exact versioned AppImage, Debian package, and unpacked application', () => {
     const value = fixture()
 

@@ -153,6 +153,17 @@ describe('pre-Host recovery plugin uninstall command', () => {
       environment: {
         PATH: systemBin,
         PNPM_SELECTION_MARKER: selectedMarker,
+        // The suite replaces the whole environment, so keep the Windows plumbing a
+        // real recovery launch inherits: the managed runner needs cmd.exe and the
+        // packaged pnpm is a .cmd shim.
+        ...(process.platform === 'win32'
+          ? {
+              PATHEXT: process.env.PATHEXT,
+              SystemRoot: process.env.SystemRoot,
+              ComSpec: process.env.ComSpec,
+              TEMP: process.env.TEMP,
+            }
+          : {}),
       },
     })).resolves.toMatchObject({ exitCode: 0 })
 
