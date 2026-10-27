@@ -20,6 +20,7 @@ import {
   BankError,
   createProblem,
   defaultBankDirectory,
+  isReviewDue,
   listProblems,
   pendingHandoffs,
   readProblem,
@@ -60,6 +61,11 @@ export interface Config {
 function explain(error: unknown): string {
   if (error instanceof BankError) return error.code + ': ' + error.message
   return 'bank error: ' + (error instanceof Error ? error.message : String(error))
+}
+
+/** 本地时区的「今天结束」，到期判断留出整天余量。 */
+function endOfToday(now: Date = new Date()): Date {
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0)
 }
 
 /** One-line JSON with a stable order. */
@@ -123,11 +129,13 @@ export function apply(ctx: Context, config: Config): void {
       '按状态列出题库里的题，每行：id、状态、科目、建立日期、题干前 40 字。',
       '用在：学生说「接着上次那道题」，或者你想知道现在手上有哪些题。',
       'status 可选：new / guide / hrl / review / mastered / parked；不传则全部。',
+      'due: true 只看今天该复习的（review.nextAt 已到期，含今天），用来开复习场。',
       '看到合适的那道题，用 bank_show 读完整记录。',
     ].join('\n'),
     parameters: {
       status: { type: 'string', description: '只看某个状态' },
       subject: { type: 'string', description: '只看某个科目' },
+      due: { type: 'boolean', description: '只看今天到期该复习的题；mastered / parked 不会出现' },
       limit: { type: 'integer', description: '最多返回几条，默认 20' },
     },
     output: {
@@ -145,11 +153,20 @@ export function apply(ctx: Context, config: Config): void {
           const wanted = args.subject.toLowerCase()
           rows = rows.filter(record => record.subject.toLowerCase() === wanted)
         }
+        if (args.due === true) {
+          // 到期按「今天结束」算，和 schedule_plan 的口径一致
+          const horizon = endOfToday()
+          rows = rows.filter(record => isReviewDue(record, horizon))
+        }
         const limit = args.limit === undefined ? 20 : Math.max(1, Math.min(100, args.limit))
         const shown = rows.slice(-limit)
         const lines = shown.map(summarizeProblem)
-        if (lines.length === 0) return '题库里没有符合条件的题。'
-        const header = '共 ' + rows.length + ' 道，显示最近 ' + lines.length + ' 道：'
+        if (lines.length === 0) {
+          return args.due === true ? '今天没有到期的题。' : '题库里没有符合条件的题。'
+        }
+        const header = args.due === true
+          ? '今天该复习 ' + rows.length + ' 道，显示最近 ' + lines.length + ' 道：'
+          : '共 ' + rows.length + ' 道，显示最近 ' + lines.length + ' 道：'
         const broken = skipped.length > 0 ? '\n跳过 ' + skipped.length + ' 个损坏文件：' + skipped.map(item => item.file).join('、') : ''
         return header + '\n' + lines.join('\n') + broken
       } catch (error) {

@@ -11,7 +11,9 @@
         "dsh-plugin-work",
         "dsh-plugin-hrl",
         "dsh-plugin-bankmanager",
-        "dsh-plugin-memory"
+        "dsh-plugin-memory",
+        "dsh-plugin-textbook",
+        "dsh-plugin-schedule"
       ]
     }
   },
@@ -22,6 +24,8 @@
     "dsh-plugin-teaching-commons": "file:../../../../dsh-plugin-teaching-commons",
     "dsh-plugin-setup": "file:../../../../dsh-plugin-setup",
     "dsh-plugin-work": "file:../../../../dsh-plugin-work",
-    "dsh-plugin-hrl": "file:../../../../dsh-plugin-hrl"
+    "dsh-plugin-hrl": "file:../../../../dsh-plugin-hrl",
+    "dsh-plugin-textbook": "file:../../../../dsh-plugin-textbook",
+    "dsh-plugin-schedule": "file:../../../../dsh-plugin-schedule"
   }
 }

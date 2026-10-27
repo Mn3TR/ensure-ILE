@@ -1,0 +1,25 @@
+{
+  "generatedAt": "2026-01-01T00:00:00+08:00",
+  "books": [
+    {
+      "id": "fx-text",
+      "title": "测试·有文字层",
+      "subject": "math",
+      "publisher": "测试出版社",
+      "pages": 12,
+      "textbookOffset": 3,
+      "textAvailable": true,
+      "sectionCount": 5
+    },
+    {
+      "id": "fx-scan",
+      "title": "测试·扫描件",
+      "subject": "physics",
+      "publisher": "测试出版社",
+      "pages": 6,
+      "textbookOffset": 0,
+      "textAvailable": false,
+      "sectionCount": 2
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "generatedAt": "2026-10-28T00:10:03+08:00",
+  "source": "E:\\Projects\\DHDL\\.ensure-ile\\deepseek-harness\\default-workspace\\教材",
+  "books": [
+    {
+      "id": "renjiaoA-math-1",
+      "title": "人教版A·数学必修第一册",
+      "subject": "math",
+      "publisher": "人民教育出版社（人教A版）",
+      "pages": 270,
+      "textbookOffset": 7,
+      "textAvailable": false,
+      "sectionCount": 39
+    },
+    {
+      "id": "renjiaoA-math-2",
+      "title": "人教版A·数学必修第二册",
+      "subject": "math",
+      "publisher": "人民教育出版社（人教A版）",
+      "pages": 282,
+      "textbookOffset": 7,
+      "textAvailable": true,
+      "sectionCount": 34
+    },
+    {
+      "id": "renjiao-chem-1",
+      "title": "人教版·化学必修第一册",
+      "subject": "chem",
+      "publisher": "人民教育出版社",
+      "pages": 139,
+      "textbookOffset": 5,
+      "textAvailable": true,
+      "sectionCount": 23
+    },
+    {
+      "id": "renjiao-chem-2",
+      "title": "人教版·化学必修第二册",
+      "subject": "chem",
+      "publisher": "人民教育出版社",
+      "pages": 139,
+      "textbookOffset": 5,
+      "textAvailable": true,
+      "sectionCount": 20
+    },
+    {
+      "id": "jiaoke-phys-1",
+      "title": "教科版·物理必修第一册",
+      "subject": "physics",
+      "publisher": "教育科学出版社",
+      "pages": 143,
+      "textbookOffset": 9,
+      "textAvailable": true,
+      "sectionCount": 27
+    },
+    {
+      "id": "jiaoke-phys-2",
+      "title": "教科版·物理必修第二册",
+      "subject": "physics",
+      "publisher": "教育科学出版社",
+      "pages": 126,
+      "textbookOffset": 4,
+      "textAvailable": true,
+      "sectionCount": 28
+    },
+    {
+      "id": "jiaoke-phys-3",
+      "title": "教科版·物理必修第三册",
+      "subject": "physics",
+      "publisher": "教育科学出版社",
+      "pages": 168,
+      "textbookOffset": 4,
+      "textAvailable": true,
+      "sectionCount": 30
+    }
+  ]
+}

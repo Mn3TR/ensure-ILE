@@ -7,9 +7,17 @@
   "type": "module",
   "main": "./lib/index.js",
   "exports": {
-    ".": "./lib/index.js",
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./store": {
+      "types": "./lib/types/store.d.ts",
+      "default": "./lib/store.js"
+    },
     "./client": "./lib/client.js"
   },
+  "types": "./lib/types/index.d.ts",
   "files": [
     "lib",
     "cordis.patch.yml"
@@ -24,7 +32,7 @@
     }
   },
   "scripts": {
-    "build": "tsdown",
+    "build": "tsc -p tsconfig.json && tsdown",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "verify": "node scripts/verify-bank.mjs",

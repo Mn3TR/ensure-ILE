@@ -30,6 +30,8 @@ const LOCAL_PACKAGES = [
   'dsh-plugin-hrl',
   'dsh-plugin-bankmanager',
   'dsh-plugin-memory',
+  'dsh-plugin-textbook',
+  'dsh-plugin-schedule',
 ]
 
 if (!existsSync(source)) {

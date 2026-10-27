@@ -1,0 +1,7 @@
+# ensure-ILE textbook anchor: one insert over the profile root.
+# The corpus is shared state across modes (guide reads it aloud, work checks the
+# answer against it, schedule maps the class progress onto it), so this row sits
+# at the root rather than inside one preset.
+- insert:
+    - id: textbook
+      name: dsh-plugin-textbook

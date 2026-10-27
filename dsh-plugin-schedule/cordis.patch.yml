@@ -1,0 +1,8 @@
+# ensure-ILE schedule: one insert over the profile root.
+# The timetable and the progress belong to the learner, not to a single mode, so
+# the row sits at the root: guide, work and HRL all ask the same record what is
+# due today. No systemPrompt section is registered — every mode replaces the
+# whole prompt — so the rules live in the tool descriptions.
+- insert:
+    - id: schedule
+      name: dsh-plugin-schedule

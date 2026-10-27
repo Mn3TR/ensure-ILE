@@ -10824,6 +10824,12 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"dsh-plugin-bankmanager@link:../dsh-plugin-bankmanager::locator=dsh-plugin-schedule%40workspace%3Adsh-plugin-schedule":
+  version: 0.0.0-use.local
+  resolution: "dsh-plugin-bankmanager@link:../dsh-plugin-bankmanager::locator=dsh-plugin-schedule%40workspace%3Adsh-plugin-schedule"
+  languageName: node
+  linkType: soft
+
 "dsh-plugin-bankmanager@workspace:dsh-plugin-bankmanager":
   version: 0.0.0-use.local
   resolution: "dsh-plugin-bankmanager@workspace:dsh-plugin-bankmanager"
@@ -11166,6 +11172,35 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"dsh-plugin-schedule@workspace:dsh-plugin-schedule":
+  version: 0.0.0-use.local
+  resolution: "dsh-plugin-schedule@workspace:dsh-plugin-schedule"
+  dependencies:
+    "@deepseek-ai/cordis": "npm:4.0.5"
+    "@deepseek-ai/dsh-agent": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-llm": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-ptc-runtime": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-sandbox": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-sandbox-policy": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-scope": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-session": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-tools": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-user-approval": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-working-directory": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/schemastery": "npm:^3.18.5"
+    "@types/node": "npm:^22.20.0"
+    dsh-plugin-bankmanager: "link:../dsh-plugin-bankmanager"
+    dsh-plugin-textbook: "link:../dsh-plugin-textbook"
+    tsdown: "npm:0.22.2"
+    typescript: "npm:6.0.3"
+    vitest: "npm:4.1.8"
+  peerDependencies:
+    "@deepseek-ai/cordis": 4.0.5
+    "@deepseek-ai/dsh-tools": ^0.2.1-rc.2
+    "@deepseek-ai/schemastery": ^3.18.5
+  languageName: unknown
+  linkType: soft
+
 "dsh-plugin-setup@workspace:dsh-plugin-setup":
   version: 0.0.0-use.local
   resolution: "dsh-plugin-setup@workspace:dsh-plugin-setup"
@@ -11219,6 +11254,39 @@ __metadata:
     tsdown: "npm:0.22.2"
     typescript: "npm:6.0.3"
     vitest: "npm:^4.1.8"
+  languageName: unknown
+  linkType: soft
+
+"dsh-plugin-textbook@link:../dsh-plugin-textbook::locator=dsh-plugin-schedule%40workspace%3Adsh-plugin-schedule":
+  version: 0.0.0-use.local
+  resolution: "dsh-plugin-textbook@link:../dsh-plugin-textbook::locator=dsh-plugin-schedule%40workspace%3Adsh-plugin-schedule"
+  languageName: node
+  linkType: soft
+
+"dsh-plugin-textbook@workspace:dsh-plugin-textbook":
+  version: 0.0.0-use.local
+  resolution: "dsh-plugin-textbook@workspace:dsh-plugin-textbook"
+  dependencies:
+    "@deepseek-ai/cordis": "npm:4.0.5"
+    "@deepseek-ai/dsh-agent": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-llm": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-ptc-runtime": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-sandbox": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-sandbox-policy": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-scope": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-session": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-tools": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-user-approval": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-working-directory": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/schemastery": "npm:^3.18.5"
+    "@types/node": "npm:^22.20.0"
+    tsdown: "npm:0.22.2"
+    typescript: "npm:6.0.3"
+    vitest: "npm:^4.1.8"
+  peerDependencies:
+    "@deepseek-ai/cordis": 4.0.5
+    "@deepseek-ai/dsh-tools": ^0.2.1-rc.2
+    "@deepseek-ai/schemastery": ^3.18.5
   languageName: unknown
   linkType: soft
 

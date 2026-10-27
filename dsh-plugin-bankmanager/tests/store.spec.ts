@@ -5,11 +5,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   BankError,
   createProblem,
+  isReviewDue,
   listProblems,
   makeProblemId,
   parseRecord,
   problemPath,
   readProblem,
+  reviewDueAt,
   slugSubject,
   pendingHandoffs,
   resumeView,
@@ -287,5 +289,30 @@ describe('resume', () => {
     expect(view.insight).toBe('先看重复结构')
     expect(view.lastAttempt?.answer).toBe('我写了一半')
     expect(view.handoff?.to).toBe('guide')
+  })
+})
+describe('review due window', () => {
+  it('只有排过期、状态还活着、时间已到的题才算到期', () => {
+    const base = {
+      schema: 2 as const,
+      id: 'x',
+      subject: 'math',
+      tags: [],
+      statement: 's',
+      attachments: [],
+      createdAt: '2026-10-01T00:00:00.000Z',
+      updatedAt: '2026-10-01T00:00:00.000Z',
+      guide: { sessions: [] },
+      work: { attempts: [] },
+      history: [],
+    }
+    const now = new Date('2026-10-10T12:00:00.000Z')
+    const due = (record: Parameters<typeof isReviewDue>[0]) => isReviewDue(record, now)
+    expect(due({ ...base, status: 'review', review: { count: 1, history: [], nextAt: '2026-10-10T00:00:00.000Z' } })).toBe(true)
+    expect(due({ ...base, status: 'review', review: { count: 1, history: [], nextAt: '2026-10-20T00:00:00.000Z' } })).toBe(false)
+    expect(due({ ...base, status: 'review', review: { count: 1, history: [] } })).toBe(false)
+    expect(due({ ...base, status: 'mastered', review: { count: 9, history: [], nextAt: '2026-01-01T00:00:00.000Z' } })).toBe(false)
+    expect(due({ ...base, status: 'parked', review: { count: 1, history: [], nextAt: '2026-01-01T00:00:00.000Z' } })).toBe(false)
+    expect(reviewDueAt({ ...base, status: 'review', review: { count: 1, history: [], nextAt: '不是日期' } })).toBeUndefined()
   })
 })

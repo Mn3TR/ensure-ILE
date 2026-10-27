@@ -5,6 +5,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "types": ["node"],
+    "rootDir": "src",
     "outDir": "lib/types",
     "declaration": true,
     "emitDeclarationOnly": true,

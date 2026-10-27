@@ -34,6 +34,8 @@ if (JSON.stringify(workspace.workspaces) !== JSON.stringify([
   'dsh-plugin-guide',
   'dsh-plugin-bankmanager',
   'dsh-plugin-memory',
+  'dsh-plugin-textbook',
+  'dsh-plugin-schedule',
   'dsh-plugin-desktop',
   'dsh-community-fabric',
 ])) {

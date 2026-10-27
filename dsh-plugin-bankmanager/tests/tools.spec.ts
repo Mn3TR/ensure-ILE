@@ -67,3 +67,23 @@ describe('bank tools', () => {
     expect(shown).toContain('not-found')
   })
 })
+
+describe('bank_list due filter', () => {
+  it('只列今天到期该复习的题', async () => {
+    const dir = bank()
+    const tool = toolsFor(dir)
+    const soon = await tool('bank_add').execute({ statement: '向量', subject: 'math' }, exec)
+    const soonId = /已建题：([a-z0-9-]+)/u.exec(soon)?.[1]
+    const later = await tool('bank_add').execute({ statement: '概率', subject: 'math' }, exec)
+    const laterId = /已建题：([a-z0-9-]+)/u.exec(later)?.[1]
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString()
+    const nextYear = new Date(Date.now() + 365 * 86_400_000).toISOString()
+    await tool('bank_update').execute({ id: soonId, status: 'review', reviewNextAt: yesterday }, exec)
+    await tool('bank_update').execute({ id: laterId, status: 'review', reviewNextAt: nextYear }, exec)
+
+    const due = await tool('bank_list').execute({ due: true }, exec)
+    expect(due).toContain(soonId as string)
+    expect(due).not.toContain(laterId as string)
+    expect(due).toContain('今天该复习 1 道')
+  })
+})

@@ -664,6 +664,31 @@ export function summarizeProblem(record: ProblemRecord): string {
   return [record.id, record.status, record.subject, record.createdAt.slice(0, 10), statement].join(' | ') + pending
 }
 
+/**
+ * When the next review sitting is due, as a millisecond stamp.
+ * Undefined when the problem has no schedule yet or the stamp is unreadable.
+ * @param record - the problem.
+ */
+export function reviewDueAt(record: ProblemRecord): number | undefined {
+  const raw = record.review.nextAt
+  if (raw === undefined || raw.length === 0) return undefined
+  const at = Date.parse(raw)
+  return Number.isNaN(at) ? undefined : at
+}
+
+/**
+ * True when a review sitting has come due. mastered/parked never come up again;
+ * every other status does once its date arrives. Pass an end-of-day stamp to ask
+ * "还差今天这几小时算不算到期".
+ * @param record - the problem.
+ * @param now - the instant to compare against.
+ */
+export function isReviewDue(record: ProblemRecord, now: Date = new Date()): boolean {
+  if (record.status === 'mastered' || record.status === 'parked') return false
+  const at = reviewDueAt(record)
+  return at !== undefined && at <= now.getTime()
+}
+
 /** Counts and the stalest problems. */
 export interface BankStats {
   total: number
