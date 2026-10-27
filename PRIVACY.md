@@ -1,218 +1,201 @@
-# DSH Desktop Privacy Policy
+# DSH Desktop 隐私政策
 
-[中文](PRIVACY.zh.md)
+[English](PRIVACY.en.md)
 
-- **Version:** 1.1
-- **Effective and last updated:** September 28, 2026
+- **版本：** 1.1
+- **生效及最近更新日期：** 2026 年 9 月 28 日
 
-DSH Desktop is a local-first, open-source desktop application. This policy explains what information the official DSH Desktop distribution and official online services process, why they process it, who receives it, and what choices you have.
+DSH Desktop 是一个本地优先的开源桌面应用。本政策说明 DSH Desktop 官方版本及官方在线服务会处理哪些信息、为什么处理、信息会发送给谁，以及您可以如何作出选择。
 
-In this policy, “we” means the **Anywhere Labs project maintainer team** that maintains and publishes the official DSH Desktop distribution under the [`anywhere-labs`](https://github.com/anywhere-labs) GitHub organization and operates the official `dshdesktop.cn` services. DSH Desktop is an independent community project and has no affiliation, partnership, authorization, or endorsement relationship with DeepSeek.
+本政策中的“我们”指在 GitHub 组织 [`anywhere-labs`](https://github.com/anywhere-labs) 下维护和发布 DSH Desktop 官方版本、并运营 `dshdesktop.cn` 官方服务的 **Anywhere Labs 项目维护团队**。项目是独立的社区开源项目，与 DeepSeek 不存在隶属、合作、授权或背书关系。
 
-For privacy questions or rights requests, email [t4wefan@qq.com](mailto:t4wefan@qq.com). Do not put installation identifiers, logs, credentials, or other private information in a public GitHub Issue.
+隐私问题或权利请求请发送至 [t4wefan@qq.com](mailto:t4wefan@qq.com)。请不要在公开 GitHub Issue 中提交安装标识、日志、凭据或其他私密信息。
 
-## 1. Scope
+## 1. 适用范围
 
-This policy applies to:
+本政策适用于：
 
-- DSH Desktop provided through the [official GitHub repository](https://github.com/anywhere-labs/dsh-desktop) and official release channels;
-- the official website, version-check service, and download redirects under `https://www.dshdesktop.cn/`; and
-- privacy requests, support email, or issue reports that you voluntarily send to the project maintainers.
+- 我们通过 [官方 GitHub 仓库](https://github.com/anywhere-labs/dsh-desktop)及官方发布渠道提供的 DSH Desktop；
+- `https://www.dshdesktop.cn/` 下的官方网页、版本检查和下载跳转服务；
+- 您主动发送给项目维护团队的隐私请求、支持邮件或问题报告。
 
-This policy does not control processing performed by third-party forks, modified builds, third-party distributors, model providers, plugins, marketplace sources, or package services. If a third-party build still calls the hard-coded official `dshdesktop.cn` endpoints, this policy applies to the information those official endpoints actually receive, but not to other processing by that build or its distributor.
+第三方 Fork、自行修改的构建、第三方分发渠道、模型服务商、插件及软件包服务各自的处理行为不由本政策控制。如果第三方构建仍访问硬编码的 `dshdesktop.cn` 官方端点，本政策仍适用于该官方端点实际收到的信息，但不适用于第三方构建或分发者的其他处理行为。
 
-## 2. Summary
+## 2. 摘要
 
-- DSH Desktop profiles, settings, workspaces, sessions, logs, and crash files remain on your device by default.
-- The official update service does not require a DSH Desktop account. Its version-check code does not intentionally send prompts, responses, file contents, workspace paths, profile names, session contents, API keys, MAC addresses, or hardware serial numbers.
-- Packaged macOS and Windows builds check for updates by default and send a locally generated, persistently stored random installation UUID. This is a pseudonymous identifier that may qualify as personal data under applicable law. It is not a hardware ID and does not guarantee one value per physical machine.
-- Installer downloads do not receive that installation UUID from Desktop, although the website, download host, and network infrastructure still receive ordinary network metadata.
-- Diagnostic archives are created locally only when you export them and are never uploaded automatically by DSH Desktop.
-- Model services, plugins, marketplace sources, and package services that you choose process data under their own terms. They do not become subject to this policy merely because DSH Desktop can connect to them.
+- DSH Desktop 的 Profile、设置、工作区、会话、日志和崩溃文件默认保存在本机。
+- 官方更新服务不需要 DSH Desktop 账户；版本检查代码也不会主动发送或附加提示词、回复、文件内容、工作区路径、Profile 名称、会话内容、API Key、MAC 地址或硬件序列号。
+- 打包后的 macOS 和 Windows 版本默认会检查更新，并发送一个本地随机生成、持续保存的安装 UUID。该 UUID 是伪匿名标识，可能依法构成个人信息；它不是硬件 ID，也不保证一台机器只有一个值。
+- 安装包下载不附带上述安装 UUID，但官网、下载承载方和网络基础设施仍会看到通常的网络元数据。
+- 诊断包只在您主动导出时在本地创建，不会由 DSH Desktop 自动上传。
+- 您选择的模型服务、插件和软件包服务会按照各自规则处理信息；它们不因出现在 DSH Desktop 中而受本政策约束。
 
-## 3. Official version checks
+## 3. 官方版本检查
 
-### 3.1 When the request occurs
+### 3.1 何时请求
 
-Packaged macOS and Windows applications request the following endpoint about 60 seconds after startup by default:
+打包后的 macOS 和 Windows 应用默认在启动约 60 秒后请求：
 
 ```text
 GET https://www.dshdesktop.cn/api/desktop/version
 ```
 
-Another check occurs about six hours after each completed check. You can also select **Check for Updates** manually. Development runs, unpackaged launches, and Linux do not currently use this packaged automatic-update flow.
+此后，每次检查完成约 6 小时后会再次检查。您也可以手动选择“检查更新”。开发运行、未打包启动和 Linux 当前不会执行这套打包版自动更新流程。
 
-### 3.2 What the request contains
+### 3.2 请求包含什么
 
-The client explicitly adds:
+客户端明确添加：
 
-- `Accept: application/json`; and
-- `X-DSH-Desktop-Installation-Id: <random UUID v4>`.
-- `X-DSH-Desktop-Version: <canonical installed stable version>`.
+- `Accept: application/json`；
+- `X-DSH-Desktop-Installation-Id: <随机 UUID v4>`。
+- `X-DSH-Desktop-Version: <规范的当前稳定版本>`。
 
-The application adds no query parameters or request body to this GET request. Like every internet request, the official service and its infrastructure also receive the IP address, request time, TLS and connection details, and standard request metadata generated by the networking stack. That metadata may include a User-Agent, cookies, accepted compression, and operating-system or runtime-version information. The current code does not explicitly require the Electron network session to omit existing credentials, so we do not promise that a version request can never include session data. We also do not describe “two headers explicitly set by the client” as “only two fields leave the device.”
+该 GET 请求没有由应用添加的 query 参数或请求 body。与所有互联网请求一样，官方服务及其基础设施还会接收 IP 地址、请求时间、TLS/连接信息以及网络栈自动产生的标准请求元数据；这些元数据可能包括 User-Agent、Cookie、压缩支持、操作系统或运行时版本信息。当前代码没有显式要求 Electron 网络 session 忽略已有凭据，因此我们不会承诺版本请求一定不带 session 数据，也不会把“客户端只显式设置两个 header”描述成“网络上只会传出两个字段”。
 
-The version-check code does not intentionally attach prompts, responses, file contents, workspace paths, profile names, session contents, model credentials, MAC addresses, or hardware serial numbers.
+版本检查代码不会主动把提示词、回复、文件内容、工作区路径、Profile 名称、会话内容、模型凭据、MAC 地址或硬件序列号附加到该请求。
 
-### 3.3 How the installation UUID is created and changed
+### 3.3 安装 UUID 如何生成和变化
 
-The installation UUID:
+安装 UUID：
 
-- is generated as a cryptographically random UUID v4 when Desktop starts and no valid persistent value exists in its Electron user-data directory;
-- is stored in `identity/installation-id` below that user-data directory;
-- is regenerated when the file is missing or corrupt, or when the complete user-data directory has been removed, and is not rotated during an ordinary launch;
-- is not derived from and does not encode a username, device name, MAC address, disk serial number, or other hardware information;
-- identifies one Desktop user-data directory, not a physical machine. Different operating-system users, user-data directories, or app copies on the same computer can have different UUIDs, while copied user data may copy the UUID; and
-- normally persists until the file or application user data is deleted, becomes corrupt, and is rebuilt.
+- Desktop 启动时，如果 Electron 用户数据目录中没有有效的持久值，则通过加密安全的随机 UUID v4 生成；
+- 保存在用户数据目录的 `identity/installation-id` 文件中；
+- 缺失、内容损坏或整个用户数据目录被删除时会重新生成；正常启动不会轮换；
+- 不从用户名、设备名、MAC 地址、磁盘序列号或其他硬件信息推导，也不编码这些信息；
+- 只对应一个 Desktop 用户数据目录，不是“机器唯一 ID”。同一电脑的不同系统用户、不同用户数据目录或不同副本可以有不同 UUID；复制用户数据也可能复制该 UUID；
+- 通常持续到该文件或应用用户数据被删除、损坏并重建。
 
-Default locations are:
+默认位置为：
 
-- macOS: `~/Library/Application Support/DSH Desktop/identity/installation-id`;
-- Windows: `%APPDATA%\DSH Desktop\identity\installation-id`.
+- macOS：`~/Library/Application Support/DSH Desktop/identity/installation-id`；
+- Windows：`%APPDATA%\DSH Desktop\identity\installation-id`。
 
-Deleting this file only causes a new UUID to be generated at the next launch. It **does not stop later version checks or prevent the new UUID from being sent**.
+删除该文件只会在下次启动时生成新 UUID，**不会停止后续版本检查或阻止新 UUID 被发送**。
 
-### 3.4 Purposes
+### 3.4 用途
 
-Version-check data may be used only to:
+版本检查数据仅可用于：
 
-- return the latest stable version and support update notices;
-- recognize repeated requests from the same Desktop user-data directory as one installation, enabling deduplicated, aggregate update-service usage trends;
-- maintain service reliability, investigate abnormal requests, and prevent abuse; and
-- meet applicable legal obligations.
+- 返回最新稳定版本并支持更新提示；
+- 将同一 Desktop 用户数据目录的重复请求识别为同一安装，以生成去重、汇总的更新服务使用趋势；
+- 维护服务可靠性、排查异常请求并防止滥用；
+- 满足适用法律义务。
 
-We do not use the installation UUID for advertising profiles or cross-service tracking, and we do not sell it. A version check requires no login, and the client sends no name, email address, or DSH Desktop account ID in that request.
+我们不会把该安装 UUID 用于广告画像、跨服务追踪，也不会出售该 UUID。版本检查不要求登录，客户端也不会在该请求中发送姓名、邮箱或 DSH Desktop 账户 ID。
 
-## 4. Installer downloads, the website, and project communications
+## 4. 安装包下载、网站与项目沟通
 
-| Scenario | Trigger | Information that may be processed | Purpose and recipients |
+| 场景 | 触发方式 | 可能处理的信息 | 目的及接收方 |
 | --- | --- | --- | --- |
-| Installer download | You click a download or confirm a download after an update is found | IP address, time, standard network metadata, and the platform shown by the `/mac` or `/windows` path | `dshdesktop.cn`, its hosting service, and the final download host use this information to deliver the file, protect the service, and measure download service usage. Desktop does not add the installation UUID to the download request. |
-| Website visit | You open the website in a browser | IP address, time, browser and device network metadata, and the requested page | Website hosting and network infrastructure use it to deliver the page, protect the service, and diagnose failures. |
-| GitHub Issue, discussion, or contribution | You submit it | Account details, text, attachments, code, and metadata that you make public | GitHub and the project maintainers use it to process issues, contributions, and community communications. Public submissions are publicly visible. |
-| Email and support material | You send it | Email address, message, attachments, and diagnostics or environment details that you choose to provide | [QQ Mail](https://mail.qq.com/), your sending provider, and the project maintainers use it to deliver and respond to the message, investigate problems, and retain necessary correspondence. |
+| 安装包下载 | 您点击下载，或在发现新版本后确认下载 | IP 地址、时间、标准网络元数据，以及 `/mac` 或 `/windows` 路径所表示的平台 | `dshdesktop.cn`、其托管服务和最终下载承载方用于交付文件、安全防护和下载服务统计。下载请求不会由 Desktop 添加安装 UUID。 |
+| 访问官网 | 您在浏览器中打开官网 | IP 地址、时间、浏览器/设备网络元数据，以及您请求的页面 | 官网托管和网络基础设施用于提供页面、安全防护和故障排查。 |
+| GitHub Issue、讨论或贡献 | 您主动提交 | 您公开提交的账号信息、文字、附件、代码及元数据 | GitHub 和项目维护团队用于处理问题、贡献及社区沟通。公开提交会公开可见。 |
+| 邮件与支持资料 | 您主动发送 | 邮箱地址、邮件内容、附件，以及您选择提供的诊断或环境信息 | [QQ 邮箱](https://mail.qq.com/)、您的发件服务商和项目维护团队用于传递和回复邮件、排查问题及保存必要的沟通记录。 |
 
-As of this policy's effective date, the website and official APIs are hosted by [Vercel](https://vercel.com/), so Vercel directly processes the installation UUID, IP address, and request headers that reach the API. Stable release state uses [Upstash](https://upstash.com/); the repository proves only that the backend reads release state, and this policy does not claim that the Desktop installation UUID is forwarded to Upstash. Official installer downloads currently redirect to files hosted by [ModelScope](https://modelscope.cn/). A download redirect target may set its own cookies or other session identifiers and processes the request under its own policy. We will update this section when a provider or download host changes.
+截至本政策生效日，官网和官方 API 由 [Vercel](https://vercel.com/) 承载，因此 Vercel 会直接处理到达 API 的安装 UUID、IP 地址和请求 header。稳定版本状态使用 [Upstash](https://upstash.com/) 服务；仓库只证明后端读取版本状态，本政策不声称 Desktop 安装 UUID 会被转发给 Upstash。官方安装包下载目前会跳转至 [ModelScope](https://modelscope.cn/) 承载的文件。下载重定向目标可能设置自己的 Cookie 或其他会话标识，并按其政策处理下载请求。服务商或下载承载方变更时，我们会更新本节。
 
-## 5. Information stored locally by default
+## 5. 默认保存在本机的信息
 
-The following information remains on your device by default rather than being uploaded automatically to Anywhere Labs:
+以下信息默认由 DSH Desktop 或其组合的本地 DSH 运行时保存在您的设备上，而不是自动上传到 Anywhere Labs：
 
-| Local information | Purpose and retention |
+| 本地信息 | 用途和保留方式 |
 | --- | --- |
-| Profiles, Desktop preferences, window preferences, plugin configuration, and marketplace source selection | Provide your configured local experience; retained until you delete it in the application, manually delete the relevant data, or reset application data. |
-| Sessions, prompts, responses, tool records, and workspace information | Support local DSH features. Session records are stored under `$DSH_HOME/sessions` by default. The current persistence backend has no deletion API, so they accumulate until you remove them externally. Content may be sent to your chosen services when you invoke a model or tool, as described in Section 6. |
-| Attachments and image caches | Stored under `$DSH_HOME/attachments/v1` by default. The current implementation has no reference-aware garbage collection, so they remain until you delete them manually. |
-| Model and service credentials | May come from the inherited environment, a project `.env`, `$DSH_HOME/.env`, or `$DSH_HOME/.credentials.yaml`. The managed YAML uses a `0600` file below a `0700` directory on platforms with POSIX permissions, but it is not encrypted. Tools or models running as the same operating-system user can deliberately read it. |
-| Desktop logs | Stored below the Electron user-data directory. A file rotates at 10 MiB; files older than seven days are removed at startup; and the log directory is held below 200 MiB. Logs can still contain paths, workspace IDs, session IDs, commands, or plugin messages. |
-| Local crash files | Electron Crashpad collects them locally and is configured not to upload to a crash server. They may contain fragments of process memory. |
-| Diagnostic ZIP archives | Created only when you export one. They may contain logs, system and version information, paths, workspace or session IDs, bounded lifecycle and plugin IDs, and crash files within a shared 50 MiB evidence budget. The application retains the three newest archives that it manages; copies you make elsewhere are outside that limit. |
-| System notifications | Turn and job notices use generic completion or failure copy without session names, user text, job contents, or error details; update notices include the available version. The operating system handles them locally without a DSH Desktop remote-push service. Notification history or cross-device synchronization depends on your system account settings. |
-| Installation UUID | Stored as described in Section 3 and sent to the official update endpoint during a version check. |
+| Profile、Desktop 设置、窗口设置和插件配置 | 提供您配置的本地体验；持续到您在应用中删除、手动删除相应数据或重置应用数据。 |
+| 会话、提示词、回复、工具记录和工作区信息 | 用于本地 DSH 功能。默认会话记录位于 `$DSH_HOME/sessions`；当前持久化后端没有删除 API，会持续累积到您从外部删除。调用模型或工具时，相应内容可能发送给您选择的服务，见第 6 节。 |
+| 附件和图片缓存 | 默认位于 `$DSH_HOME/attachments/v1`。当前没有基于引用的垃圾回收，会持续保留到您手动删除。 |
+| 模型和服务凭据 | 可来自继承的环境、项目 `.env`、`$DSH_HOME/.env` 或 `$DSH_HOME/.credentials.yaml`。受管 YAML 在支持 POSIX 权限的平台使用 `0600` 文件和 `0700` 目录，但不会加密；以同一操作系统用户运行的工具或模型可以刻意读取它。 |
+| Desktop 日志 | 位于 Electron 用户数据目录。单文件达到 10 MiB 后轮转；应用启动时清理超过 7 天的日志，并将日志目录限制在 200 MiB 以内。日志仍可能包含路径、工作区 ID、会话 ID、命令或插件消息。 |
+| 本地崩溃文件 | Electron Crashpad 只在本地收集，配置为不向崩溃服务器上传。文件可能包含进程内存片段。 |
+| 诊断 ZIP | 只有您主动导出时创建；可能包含日志、系统和版本信息、路径、工作区/会话 ID、有限的生命周期/插件 ID，以及最多 50 MiB 证据预算内的崩溃文件。应用只保留最新 3 份由其管理的 ZIP；您复制到其他位置的文件不受该限制。 |
+| 系统通知 | 回合和任务通知使用不含会话名、用户文本、任务内容或错误详情的泛化完成/失败文案；更新通知包含可用版本号。通知由本机操作系统处理，不经过 DSH Desktop 远程推送服务；操作系统的通知历史或跨设备同步取决于您的系统账户设置。 |
+| 安装 UUID | 按第 3 节保存；在版本检查时会发送给官方更新端点。 |
 
-Credential masking reduces risk but cannot guarantee that a log or diagnostic archive contains no sensitive information. Review an archive and remove information you do not want a recipient to see before sharing it.
+凭据脱敏只能降低风险，不能保证日志或诊断包不含敏感信息。分享诊断包前，请先检查内容并删除不希望接收方看到的信息。
 
-Uninstalling the application may leave Electron user data, the DSH home, profiles, downloaded installers, or diagnostic files that you copied elsewhere. Back up anything you need before deleting local data.
+卸载应用不一定会删除 Electron 用户数据、DSH Home、Profile、已下载的安装包或您另行复制的诊断文件。删除前请先备份需要保留的数据。
 
-## 6. Third-party services you choose
+## 6. 您选择的第三方服务
 
-DSH Desktop is a composable plugin platform. The following transfers are triggered by services, sources, plugins, or actions you choose. Each recipient processes information under its own privacy terms.
+DSH Desktop 是可组合的插件平台。下列传输由您选择的服务、来源、插件或操作触发，接收方按自己的隐私政策处理信息。
 
-### 6.1 Model and tool services
+### 6.1 模型和工具服务
 
-When you configure and invoke a model provider, MCP service, external tool, or other API, the recipient may receive an API key, prompts, conversation context, attachments or file contents, tool inputs and outputs, session identifiers, network metadata, and other information required by that service's protocol. The exact scope depends on your configuration and request. Do not send sensitive data to a provider you do not trust.
+当您配置并调用模型供应商、MCP 服务、外部工具或其他 API 时，接收方可能收到 API Key、提示词、对话上下文、附件或文件内容、工具输入输出、会话标识、网络元数据，以及该服务协议所需的其他信息。具体范围取决于您的配置和请求。不要向不受信任的供应商发送敏感数据。
 
-Upstream DSH also maintains an `.anonymous-user-id` that is separate from the Desktop installation UUID. When you invoke the current default DeepSeek model adapter, it sends that identifier in the `x-deepseek-harness-user-id` header, together with an optional session ID, the API key, and the complete model request, to the DeepSeek or compatible `baseURL` you configure. Do not confuse it with `X-DSH-Desktop-Installation-Id`.
+上游 DSH 还维护一个与 Desktop 安装 UUID 不同的 `.anonymous-user-id`。当您调用当前默认的 DeepSeek 模型适配器时，它会把该标识放在 `x-deepseek-harness-user-id` header 中，并把可选的会话 ID、API Key 以及完整模型请求发送到您配置的 DeepSeek 或兼容 `baseURL`。请勿将它与 `X-DSH-Desktop-Installation-Id` 混为一谈。
 
-The default composition also provides DeepSeek `web_search`. When you invoke it, it sends the API key, original search term inside a fixed prompt, model and token/use limits, and standard request metadata to the configured DeepSeek Messages endpoint. The webpage `fetch` tool is disabled by default.
+默认组合还提供 DeepSeek `web_search`。当您主动使用该工具时，它会向配置的 DeepSeek Messages 端点发送 API Key、原始搜索词（嵌入固定提示中）、模型、token/使用次数限制和标准请求元数据；网页 `fetch` 工具默认关闭。
 
-### 6.2 Plugin market and package services
+### 6.2 插件与软件包服务
 
-The built-in `dshmarket` plugin market is turned off by default. After you enable it, the Host requests its index from the source selected for your region, either `cdn.jsdelivr.net` (China CDN) or `realguan.github.io` (GitHub Pages). You can instead enable the official plugin market and configure standard catalog sources yourself.
+ensure-ILE 不带插件市场：不会浏览目录，也不会请求任何目录来源。只有您按包名显式安装插件时（在插件管理器里装，或执行 `dsh plugin` 命令），内置包管理器才会访问该安装指定的 registry——`registry.npmjs.org`、`registry.npmmirror.com` 镜像、`raw.githubusercontent.com`、GitHub 或您配置的 registry——以获取软件包名称、版本、manifest、仓库/commit 证据及依赖。启动时如需补全 Profile 依赖，内置包管理器也可能访问 npm、GitHub、依赖提供方或 Electron 下载服务。安装后的插件及其依赖以您的本地权限运行，可能自行读取本地数据或联网；“可安装”状态不代表隐私或安全审核。
 
-These sources receive the IP address, time, a fixed Market User-Agent, and the requested catalog resource. Depending on the capabilities of the selected source, a request can also include search terms, categories, sort order, language, page numbers, or cursors. Desktop's Host may fetch plugin images from the catalog source, GitHub, or an allowed image host, allowing the recipient to infer which plugin or publisher you are viewing.
+### 6.3 可选的上游遥测
 
-When you preview or confirm a plugin installation, Desktop may also contact `registry.npmjs.org`, `raw.githubusercontent.com`, GitHub, or a registry you configure to retrieve package names, versions, manifests, repository or commit evidence, and dependencies. When profile dependencies need to be materialized at startup, the bundled package manager may also contact npm, GitHub, dependency hosts, or Electron's download service. Installed plugins and their dependencies run locally with your permissions and may independently read local data or access the network. Catalog inclusion and an **Installable** result are not privacy or security reviews.
+上游 DSH session telemetry 在 Desktop 默认组合中沿用上游默认的 `FEEDBACK_ONLY`：日常使用不会上传会话内容；只有您在会话中明确提交反馈后，该会话截至反馈时的原始日志才会与上游匿名用户 ID（保存在 DSH 数据目录的 `.anonymous-user-id`，删除即重置）一起发送到 `https://dsh-otel-collector.deepseeksvc.com/v1/logs` 或您配置的 `DSH_TELEMETRY_OTLP_URL`。如果您或部署者显式设置 `DSH_TELEMETRY_MODE` 为 `FULL`，会话遥测会在日常使用中持续发送；设置任意非空的 `DSH_TELEMETRY_DISABLED` 会让 Desktop 关闭该组件。该处理由上游配置和接收方政策决定，不属于 Anywhere Labs 官方更新服务。
 
-### 6.3 dsh-market
+上游还为名为 `desktop` 的 Profile 提供 Desktop 产品使用统计（`product-analytics` 和 `desktop-product-telemetry`），会把设备 ID、登录 DeepSeek 账号后的用户 ID、系统和应用版本以及界面操作事件发送给 DeepSeek。DSH Desktop 在启动时关闭这两项，官方版本不会发送这类统计。
 
-If you select `dsh-market` in Setup or settings, opening the market, checking for updates, or viewing plugin content can contact `awesome-dsh-plugin.com`, the npm Registry, the GitHub API, `raw.githubusercontent.com`, GitHub avatar services, and `images.weserv.nl`. These recipients receive the IP address, time, requested resource, and relevant plugin, package, or repository identifiers; an image proxy also receives the original image URL. Installation or update still requires your confirmation and can then contact addresses declared by plugin dependencies. These requests do not include Desktop's `X-DSH-Desktop-Installation-Id`.
+### 6.4 外部链接
 
-`dsh-market` also provides profile backups that you trigger manually or after you explicitly enable optional automatic backup:
+应用或文档中的外部 HTTP、HTTPS 和邮件链接会交给系统浏览器或邮件客户端。打开链接后，相应网站或服务的政策适用。
 
-- a local export only creates a file on your device;
-- a WebDAV upload always sends a complete backup. Automatic backup is off by default; after you enable it, an upload can occur automatically when its 24-hour interval condition is met. The URL, username, automatic-backup setting, and last-success time are stored in browser local storage. After entry, the password remains in current renderer memory until the component unmounts or the page refreshes and is sent temporarily to the local Host for each request; `dsh-market` does not write the password to local storage or disk;
-- a GitHub Gist backup uses a GitHub token with `api.github.com` to verify access and create, update, or read a secret Gist. A secret Gist is not publicly listed, but anyone with its URL can read it. A manually entered token remains in session memory, while `DSH_GITHUB_TOKEN` or a locally authenticated `gh` can also be used. The Gist ID and WebDAV URL or username may remain in browser local storage; and
-- a complete backup contains `package.json` and profile configuration files. It excludes `node_modules`, the lockfile, and Market cache, but may include `config.toml`, `.env`, API keys, tokens, or other secrets without masking. Local and WebDAV exports always use a complete backup; only a Gist export can select plugins and let you decide whether to include configuration.
+## 7. 浏览器和局域网访问
 
-Upload a backup only to a WebDAV service or GitHub account you trust. The selected service processes the backup, credentials, and network metadata under its own policy.
+允许在浏览器中打开 DSH 本身不会向 Anywhere Labs 上传会话；它让普通浏览器访问本机 Host，并且只能在兼容模式中使用。回环访问默认限制在 `127.0.0.1`。
 
-### 6.4 Optional upstream telemetry
+如果您明确开启局域网访问，Host 会监听局域网接口。Host 的信任标记不是用户鉴权。设置、凭据和本机原生对话框等配置面仍被限制在回环访问，但局域网客户端可以创建会话，并可能通过默认的命令和文件系统工具操作您的电脑。局域网 HTTP 还可能因浏览器安全限制而无法使用部分安全模块。只应在完全信任的网络中临时开启，并在不需要时关闭。
 
-Upstream DSH session telemetry keeps the upstream default of `FEEDBACK_ONLY` in Desktop's default composition: ordinary use uploads no session content, and only after you explicitly submit feedback in a session is that session's raw log up to the feedback sent, with the upstream anonymous user ID (stored as `.anonymous-user-id` in the DSH data directory; delete it to reset), to `https://dsh-otel-collector.deepseeksvc.com/v1/logs` or the endpoint configured in `DSH_TELEMETRY_OTLP_URL`. If you or a deployment operator explicitly sets `DSH_TELEMETRY_MODE` to `FULL`, session telemetry is sent continuously during ordinary use; setting `DSH_TELEMETRY_DISABLED` to any non-empty value makes Desktop turn the component off. That processing is controlled by the upstream configuration and recipient policy and is not the Anywhere Labs official update service.
+这类局域网流量通常不经过 Anywhere Labs，但连接到您电脑的局域网用户会成为该数据的接收方。
 
-Upstream also provides Desktop product analytics (`product-analytics` and `desktop-product-telemetry`) for any Profile named `desktop`, which would send a device ID, a user ID when signed in to a DeepSeek account, OS and app versions, and interface interaction events to DeepSeek. DSH Desktop turns both off at startup, and the official distribution does not send these analytics.
+## 8. 共享、受托处理和跨境
 
-### 6.5 External links
+处理所依据的法律基础取决于您的司法辖区和具体场景：您主动请求的下载、支持和第三方连接用于履行您的请求；在承认该基础的地区，版本检查和必要网络日志基于我们提供安全、可靠更新并保护官方服务的合法利益；法律义务基于相应法规；法律要求同意的非必要处理只能基于有效同意。不承认“合法利益”作为相应依据的地区不能仅因本政策而获得该法律基础。第 11 节说明当前稳定安装 UUID 的同意限制和您的反对权。
 
-External HTTP, HTTPS, and email links in the application or documentation are handed to the system browser or email client. The destination's policy applies after you open it.
+我们只会在以下范围披露或允许处理信息：
 
-## 7. Browser and LAN access
+- 为提供官网、更新、下载、邮件和代码托管而使用的基础设施服务商；
+- 您主动选择的模型、工具、插件、目录、registry、下载或外部链接服务；
+- 为遵守适用法律、法院命令，或保护用户、项目和公众安全所合理必要的接收方；
+- 项目重组或服务迁移中承接相同目的和本政策义务的后续运营者，并在法律要求时另行通知。
 
-Allowing DSH to open in a browser does not itself upload a session to Anywhere Labs. It lets an ordinary browser access the local Host and is available only in compatibility mode. Loopback access is limited to `127.0.0.1` by default.
+我们不出售个人信息，也不向第三方提供安装 UUID 用于其广告画像。
 
-If you explicitly enable LAN access, the Host listens on LAN interfaces. The Host trust marker is not user authentication. Configuration surfaces such as settings, credentials, and local native dialogs remain restricted to loopback access, but a LAN client can create sessions and may operate your computer through the default command and filesystem tools. Browser security restrictions on LAN HTTP can also make some security modules unavailable. Enable it only temporarily on a fully trusted network, and turn it off when no longer needed.
+Vercel、Upstash、GitHub、npm、ModelScope、模型供应商及社区来源可能在不同国家或地区处理数据。具体位置取决于当时的服务路由、接收方和您的选择。需要跨境告知、单独同意、标准合同或其他保障时，我们及相应接收方应按适用法律完成这些要求。
 
-LAN traffic normally does not pass through Anywhere Labs, but a person who connects to your computer over the LAN becomes a recipient of the data exposed through that connection.
+## 9. 保留期限
 
-## 8. Sharing, processors, and international transfers
+我们按以下规则确定期限：
 
-The legal basis depends on your jurisdiction and the specific processing. Downloads, support, and third-party connections that you initiate are used to fulfill your request. Where that basis is recognized, version checks and necessary network logs rely on our legitimate interests in delivering secure, reliable updates and protecting the official service. Legal obligations rely on the relevant law, and non-essential processing that requires consent can rely only on valid consent. A jurisdiction that does not recognize legitimate interests for the processing does not acquire such a basis merely from this policy. Section 11 explains the current consent limitation for the stable installation UUID and your right to object.
+- 本地安装 UUID、日志和诊断包按第 3 节和第 5 节所述规则保留；
+- 官方服务的原始请求日志和其中可能包含的 UUID、IP 地址及网络元数据，只在交付更新、维护安全、防止滥用、排查故障和生成去标识化汇总统计所合理需要的最短期间内保留；不再需要后删除或不可逆地去标识化，法律要求保留更久的除外；
+- 支持邮件和问题记录保留到处理完成、争议或安全跟进不再合理需要时；公开 GitHub 内容由您和 GitHub 的控制及保留规则决定；
+- 第三方接收方按其政策和您与其之间的安排保留信息。
 
-We disclose or permit processing only in the following circumstances:
+官方服务的基础设施和日志配置可能调整，因此本政策采用上述目的与删除条件确定期限，而不虚构一个未经服务端配置证实的固定天数。您可以通过隐私联系邮箱询问当前处理和期限。
 
-- infrastructure providers needed for the website, updates, downloads, email, and source-code hosting;
-- model, tool, plugin, catalog, registry, download, or external-link services that you choose;
-- recipients reasonably necessary to comply with applicable law or a court order, or to protect users, the project, and public safety; and
-- a successor operator that assumes the same purposes and policy obligations in a project reorganization or service migration, with additional notice where required.
+## 10. 安全
 
-We do not sell personal data or provide the installation UUID to third parties for their advertising profiles.
+官方互联网端点使用 HTTPS。Desktop 为本地安装 UUID 创建私有目录和文件权限，并限制导航、远程图片和目录请求。Crashpad 不自动上传，诊断导出前会提示风险。
 
-Vercel, Upstash, GitHub, npm, ModelScope, model providers, and community sources may process data in different countries or regions. The location depends on current routing, the recipient, and your choices. Where a cross-border notice, separate consent, standard contract, or another safeguard is required, we and the relevant recipient must complete the applicable requirements.
+这些措施不能保证绝对安全。第三方插件、本地高权限进程、被复制的用户数据、公开分享的诊断文件，以及无鉴权的局域网访问都可能绕过 Desktop 的预期边界。局域网 HTTP 也不是端到端加密通道。
 
-## 9. Retention
+## 11. 您的选择和权利
 
-We determine retention as follows:
+根据适用法律，您可能有权请求查阅、复制、更正、删除或限制处理个人信息，撤回同意，反对特定处理，获取可携带副本，以及向主管机构投诉。请通过 [t4wefan@qq.com](mailto:t4wefan@qq.com) 联系我们。为定位版本服务中的记录，我们可能请您私下提供本机安装 UUID；请勿公开发布该值。
 
-- local installation UUIDs, logs, and diagnostic archives follow the rules in Sections 3 and 5;
-- raw official-service request logs, including any UUID, IP address, and network metadata they contain, are retained only for the shortest period reasonably needed to deliver updates, maintain security, prevent abuse, diagnose failures, and produce de-identified aggregate statistics. They are then deleted or irreversibly de-identified unless a longer period is legally required;
-- support email and issue records are retained until responding, dispute handling, or security follow-up no longer reasonably requires them. Public GitHub content is also subject to your controls and GitHub's retention rules; and
-- third-party recipients retain information under their own policies and your arrangements with them.
+我们无法从远程替您删除本机文件。您可以在应用关闭后删除相应本地数据；删除安装 UUID 会在下次启动时生成新值。已经不可逆汇总或无法再关联到您的数据，可能无法恢复或单独删除。
 
-Official-service infrastructure and logging settings can change, so this policy states the purpose and deletion conditions used to determine the period instead of inventing a fixed number of days that has not been verified against server configuration. You can ask about current processing and retention through the privacy contact email.
+本政策是信息告知，不应被解释为在法律要求单独或明确同意的场景下自动取得同意。当前版本默认发送稳定的安装 UUID，且尚未提供只停用该标识的独立用户界面。若适用法律要求发送前取得同意，产品还需要提供相应的事前选择机制；仅安装或继续使用软件不替代法律要求的单独同意。
 
-## 10. Security
+我们不会仅基于本政策所述数据作出对您产生法律或类似重大影响的自动化决定。
 
-Official internet endpoints use HTTPS. Desktop creates private directory and file permissions for the local installation UUID and constrains navigation, remote images, and catalog requests. Crashpad does not upload automatically, and diagnostic export warns about its privacy boundary.
+## 12. 未成年人
 
-No measure provides absolute security. Third-party plugins, privileged local processes, copied user data, publicly shared diagnostics, and unauthenticated LAN access can cross Desktop's intended boundaries. LAN HTTP is not an end-to-end encrypted channel.
+DSH Desktop 是面向开发者和能够管理本地计算环境的用户的工具，并非专门面向儿童。未成年人应在监护人指导下使用。若您认为我们在不符合法律要求的情况下处理了未成年人的个人信息，请联系我们；我们会核实并采取适当措施。
 
-## 11. Your choices and rights
+## 13. 政策更新
 
-Depending on applicable law, you may have rights to access, copy, correct, delete, or restrict processing of personal data; withdraw consent; object to particular processing; receive a portable copy; and complain to a supervisory authority. Contact [t4wefan@qq.com](mailto:t4wefan@qq.com). To locate version-service records, we may ask you to provide your local installation UUID privately. Do not publish it.
+当数据类型、用途、官方接收方或用户选择发生实质变化时，我们会更新本政策、生效日期和仓库历史。法律要求再次告知或取得同意的重大变化，会在相关处理开始前完成相应步骤。
 
-We cannot remotely delete files on your device. You can remove relevant local data while the application is closed; deleting the installation UUID causes a new value to be generated at the next launch. Data that has already been irreversibly aggregated or can no longer be linked to you may not be recoverable or individually deletable.
-
-This policy is a notice, not automatic consent where law requires separate or affirmative consent. The current release sends a stable installation UUID by default and does not yet expose a dedicated user interface that disables only that identifier. Where applicable law requires consent before transmission, the product also needs an appropriate prior-choice mechanism; installing or continuing to use the software does not replace legally required separate consent.
-
-We do not make decisions with legal or similarly significant effects about you solely from the data described in this policy.
-
-## 12. Children
-
-DSH Desktop is a tool for developers and people able to manage a local computing environment and is not directed specifically to children. Minors should use it with a guardian's guidance. If you believe we processed a child's personal data without satisfying applicable requirements, contact us so that we can investigate and take appropriate action.
-
-## 13. Changes to this policy
-
-When data categories, purposes, official recipients, or user choices change materially, we will update this policy, its effective date, and the repository history. Where law requires renewed notice or consent for a material change, we will complete that step before the relevant processing begins.
-
-The Chinese and English versions of this policy have equal authority. If they diverge, read them together and notify us through the privacy contact email so that we can correct them.
+本政策的中英文版本具有同等效力。若两个版本出现表述差异，请结合两者理解并通过隐私联系邮箱告知我们修正。

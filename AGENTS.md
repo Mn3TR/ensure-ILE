@@ -1,56 +1,85 @@
 # ensure-ILE — DeepSeek Harness Desktop in Learning
 
-最高原则：**以代码为第一信源而非文档**
+最高原则：**以代码为第一信源而非文档**。`src/`、`package.json`、`cordis.patch.yml` 写的东西才算数；本文只记**为什么这么定**和**踩过的坑**，能被代码回答的事实不要在这里重复。改代码顺手改这里，改不动就是设计有问题。
 
 > 这个仓库是 **ensure-ILE**，从 [DSH Desktop](https://github.com/anywhere-labs/dsh-desktop) fork 而来，用来做一件事：
 > 把桌面 agent 变成**引导学生自己把题解出来**的工具（Human RL 的 guide 阶段）。
 >
 > 底座不动：`deepseek-harness/` 是固定的上游子模块，**禁止修改**；桌面外壳、插件机制、打包流程都沿用上游。
-> 我们的东西集中在 `dsh-plugin-guide/`（引导模式）、`dsh-plugin-bankmanager/`（题库）、`dsh-plugin-memory/`（学生记忆）、`dsh-plugin-textbook/`（教材语料）与 `dsh-plugin-schedule/`（课表与进度），它们都以 bundle 的形式挂在 profile 根，壳不再知道它们的存在。
->
-> 下面「DSH Desktop repository rules」是上游规则，对本仓库仍然全部有效。
+> 我们自己的东西全在插件包里，以 bundle 形式挂在 profile 根——壳不知道它们存在。
 
-## 当前状态（2026-10-28 00:45）
+组织：EnSure Lab / 因需（因=原因、需=需要，即「每一步都要说得清为什么」）。包名统一 `dsh-plugin-` 前缀，不用 npm scope。
 
-**组织**：EnSure Lab / 因需（因=原因、需=需要，即「每一步都要说得清为什么」）。包名统一 `dsh-plugin-` 前缀，不用 npm scope。
+## 仓库地图
 
-**仓库形态**（11 个 workspace，无占位目录）：
-- `dsh-plugin-desktop/`：上游桌面壳（2.0.18）+ ensure-ILE 改动（数据根、OOBE 裁剪、引导模式预设、视觉层）。**视觉层＝演算纸**（2026-10-25 23:30）：宋体＝印刷体（题干/教材原文/教师版）、楷体＝手写（学生原话）、黑体＝界面；颜色只编码状态（墨蓝 `primary`、朱批 `destructive`、印章青 `seal`）。霞鹜文楷 v1.530 与思源宋体 2.003R 子集到 GB2312 + 数理符号，因 OFL 保留字体名条款改名 `ILE Kai` / `ILE Song`，许可证在 `src/native-ui/assets/fonts/`；`src/native-ui/gallery.html` 是画廊入口（进 `vite.native-ui.config.ts` 的 input），设计稿与截图在 `docs/design/`。
-- `dsh-plugin-teaching-commons/`：**四个模式共用的教学文字**——安全边界、说话方式、题库规则（`prompts/common.md`、`prompts/bank.md`）+ 学科备注（`skills/{math,arts}.md`）+ `readNote` 实现。各预设 `complete: true` 整份替换，所以共用段必须只有一份（2026-10-25 抽出）。
-- `dsh-plugin-setup/`：**开学对话**（预设 id `setup`、显示「开学」）——问年级/课表/作息/解题偏好，进度字段级落在 `<DSH_HOME>/setup.json`；两个工具 `setup_read` / `setup_update`；完成判据是「能说出下一步」（`next` 有内容），不是问齐四样。默认预设仍是 guide（2026-10-25 加）。
-- `dsh-plugin-guide/`：guide 模式——系统提示 = commons 的 common + bank 片段 + `prompts/guide.md`；`read_note` 委托给 commons；预设 id `guide`、显示「引导模式」，是 Profile 默认预设。两个预设都用同名空 context 遮蔽上游那条 `required` 的 cwd 快照。
-- `dsh-community-fabric/`：社区互操作 RFC，纯文档，不声明可加载入口。
-- `dsh-plugin-bankmanager/`：题库插件。六个工具（add / list / show / update / stats / resume），一道题一个 JSON，存 `<DSH_HOME>/bank/problems/`；以 bundle 挂在 profile 根，guide / work / HRL / schedule 共用。宿主侧 `src/`（工具 + `/bank/api` 路由），浏览器半边 `src/client/`（交接卡片 + 空白会话首页的接续入口，见下）。浏览器通道用嵌套 `ctx.inject(['webServer', 'webStartup'])` 等这两个服务（都由 web-app bundle 提供）：桌面壳里路由会挂上，headless profile 里只有路由缺席、工具一个不少——所以 `inject` 仍然只有 `['tools']`。
-- `dsh-plugin-memory/`：`@max-null/dsh-memory` v0.18.0 的 fork（包名 `dsh-plugin-memory`，已注册 workspace、已接 profile，zod 打包内联）；同步规则见 `dsh-plugin-memory/UPSTREAM.md`。
-- `dsh-plugin-work/`：**独立做题**（预设 id `work`、显示「独立做题」）——学生自己做、交上来，判结果和过程两件事；重交只给一次，讲不清就写 `handoff` 让他转 guide（2026-10-25 实现）。
-- `dsh-plugin-hrl/`：**答案优化**（预设 id `hrl`、显示「答案优化」）——学生已有答案，教师轨迹一次写全，再逐小步 A/B（`student / teacher / merged`，`merged` 必须学生自己写）（2026-10-25 实现）。
-- `dsh-plugin-textbook/`：**教材读端**（2026-10-28）——把 7 本必修 PDF 抽成语料入库（`data/index.json` + `data/books/<id>.json`，共 1.8MB），运行时零依赖；三工具 `textbook_books` / `textbook_find`（只匹配节标题，多词按空格/逗号/顿号全命中）/ `textbook_read`（给 section 或 from/to 页码，正文软上限 6000 字，返回 `nextPage` 续读）。扫描件（`renjiaoA-math-1`，270 页只有 2 页有字）`textAvailable: false`，读时直说「这一册只有目录和页码」不报错；人教A数学把斜体字母抽成生僻字（犃=A、犪=a、狓=x，落在 U+7280–U+72FF，同区间也有真汉字），`italicLetterNote()` 命中 ≥3 次才附一句读法，不改写正文。语料由 `scripts/extract.py`（PyMuPDF，开发期跑）生成，`--out` 默认包内 `data/`。
-- `dsh-plugin-schedule/`：**课表与进度**（2026-10-28，原占位目录）——`<DSH_HOME>/schedule/schedule.json`（schema 1：subjects / timetable.weekly / pace / progress / exceptions）；三工具 `schedule_read`（part: all/timetable/progress/subjects/pace/exceptions）、`schedule_update`（字段级 patch，`bookId` 空串=解绑、weekly 整份替换、addLessons 同天同节覆盖、空调用回「没有要更新的字段」）、`schedule_plan`（接下来哪几节课 + 今天讲什么 + 复习队列 + 预习锚点；默认 25 分钟预算、每题 8 分钟；复习顺序 due → wrong → stuck；教材不可用时退化成一句「教材不可用」不炸）。`plan.ts` 纯函数、`store.ts` 原子写（tmp + rename），兄弟依赖走 `link:../dsh-plugin-*`、按 `/store` `/data` 子路径 import。
-- 已删：Beta/Next 变体、`dsh-community-market/`、`vendor/agents-anywhere/`（含全部 AA 接线）；2026-10-22 又删了 `_deprecated/`（上游 0.1.x 归档）、Next 交接提示（`next-transition-notice` 与 `docs/stable-next-transition`）、`upstream.json` 的 beta channel，以及旧 profile 的 retired bundle 兼容层（`RETIRED_BUNDLES`/`RETIRED_ROW_IDS`——ensure-ILE 的 profile 都在 `.ensure-ile` 里新种，永远不读旧 profile，2026-10-22 李确认后删）；插件市场整个从构建里拿掉（`dshmarket` 依赖、`.yarn/patches/dshmarket-*.patch`、`scripts/prepare-dsh-market.mjs`、三个 market 脚本与 `market:prepare` 的全部调用点、`dshmarket-compat.spec.ts`），学生装不了插件也不需要装。
-- 能力面与载荷（2026-10-22 精简）：web-app 关掉了 base 的工具行、工具只由 preset 挂载，所以 `preset-standard` 禁掉后学生只能开这四个 ensure-ILE 预设（setup / guide / work / hrl）；guide 会话实际有 28 个工具：`read_note` + base 残留的 `working_directory` + `bank_*`×6 + `textbook_*`×3（books / find / read）+ `schedule_*`×3（read / update / plan）+ memory 插件注册的 14 个（`memory_*`×8 + `prompt_*`×4 + `profile_*`×2）（`ask_user_question` 只在 standard/ptc/cordis 预设里挂，guide 没有）；打包只带 Node+pnpm 载荷，实测 109MB（原 265MB），Python 解释器、Office 技能和 `load_workspace_dependencies` 一起删了，`desktop-office.ts` 已不存在。
+| 路径 | 是什么 | 什么时候读它 |
+| --- | --- | --- |
+| `dsh-plugin-desktop/` | 上游桌面壳 2.0.18 + 我们的改动（数据根、OOBE 裁剪、预设、视觉层、打包） | 改外壳 / 窗口 / 设置 / 打包 |
+| `dsh-plugin-teaching-commons/` | 四个模式共用的教学文字：安全边界、说话方式、题库规则 + 学科备注 `skills/` + `readNote` | 改「怎么说话」的规矩 |
+| `dsh-plugin-setup/` | 开学对话，预设 `setup`「开学」，状态落 `setup.json` | 改开学问话 |
+| `dsh-plugin-guide/` | 引导模式，预设 `guide`「引导模式」，**Profile 默认** | 改引导流程 |
+| `dsh-plugin-work/` | 独立做题，预设 `work`「独立做题」 | 改判卷 / 重交规则 |
+| `dsh-plugin-hrl/` | 答案优化，预设 `hrl`「答案优化」 | 改 A/B 配对 |
+| `dsh-plugin-bankmanager/` | 题库：6 工具 + `/bank/api` + 浏览器卡片与首页接续入口 | 改题目账本 |
+| `dsh-plugin-textbook/` | 教材语料（7 本入库）+ 3 个读端工具 | 改教材检索 |
+| `dsh-plugin-schedule/` | 课表与进度 + 3 个工具（含 `schedule_plan`） | 改「今天讲什么」 |
+| `dsh-plugin-memory/` | `@max-null/dsh-memory` v0.18.0 的 fork（14 工具），同步规则见其 `UPSTREAM.md` | 改记忆 / 提示词模板 |
+| `dsh-community-fabric/` | 社区互操作 RFC，**纯文档**，不声明可加载入口 | 社区协作 |
+| `profiles/ensure-ile/` | 唯一的 profile 模板：`package.json` / `cordis.patch.yml` / `pnpm-workspace.yaml` | 加 bundle、改预设 |
+| `scripts/` | 根级校验脚本（bilingual、layout、icons、vendored runtime、run-parallel） | 改门禁 |
+| `docs/` | 产品文档；`research/` 研究、`design/` 设计稿与 `screenshots/`、`evidence/` 证据 | 写面向人的文档 |
+| `assets/` | 产品截图、社区二维码、图标源 | 发版素材 |
+| `.agents/notes/` | 日期化的维护者决策记录（`implemented/` / `proposed/`） | 追溯某个取舍的来龙去脉 |
+| `deepseek-harness/` | 固定上游子模块（`dsh-v0.2.1-rc.2`），**禁止修改** | 只读，查上游行为 |
 
-**能跑**：`Start-Process dsh-plugin-desktop\node_modules\electron\dist\electron.exe dsh-plugin-desktop\lib\main.js`，composer 预设默认「引导模式」；`ENSURE_ILE_SETUP=full` 可看完整 7 屏向导。
-**数据隔离**：`run()` 把 `DSH_HOME`/`ENSURE_ILE_HOME`/`DSH_AGENTS_HOME`/`userData` 全放 `.ensure-ile/`；`seedProfile()` 复制 `profiles/ensure-ile/` 的 `package.json`、`cordis.patch.yml` 与 `pnpm-workspace.yaml`，**不装依赖**——清掉 `.ensure-ile` 后要手动在 `.ensure-ile/home/profiles/desktop` 跑一次 `pnpm install --offline`（七个本地包都是 `file:` 链接、零注册表依赖，离线可装；加包后要在 profile 里 `CI=true pnpm install --offline --no-frozen-lockfile`）。**会话工作区也在数据根里**：`workspace-controller` 的 `documentsDirectory` 被 patch 成 `!!js dshHomePath('..')`，默认工作区因此落在 `.ensure-ile/deepseek-harness/default-workspace`（上游把叶子目录名写死成 `deepseek-harness/default-workspace`，所以拿不到更短的 `.ensure-ile/workspace`）。**已知不一致（2026-10-25 09:36 查）**：08:19 那次真机会话的 `identity.cwd` 记的是 `C:\Users\libai\Documents\deepseek-harness\default-workspace`，而 `workspace.json` 登记的是 `.ensure-ile\deepseek-harness\default-workspace`；教材两边各有一份 183MB。下次真机前先确认会话落在哪边。
+**每个插件包自己的 `README.md` 是该包的信源**（工具表、数据落点、算法、已知限制）。本文不重复包内细节，只写跨包的关系和决定。
 
-**共享数据层（guide / setup / work / hrl / schedule 都指着它）**：八个 bundle（setup / guide / work / hrl / bank / memory / textbook / schedule）都已接进 profile，全部本地 `file:` 链接、零注册表依赖。
-- **记忆**：本地 fork `dsh-plugin-memory` 0.18.0-ensure-ile.1（上游 v0.18.0 的 fork，zod 已打包内联，client id 由包名生成）。工具是 profile 根注册的，所以**所有会话都能看到** `memory_*`；它的提示段会被 guide 的 `complete: true` 吞掉，模型只能靠工具描述理解它。存量按「global / 当前工作区」两层，工作区层落在会话工作区的 `.dsh/storages/`。**2026-10-25 08:19 真机跑过一道题**（待办 1），但那次会话里 `memory_*` 有没有真的被调用还没查。
-- **题库**：`dsh-plugin-bankmanager` 已实现——六个工具（`bank_add` / `bank_list` / `bank_show` / `bank_update` / `bank_stats` / `bank_resume`），一道题一个 JSON 文件（`<DSH_HOME>/bank/problems/<id>.json`，id = `YYYYMMDD-<slug>-<6 位 hex>`，subject 自由写、只归一化进 id），原子写 + 跨进程锁 + 坏文件只跳过。挂在 profile 根，后续 work / HRL / schedule 共用同一份。**浏览器半边（2026-10-25 23:30）**：`src/client/` 认领 `tool.call.toolview` 的 `bank_resume` 键，把工具结果 JSON 画成一张卡片——题干、学生上次原话、卡点、下一步、一个按钮；字段缺一块就静默不渲染、退回通用工具行，不炸会话。vite 打 CJS，外面包 `window.__ModuleLoader__.load({ id, factory })`，React 与 `@deepseek-ai/*` 全交宿主模块表，产物 `lib/client.js`（17.0 kB）入库；构建 `yarn workspace dsh-plugin-bankmanager build:client`。`package.json` 多了 `exports["./client"]` 与 `dsh.client`。**另一个注册点（23:50）**：`conversation.hero.options` 的 `ile-resume`——空白会话首页列出待接的交接，点一下只把「接着上次那道题：<id>（<状态>）」填进输入框（`inputActions.setDraft`），不替学生发；「不点接续时 prompt 原样」。两条入口共用宿主路由 `/bank/api`（`src/api.ts`）：`handoff.pending` 列待接、`handoff.consume` 标成已被某个会话接走；信任围栏同 `/api`（loopback / `trustedHosts`、拒绝 cross-site），路由缺席时插件照常工作。
-- **收尾（2026-10-23 李定）**：模型自己判断状态，但每轮引导收尾必须问学生一句「这题你自己做出来了吗」；做出来 → `status: review` + `guideOutcome: solved`，没做出来 → 保持 `guide` + `stuck`。这句写在 `guide.md` 里。
+## 跑起来
 
-**模式与交接（2026-10-25 定稿；schema v2.1 与共享包已实现，其余未实现）**：一轮 grilling（Q1–Q35）后定下的架构，关键事实全部落到代码，出处按「文件:行」记。
+- 开发启动：`Start-Process dsh-plugin-desktop\node_modules\electron\dist\electron.exe dsh-plugin-desktop\lib\main.js`；`ENSURE_ILE_SETUP=full` 看完整 7 屏向导。
+- 全量门：`corepack yarn check`（**不跑插件包自己的单测**）。插件包整批：`corepack yarn check:plugins`（见坑·工具链 4）。桌面壳：`corepack yarn workspace dsh-plugin-desktop typecheck|test`。单个插件：`corepack yarn workspace <pkg> typecheck|test|build`。
+- 数据隔离：`run()` 把 `DSH_HOME` / `ENSURE_ILE_HOME` / `DSH_AGENTS_HOME` / `userData` 全放 `.ensure-ile/`。
+- **`seedProfile()` 只在文件不存在时复制，存在就不覆盖**：改完 `profiles/ensure-ile/` 要删掉 `.ensure-ile/home/profiles/desktop` 再启动，然后手动跑一次 `pnpm install --offline`（校验用 `COREPACK_ENABLE_PROJECT_SPEC=0 corepack pnpm install --offline --no-frozen-lockfile`；直接 `corepack pnpm` 会被根的 `packageManager` 挡住）。
+- 会话工作区也在数据根里：`workspace-controller` 的 `documentsDirectory` 被 patch 成 `!!js dshHomePath('..')`，默认工作区落在 `.ensure-ile/deepseek-harness/default-workspace`（上游把叶子目录名写死，拿不到更短的名字）。
+- 打包：`corepack yarn dist:win` → `dsh-plugin-desktop/dist/`；**打包后的数据根 = `dirname(ensure-ILE.exe)\.ensure-ile`**，就在安装目录里。
 
-- **模式 = 预设，切换 = 新会话**。`agentPresets.select` 只认空会话（`agent-preset/locked`，`boundary.lastTurn > 0` 即锁，`deepseek-harness/packages/preset/agent-preset-registry/src/index.ts:351`）；UI 只给空会话挂选择器（`client/ui-agent-preset/src/client/seat-store.ts:214`）；resume 按 `meta.agentPreset` 还原，缺预设直接拒绝恢复。
-- **模型切不了自己的模式**。`recompose()` 内部能动但不写 `agent-preset/selected`、不更新投影，重启回到旧预设——**不用**。
-- **不做「一个预设内换提示词」**。技术上可行：DeepSeek flash 声明 `systemPromptUpdate: 'in-history'`（`llm-deepseek/src/models.ts:12`），新 system 作为历史里的一条追加、不重写第 0 条（`llm-deepseek/src/serialize.ts:64`），缓存前缀不破。**否决理由**：flash 的 `toolUpdate` 是 `addition-only`（只能加工具、不能删），按模式换工具集做不到；静态工具全集又等于「隐预设」。所以一个模式一个预设。
-- **跨会话只靠 bank + memory，零注入**。新会话靠提示词让模型开场先 `bank_list` 找 pending `handoff`，不用 `agent.inject()`（要额外 host 插件、注入时机含糊、永久占 user 位）。代价是模型可能忘记读，真机第一件事就要验它。
-- **交接卡片**：模型写 `handoff` → 壳渲染卡片 → 学生点 → 客户端 `session.create({ sessionId 由 handoff.id 派生, agentPreset })`。幂等要点：`create` 拿一个**已经开始过**的 sessionId 会静默新开一个会话（`api/session-controller/src/agent.ts:488`），所以点之前先查列表，存在就跳转、不 create；`consumedAt` 失败要清回。**当前实现（2026-10-25 23:50）**：卡片「接着做」=`sessions.create({ agentPreset })`（按 handoff 的 `to` 选预设，`presetForMode` 也认中文显示名）+ `uiWorkspace.openSession` + `conversation.input.requestDraftInitialization(binding, { prompt })` 把「接着上次那道题：<id>（<状态>）」填进输入框（学生自己按回车，模型收到的就是他的消息，零注入不变）+ `/bank/api` 的 `handoff.consume`。幂等靠 `localStorage` 记「这道交接开过的会话 id」+ 列表里还在就只跳转（Host 的 `sessionId` 只能用来复用空白会话、不能自己命名，所以这条记忆必须落在客户端）；`consumedAt` 写失败时卡片提示「还会出现在待接里」，不假装成功。
-- **OOBE = 独立 `setup` 预设**，状态记 `<DSH_HOME>/setup.json`，**字段级**：`{ onboarding: "pending"|"done", got: { grade, schedule, rhythm, preference } }`，可中断续问；完成判据是「能给出下一步」，不是「问够四样」。参考 OpenClaw 的专用 onboarding chat：与日常会话分开、可 Configure later、结束后衔接到下一步。
-- **显示名**：`guide` 引导模式 / `work` 独立做题 / `hrl` 答案优化。
-- **A/B（HRL）**：教师轨迹一次写全（按 memory 里的偏好，不再存固定的 preference 字段）；学生轨迹是原文；逐小步 `student / teacher / merged`，`merged` 必须存学生自己重写的 `mergedText`；每 3 步 flush，pairing 结束必 flush。
-- **memory 改造**：课表、上课节奏、年级等分不同**固定文件**，走 `prompt_*` 那套文件机制新增 `profile_*` 家族（固定文件名、不进检索、不占注入预算）。
-- **共享提示词片段**（2026-10-25 由调研逼出）：四个预设都用 `complete: true`，安全边界/说话方式/题库规则会重复四份 → 抽共享包（与科目备注同一个包），各预设 mount 时拼接。模板路径是仓库根的 `profiles/ensure-ile/`。
+## 数据落在哪
 
-bank schema v2.1（2026-10-25 已实现，按模式分块）：
+`<DSH_HOME>` = 数据根的 `home`（打包后是 `<安装目录>\.ensure-ile\home`）。
+
+| 数据 | 路径 | 谁写 | 谁读 |
+| --- | --- | --- | --- |
+| 题目 | `<DSH_HOME>/bank/problems/<id>.json` | `bank_*` | guide / work / hrl / schedule |
+| 课表与进度 | `<DSH_HOME>/schedule/schedule.json` | `schedule_update` | `schedule_plan` |
+| 开学问话 | `<DSH_HOME>/setup.json` | `setup_update` | `setup_read` |
+| 学生固定档案 | `<DSH_HOME>/profile/{grade,schedule,rhythm,preference}.md` | `profile_write` | `profile_read`（不进检索、不占注入预算） |
+| 记忆 | global 层 + 会话工作区的 `.dsh/storages/` | `memory_*` | 全体会话 |
+| 教材 | `<数据根>/deepseek-harness/default-workspace/教材/`（7 本 PDF + 索引 + 教辅资料） | 人 | `textbook_*`（读的是入库语料，不是 PDF） |
+
+**已知不一致**：老会话的 `identity.cwd` 记过 `C:\Users\libai\Documents\deepseek-harness\default-workspace`，而 `workspace.json` 登记的是数据根那份；教材两边各有一份（Documents 那份 183MB 留作备份）。真机前先确认会话落在哪边。
+
+## 八个插件包怎么接在一起
+
+- **能力面**：web-app 关掉了 base 的工具行，工具只由 preset 挂载，`preset-standard` 禁用后学生只能开这四个预设（setup / guide / work / hrl）。
+- **guide 会话实际 28 个工具**：`read_note` + 残留的 `working_directory` + `bank_*`×6 + `textbook_*`×3 + `schedule_*`×3 + memory 注册的 14 个（`memory_*`×8 + `prompt_*`×4 + `profile_*`×2）。`ask_user_question` 只在 standard/ptc/cordis 预设里挂，guide 没有。
+- **提示词拼法**：四个模式都 `complete: true` 整份替换，所以共用段（安全边界 / 说话方式 / 题库规则）只在 `teaching-commons` 存一份，各预设 mount 时拼自己的 md。
+- **cwd 快照**：上游那条 `required` 的 cwd 快照压不掉，两个预设都用**同名空 context** 盖住它。
+- **跨包依赖**：全部本地 `file:` / `link:` 链接、零注册表依赖；兄弟包之间只走 `exports` 子路径（`dsh-plugin-bankmanager/store`、`dsh-plugin-textbook/data`），对方必须出 `lib/types` 声明（tsconfig `paths` 指源码会撞 TS6059）。
+
+## 模式与交接（2026-10-25 定稿，关键事实都有代码出处）
+
+- **模式 = 预设，切换 = 新会话**。`agentPresets.select` 只认空会话（`boundary.lastTurn > 0` 即锁，`deepseek-harness/packages/preset/agent-preset-registry/src/index.ts:351`）；UI 只给空会话挂选择器（`client/ui-agent-preset/src/client/seat-store.ts:214`）；resume 按 `meta.agentPreset` 还原，缺预设直接拒绝恢复。
+- **模型切不了自己的模式**。`recompose()` 内部能动但不写 `agent-preset/selected`、不更新投影，重启回到旧预设——所以不做。
+- **不做「一个预设内换提示词」**：技术上可行（DeepSeek flash 声明 `systemPromptUpdate: 'in-history'`，新 system 作为历史追加、不重写第 0 条，缓存前缀不破），但 flash 的 `toolUpdate` 是 `addition-only`——只能加工具不能删，按模式换工具集做不到；静态全集又等于隐式预设。所以一个模式一个预设。
+- **跨会话只靠 bank + memory，零注入**。新会话靠提示词让模型开场先 `bank_list` 找 pending `handoff`，不用 `agent.inject()`（要额外 host 插件、注入时机含糊、永久占 user 位）。代价是模型可能忘记读。
+- **交接卡片**：模型写 `handoff` → 壳渲染卡片 → 学生点 → 客户端 `session.create` + `uiWorkspace.openSession` + `conversation.input.requestDraftInitialization` 把「接着上次那道题：<id>（<状态>）」填进输入框（学生自己按回车，零注入不变）+ `/bank/api` 的 `handoff.consume`。幂等靠列表 + 浏览器 `localStorage`（Host 的 `sessionId` 不能自己命名）。`create` 拿一个已开始过的 sessionId 会静默新开（`api/session-controller/src/agent.ts:488`），所以点之前先查列表。
+- **OOBE = 独立 `setup` 预设**，状态 `<DSH_HOME>/setup.json`，**字段级** `{ onboarding, got: { grade, schedule, rhythm, preference } }`，可中断续问；完成判据是「能给出下一步」，不是「问够四样」。
+- **A/B（HRL）**：教师轨迹一次写全（按 memory 里的偏好）；学生轨迹是原文；逐小步 `student / teacher / merged`，`merged` 必须存学生自己重写的 `mergedText`；每 3 步 flush，pairing 结束必 flush。
+- **收尾规矩**：每轮引导收尾必须问学生一句「这题你自己做出来了吗」；做出来 → `status: review` + `guideOutcome: solved`，没做出来 → 保持 `guide` + `stuck`（写在 `guide.md`）。
+- **固定档复习**：`REVIEW_LADDER = [1,3,7,14,30,60,120]`；进 `review` 自动排第一次，`reviewPassed: true` 升一档、`false` 回第一档，爬到最后一档自动 `mastered`。读端是 `bank_list` 的 due 过滤 + `bank_stats` 的到期数。
+- **画像字段**：`guide.sessions[]` 带 `affect`（frustrated/neutral/excited）与 `effectiveHint`（confirm/position/feature/structure/result），`bank_update` 可直接写。**进题不进 memory**。
+
+### bank schema v2.1（2026-10-25 实现，源码 `dsh-plugin-bankmanager/src/store.ts`）
 
 ```jsonc
 {
@@ -58,81 +87,62 @@ bank schema v2.1（2026-10-25 已实现，按模式分块）：
   "id": "...", "subject": "...", "tags": [], "statement": "...", "attachments": [],
   "status": "new|guide|hrl|review|mastered|parked",
   "createdAt": "...", "updatedAt": "...",
-
   "guide": {
     "sessions": [{ "sessionId": "...", "startedAt": "...", "endedAt": "...",
-                   "outcome": "solved|stuck|abandoned", "whereStuck": "...", "result": "他最后写的原稿" }],
+                   "outcome": "solved|stuck|abandoned", "whereStuck": "...",
+                   "result": "他最后写的原稿", "affect": "...", "effectiveHint": "..." }],
     "insight": "卡在哪、怎么走通的（写给下一次的你）"
   },
-
-  "work": {
-    "attempts": [{ "at": "...", "answer": "学生原文", "verdict": "ok|partial|wrong", "source": "text" }]
-  },
-
+  "work": { "attempts": [{ "at": "...", "answer": "学生原文", "verdict": "ok|partial|wrong", "source": "text" }] },
   "hrl": {
     "input": { "at": "...", "from": "work|pasted", "attemptAt": "...", "answer": "拿来打磨的原文" },
     "teacher": { "writtenAt": "...", "answer": "教师版最终答案", "note": "按什么写的（可空）",
                  "steps": [{ "index": 1, "body": "...", "reason": "..." }] },
-    "pairings": [{
-      "at": "...",
+    "pairings": [{ "at": "...",
       "steps": [{ "index": 1, "studentQuote": "学生原句（逐字）", "teacherStep": 1,
                   "match": "same|partial|missing", "chosen": "student|teacher|merged",
                   "mergedText": "选 merged 时学生自己重写的", "chosenAt": "...", "note": "..." }],
-      "result": "逐条选完之后的那份解"
-    }]
+      "result": "逐条选完之后的那份解" }]
   },
-
   "handoff": {
     "id": "hlt-...", "at": "...", "from": "work", "to": "guide",
     "why": "一句", "state": "这题到哪了",
     "detail": { "lastWords": "学生最后说了什么", "blocker": "卡点", "nextStep": "下一步从哪接" },
     "consumedAt": null, "consumerSessionId": null
   },
-
   "review": { "nextAt": null, "interval": null, "count": 0, "history": [] },
   "history": [{ "at": "...", "event": "...", "detail": "..." }]
 }
 ```
 
-规划待办（`handoff` 字段、`guide.sessions[].result`、`mergedText`、`teacher.note` 都是这一轮新增的）。
+## 视觉层＝演算纸（2026-10-25 23:30）
 
-**验证现状**（2026-10-25 复验）：`check:layout`、`typecheck`、桌面包 `build`、`verify:loader` 通过；`dsh-plugin-bankmanager` 43 个单测（schema v2.1、卡片模型 7、路由 3、接续流程 4、客户端烟测 1）、typecheck、`build:client` 都过、`dsh-plugin-memory` 185 个单测、`dsh-plugin-teaching-commons` 构建与类型检查全过；profile 用 `pnpm install --offline` 能离线装好 guide / work / hrl / bank / memory / teaching-commons / setup 七个本地包；`dsh-plugin-setup` 7 个单测全过。桌面包单测 2026-10-26 收干净了：那 26 个 Windows 平台基线（module-resolution 15、linux-artifacts 5、compatibility-shell 2、desktop-runtime-environment 2、electron-runtime 1、recovery-plugin-uninstall 1）全部修掉，全是 fixture 形状与宿主平台不匹配，产品行为没动（细节见待办 16）。**全量 `corepack yarn check` 2026-10-26 首次全绿**：139 个测试文件 / 1794 个用例，1766 通过 / 28 跳过（21 个原有 skip + 7 个 Linux 打包门在 Windows 上整组 skip），`verify:cli`、`verify:loader`、`verify:profile`、`verify-licenses`（584 包）、`verify-operation-reliability`（7 operations / 18 fault contracts）、`verify-runtime-closure`（318 节点）、`verify-layout`、bilingual（43 记录 / 86 文档）全过，`EXIT=0`。`dist:win` 2026-10-25 09:17 跑通（`dist/ensure-ILE-2.0.18-x64-Setup.exe`，262MB）。**10:15 重打并实测**：262→274MB，静默装到临时目录，首启在 `<安装目录>\.ensure-ile\home\profiles\desktop\node_modules` 装出 7 个本地包、启动无报错；覆盖安装后数据根里的 marker 仍在；手动卸载清空。**2026-10-28 复验（加 textbook / schedule 两包后）**：`dsh-plugin-textbook` 37 个单测（data 23 / tools 11 / real-corpus 3）、`dsh-plugin-schedule` 40 个单测（plan 与 store 各一半）、`dsh-plugin-bankmanager` 45 个（新增 `bank_list` 的 `due` 过滤 6 条），三包 typecheck 与 build 全过；`check:layout`、`verify:profile` 通过；把 `profiles/ensure-ile` 拷进一个四级子目录离线 install，9 个本地包全部链上、`require.resolve('dsh-plugin-textbook/data')` 在 schedule 的 node_modules 视角下指到 `lib/data.js`；全量 `corepack yarn check` 仍 139 文件 / 1766 通过 / 28 跳过、`EXIT=0`（数字与 10-26 一致，因为**插件包自己的单测不在这道门里**，见坑 ⑥）。
+- **字体即语义**：宋体＝印刷体（题干 / 教材原文 / 教师版）、楷体＝手写（学生原话）、黑体＝界面。
+- **颜色只编码状态**：墨蓝 `primary`、朱批 `destructive`、印章青 `seal`。不做装饰性用色。
+- 霞鹜文楷 v1.530 与思源宋体 2.003R 子集到 GB2312 + 数理符号；因 OFL 保留字体名条款改名 `ILE Kai` / `ILE Song`，许可证在 `dsh-plugin-desktop/src/native-ui/assets/fonts/`。
+- 画廊入口 `dsh-plugin-desktop/src/native-ui/gallery.html`（进 `vite.native-ui.config.ts` 的 input）；设计稿与截图在 `docs/design/`。
 
-**提交**：`272a34c` 删 Beta/Next → `d9dfdba` 删社区市场+AA 并把 hrll 改名 guide → `bc5a422` 三个占位骨架 → `a24d2c9` 记忆 → `c784397` 状态 → `4c56d90` 记忆快照 → `6b6760d` 删 Next 交接与 `_deprecated` → `380caf4` 删 retired bundle 兼容层 → `abf2025` 砍 preset + 删 Python 载荷 → `4e9546a` dshmarket 补丁挪 1.67.0 → `170edcc` 把插件市场从构建里删掉 → `3198d10` 全仓改名 ensure-ILE（产品名、appId、数据根、环境变量、根包名）→ `32a5bc7` guide 出壳（自带 bundle patch）→ `46db1cd` 题库插件 → `b196533` memory fork 接进 profile → `3076215` 加 setup 预设、会话工作区收进数据根 → `17a0789` 修正 AGENTS 重复句号 → `87d4544` work / HRL 两模式 + 复习阶梯 + 画像字段 + 打包链路 + 署名 → `cd2b3ff` memory 的 `profile_read` / `profile_write` → `0780e39` `bank_resume` + 打包改 `build.files` → `82a3210` 打包实测 → `1aa1b69` 修 `verify-profile-boot` → `905bd03` 记录 `yarn check` 卡点 → `5e3f114` 交接给出一句可直接照做的话 → `76d9577` 打包修正：vendor 七个本地包、覆盖安装保留数据根 → `109c6ad` 修 bilingual 记录 → `8603deb` 更新 yarn.lock → `0a92ca2` 工作区依赖改 `link:` → `b1845c1` CI 适配（mac uv、profile 冒烟）→ `13d801c` 签名测试跟到现状（Python 已删）→ 剪 CI 到 Windows + `yarn docs:record` 自愈 → `5f5f49a` 题库浏览器半边（交接卡片）→ `c9f4903` 视觉层换演算纸 → `16b31d7` 交接卡片接上会话 + 首页接续入口 → `998e12c` `bank.md` 交接卡片的规矩 → `bfe340f` 题库 web 通道改嵌套 inject → `11bc32e711` verify:cli 在 Windows 上跑通（断言按平台分叉、shim 根规范化）→ `a45a5f8a60` 桌面包 26 个 Windows 基线单测修完，全量 `yarn check` 首次全绿 → `a5b43b4b30` 教材锚定 + 课表插件（`textbook_*` / `schedule_*` / `bank_list` 的 `due` 读端 + 两包接线）。
+## 验证现状（2026-10-28 重整后复跑，全绿）
 
-**外部对照**：根目录 `开源AI学习伴侣调研.md`（2026-10-25，13 个开源项目的对照，带核实记录与自我修正；`⚠️ 仅描述` 标记用得对）。它的 P0-1「先真机跑一道题」与李 Q1 的「先搭模式」相反，2026-10-25 决定按「先跑」重排。它漏掉的：guide 会话实际还有 `working_directory`（说成只有 `read_note`）；它的 §5.5 与 §6.5 对同一件事反向表述（学生自证既是优势又是风险）——§6.5 才对。
+- 全量 `corepack yarn check` `EXIT=0`：139 个测试文件 / 1794 用例，1766 通过 / 28 跳过（21 个原有 skip + 7 个 Linux 打包门在 Windows 上整组 skip），104 s。它 = `check:layout` + community-fabric + 桌面包，**不含插件包单测**。
+- `corepack yarn check:plugins` `EXIT=0`：setup 7 / bankmanager 45 / memory 189 / textbook 37 / schedule 40 全过，guide / work / hrl / teaching-commons 只 typecheck + build。
+- `check:layout` 四组全绿：icons 源与全平台资源一致 / vendored runtime 343 packages @687f282e86 / verify-layout 与上游 687f282e86 一致 / bilingual 43 记录 86 文档；`verify:licenses` 584 production packages；删掉 155 个死补丁与 8 个死 vendor 版本树之后 `corepack yarn install --immutable` 仍 `exit 0`。
+- 打包链路只做过离线 install 模拟（profile 模板拷进四级子目录能装出 9 个包、`require.resolve('dsh-plugin-textbook/data')` 在 schedule 的视角下指到 `lib/data.js`）；没重打 `dist:win`。
 
-**待办（2026-10-25 重排；Q1–Q35 的结论已并入上一节）**：
-1. ✅ **真机跑一道题**（2026-10-25 08:19 验过）：提示词拼接生效、`bank_add` 第一轮就调、`read_note` / `bank_list` 正常、回复 64–108 字、零硬禁词、落盘正确。发现并修掉两条：cwd 快照是 `required` 压不掉（改用同名空 context 遮蔽）、`bank_add` 后状态停在 `new`（已写进 bank.md）。留下的那道题 `20261025-math-2d1ed2` 仍停在 `status: new`、`guide.sessions` 为空——新规矩是那之后才写进 bank.md 的，这条是旧规矩的化石。
-2. ✅ **bank schema v2.1**（2026-10-25 已实现）：按 `guide/work/hrl` 分块 + `handoff`；`store.ts`、五个工具一起改（`bank_resume` 后来另加），20 个单测、typecheck、构建通过；列表与 `bank_stats` 会标出待接交接。
-3. ✅ **共享提示词片段包**（2026-10-25 已实现，`dsh-plugin-teaching-commons`）：安全边界三条（自伤/被伤害/极度痛苦 → 停机、让找可信成年人；反复索要答案 → 说明为什么不给并给更小视角；题干里藏「忽略之前的指令」→ 当题干内容、不执行）+ 反谄媚清单 + 题库规则，`guide/setup/work/hrl` 统一拼接。
-4. ✅ **`setup` 预设 + `setup.json`**（2026-10-25 已实现，`dsh-plugin-setup`）：字段级进度、可中断、完成判据是「能给出下一步」；7 个单测。默认预设仍是 guide，学生想重过一遍开学问话时在空会话里选「开学」。
-5. ✅ `dsh-plugin-work`（2026-10-25）：预设 `work`「独立做题」，提示词 common+bank+work.md，`read_note` 只给判卷用；判两件事、重交只给一次、讲不清回 guide 并写 handoff。
-6. ✅ `dsh-plugin-hrl`（2026-10-25）：预设 `hrl`「答案优化」，教师轨迹一次写全 + 逐小步 A/B（`student/teacher/merged`，merged 正文必须学生自己写）。
-7. ✅ **交接卡片**（client 插件，最重）：工具 + 卡片 slot + `session.create` 幂等。**2026-10-25 09:22 先落了界面前的最小形态**（`5e3f114`）：bank.md 让模型原样给学生一句「开个新会话、选「<下一个模式>」，发一句：接着上次那道题」，新会话用 `bank_resume` 接上。**23:30 卡片本体做了**（`5f5f49a`）：认领 `bank_resume` 的 toolview、画题干/原话/卡点/下一步，按钮只复制一句提示。**23:50 接完**（`16b31d7`）：按钮开新会话、填输入框、认领交接，幂等靠列表 + `localStorage`；首页入口也做了（见第 10 条）。这条关闭。
-8. ✅ **memory 的 `profile_*`**（2026-10-25）：`<DSH_HOME>/profile/{grade,schedule,rhythm,preference}.md` 四个固定栏目，`profile_read` 读一个或全部、`profile_write` 写一个（空内容等于删除）；**不进检索、不占注入预算**。memory 自述从 12 个工具改成 14 个，189 个单测全过。
-9. ✅ **钩子入口（题库侧）**：`bank_list` 行尾标 `-> guide 待接`，`bank_stats` 有「待接交接：N」，另有 `bank_resume`（2026-10-25 加）：不带 id 列出待接交接，带 id 直接返回题干 + 交接包 + insight + 最后一次作答。聊天首页那个入口归第 10 条。
-10. ✅ **接续 UI**（2026-10-25 23:50，`16b31d7`）：不点接续时 prompt 原样；点一下（首页 `ile-resume` 或聊天里的交接卡片）就把上次那道题（带状态）填成学生这次要发的那句——首页入口只填输入框，卡片开新会话并填输入框；两者都不替学生按回车。模型侧规矩同步改了（`998e12c`，`bank.md`：写完 handoff 就出卡片，别再叫学生自己开新会话）。
-11. ✅ **固定档复习**（2026-10-25）：`REVIEW_LADDER = [1,3,7,14,30,60,120]`；进 `review` 自动排第一次，`reviewPassed: true` 升一档、`false` 回第一档，爬到最后一档自动 `mastered`。
-12. ✅ **画像字段**（2026-10-25）：`guide.sessions[]` 加 `affect`（frustrated/neutral/excited）与 `effectiveHint`（confirm/position/feature/structure/result），`bank_update` 可直接写，没开会话就自动开一个。**进题不进 memory**。
-13. ✅ **打包链路**（2026-10-25）：`seedProfile()` 打包时读 `app.getAppPath()/profiles/ensure-ile`、开发时读仓库根；`scripts/prepare-profile.mjs` 在 `build` 开头把仓库模板镜像进 `dsh-plugin-desktop/profiles/`（gitignore），`build.files` 加 `profiles/**`——**不能用 `build.extraResources`**，上游 `tests/package.spec.ts` 明确禁止顶层 extraResources；`materializeSeededProfile()` 在 node_modules 缺失时用内置 pnpm 跑 `install --offline --no-frozen-lockfile`。**2026-10-25 打包实测通过**：`dist:win` 产出 `dist/ensure-ILE-2.0.18-x64-Setup.exe`（262MB），`afterPack` 的 installer 校验过，`win-unpacked/resources/app/profiles/ensure-ile/` 里三个文件都在。**10:15 复验修掉两个坑**：① 七个本地包原先没进包（`file:../../../../` 指到安装目录外，首启 install 必失败）——`prepare-profile.mjs` 现在把它们 vendor 进 `profiles/ensure-ile/vendor/`，并把包内 `package.json` 的依赖改写为 `file:./vendor/*`（仓库模板不动，开发仍链源码），`seedProfile()` 把 `vendor/` 一起种进数据根；② 覆盖安装会把数据根删掉——`build/installer.nsh` 用 `$TEMP\ensure-ILE-upgrade.flag` 标记安装，旧卸载器把 `.ensure-ile` 挪到 `$TEMP\ensure-ILE-data`，`customInstall` 再挪回。实测四条：7 个包、首启、覆盖、卸载，都对。
-14. **独立 Evaluator**（廉价模型按五条硬规则校验上一轮回复：给动作了吗、含答案了吗、一次两个视角了吗、超两句话了吗、空表扬了吗）：等第一条效果数据，别现在做。
-15. ✅ **教材锚定**（2026-10-28 关闭）：语料抽成 `dsh-plugin-textbook`（见上，`textbook_*` 三工具），`common.md` 里加了三条硬规矩——出现页码/章节/「课本上说」先 `textbook_find` 再 `textbook_read`、不许凭记忆复述课本；「今天学什么 / 先做哪个 / 明天讲什么」先 `schedule_plan`；读不到（扫描版无文字层）就直说「这页我读不到，你念一下或告诉我页码」，不假装读过。**还没做的**：真机上让模型实读一次教材（数据根里的 profile 要先删再种，见坑）。教材本体仍在——`<数据根>/deepseek-harness/default-workspace/教材/` 有 7 本必修 PDF（人教A数学必修一/二、人教版化学必修一/二、教科版物理必修一/二/三）、`教材索引.md`（含 PDF 页与课本页换算）和三个 Python 小工具；`教辅资料/` 11MB（数学必修一答案、化学预习提纲等）。**09:45 定：数据根为准**。索引里的路径已改成数据根；教辅资料比 Documents 少 8 个文件（化学必修一两本答案、化学/物理预习提纲、README 等），已补齐，两边各 89+15 个文件。Documents 那份留作备份（183MB，未删；老会话 cwd 还指着它）。
-16. ✅ 修 Windows 单测（26 个基线）、跑全量 `yarn check`、试 `dist:win`（2026-10-26 关闭）。
-    **全量 `yarn check` 2026-10-25 首次跑的两个卡点**：① `scripts/verify-profile-boot.mjs` 引用了从未赋值的 `prepared`——已修（`prepareDesktopProfile` 的返回值接住）；② `scripts/verify-cli-runtime.mjs` 的 pnpm 生命周期断言期望 `runAsNode: []`、实际拿到 `["ELECTRON_RUN_AS_NODE"]`。后者是**断言写错了而不是产品错了**：Windows 的私有 node shim 是批处理（`windowsNodeShim`，`set "ELECTRON_RUN_AS_NODE=1"`），子进程丢掉这个变量就会起 GUI 而不是 Node，所以保留它是有意设计（`src/desktop-runtime-environment.ts:341` 的 win32 分支本来只留注释）。顺便发现 `windowsNodeShim` / `windowsPnpmShim` 用 `%~dp0..` 拼根会留下未规范化的 `bin\..`，改成 `for %%I in ("%~dp0..") do set "X=%%~fI"`（`11bc32e711`）。
-    **26 个基线全是 fixture 形状与宿主平台不匹配，产品行为没动**（`a45a5f8a60`）：`verify-linux-artifacts` 5+2 个整组 `describe.skipIf(platform !== 'linux')`；`compatibility-shell` / `electron-runtime` 的路径正则补上反斜杠（`/[\\/]preload\.cjs$/`）；`desktop-runtime-environment` 两条 PATH 用例改用 win32 平台 + 盘符路径（拿 `D:` 喂按 `:` 切分的 PATH 会被切碎）；`module-resolution` 15 个是因为 POSIX 字面量 `file:///tmp/...` 在 Windows 上 `fileURLToPath` 直接抛 `File URL path must be absolute`（`src/module-resolution.ts:711`，`filePath()` 在 `:88-95` 吞异常返回 `undefined`，于是 Profile 边界识别全失效），改成 `pathToFileURL(join(tmpdir(), ...))` 生成的宿主形状 fixture；`recovery-plugin-uninstall` 那条是整套替换 env 之后 Windows 缺 `PATHEXT`/`SystemRoot`/`ComSpec`/`TEMP`，托管 runner 起不来 `pnpm.cmd`（`dsh: pnpm was not found`，exit 127），补回四个同名变量就过。
-    **结果**：`corepack yarn check` 全绿（139 文件、1766 通过 / 28 跳过、`EXIT=0`）；`dist:win` 2026-10-25 跑通（见第 13 条）。
-17. ✅ README 署名（2026-10-25）：中英两份都加了 EnSure Lab / 因需 与「每一步都要说得清为什么」，`README.i18n.yaml` 的哈希同步更新，bilingual gate 通过。
-18. 图片链路（拍照发题 → 模型看得见 → 存进题库的 `attachments`）：李 2026-10-23 明确「之后搞」，暂缓。
-19. ✅ 「明确不做」已经写成独立一节（见下）。
-20. ✅ **课表插件**（2026-10-28）：`dsh-plugin-schedule` 从占位目录变成整包（见上），`schedule_*` 三工具在 guide 里可用；同时给 `bank_list` 加了复习读端——`due: true` 只列到今天为止到期（本地当天 24:00）的题，返回「今天该复习 N 道」，此前复习阶梯只有写入端。
+## 还没做
 
-## 明确不做（2026-10-25 定）
+- **教材锚定最后一步**：真机让模型实读一次教材。要先删 `.ensure-ile/home/profiles/desktop` 再启动（`seedProfile()` 不覆盖）并手动 `pnpm install --offline`。
+- **重打 `dist:win`**：`dsh-plugin-textbook` 与 `dsh-plugin-schedule` 进包的 vendor 链路只做了模拟，没跑真实打包。
+- **图片链路**（拍照发题 → 模型看得见 → 存进 `attachments`）：李 2026-10-23 说之后搞。
+- **独立 Evaluator**（廉价模型按五条硬规则校验上一轮回复：给动作了吗、含答案了吗、一次两个视角了吗、超两句话了吗、空表扬了吗）：等第一条效果数据。
+- **pi-ai 补丁已失效**（2026-10-28 发现）：`resolutions` 里 `@earendil-works/pi-ai@npm:^1.1.0` 解析到 1.2.0，而 `patches/pi-ai@0.87.1.patch`、`patches/pi-ai@1.0.2.patch` 停在旧版——补丁里那个流式 JSON 性能修复（删掉每次 delta 的 `block.arguments = parseStreamingJson(block.partialJson)`）**已经静默不生效**。要么补一份 1.2.0 的补丁，要么把选择器钉回 1.0.2。
+
+## 明确不做
 
 不是没来得及，是**决定不做**。每条都写了理由，免得下次有人重新提。
 
 | 不做 | 理由 |
-|---|---|
+| --- | --- |
 | 账号 / 多租户 / 权限 / 计费 | 只有一个已知学生。做成多租户反而要求隐私声明、配额、计费，全是成本 |
 | 4–24 周学习路径 | 别人的单位是「课程/周」，我们的单位是「一道题」。时间尺度不同，硬套会把题目账本稀释掉 |
 | 十种能力的课程工作台 | 越多的能力越容易诱导「直接给答案」——和「逼他自己想出来」相冲 |
@@ -140,8 +150,45 @@ bank schema v2.1（2026-10-25 已实现，按模式分块）：
 | 模型自己切模式 | 预设锁定，模型也不能替学生重启会话；切换只能由学生点 |
 | 一次会话内换提示词 | flash 的 `toolUpdate` 是 `addition-only`，换工具集做不到；静态全集等于隐式预设 |
 
-**坑**：`profile-setup/<hash>/state.json.pending` 必须精确 `pending\n`（8 字节），空文件会让主进程进恢复页；冷启动首屏「正在加载设置…」约 30 秒；billion-context 0.1.202 有 0.1.203 关键更新（升级后需重启 dsh）；市场已经整个删掉，不再有追 latest 和 port 补丁的事；设置里的插件市场开关现在没有可挂载的 provider；`seedProfile()` **只在首次种、存在就不覆盖**——改完 `profiles/ensure-ile/` 要删掉 `.ensure-ile/home/profiles/desktop` 下那三个文件（或整个目录）再启动，然后手动跑一次 `pnpm install --offline`；模板路径是仓库根的 `profiles/ensure-ile/`，不是 `dsh-plugin-desktop/profiles/`。C: 盘满过一次（Yarn 缓存 1.3G），缓存已用 junction 指到 `D:\yarn-berry-cache`，pnpm store 也吃 C: 盘。2026-10-25 09:39 清了改名前的旧数据根 `.dhdl/`（100MB，10-21 后没再写）与 7 个空的 `.dsh-ops-update-*.lock`；`dsh-plugin-desktop/dist/` 会堆到 1.5G（Setup 262MB + `win-unpacked` 1.2G），要腾地方先删 `win-unpacked`（可重建）。**CI 2026-10-25 剪到 Windows 平台**：只留 `changes`（文档+分类）、`check`（139 文件单测，ubuntu）、`desktop-windows`（check:win-package + dist:win + portable）、`upstream-command-windows`；macOS/Linux 打包整段删掉（学生只装 Windows，上游那两个作业每轮白跑 20 分钟）。bilingual 哈希过期不用手改：`yarn docs:record` 会重算全部记录、只改过期行，`verify-bilingual-docs` 失败时也会提示这条命令。**打包后的数据根 = `dirname(ensure-ILE.exe)\.ensure-ile`（就在安装目录里）**：覆盖安装靠上面的 NSIS 挪移保住数据，手动卸载仍然全删。`seedProfile()` 只在目标文件不存在时复制，所以以后改 profile 模板，老安装不会自动更新——要么删数据根里的 profile 再启动，要么给它加刷新逻辑。**2026-10-25 23:30 加坑**：`build:client` 要本地有 `vite`，bankmanager 的 devDependencies 补了 8.2.1（跟桌面包同版本，`yarn.lock` 已更）——之前 `yarn workspace dsh-plugin-bankmanager build:client` 直接 `command not found: vite`。`.codegraph/` 是本机索引（CodeGraph 1.6.0，索引整个仓库含上游子模块），进 `.gitignore`、不提交；它自带 `.gitignore` 只放行自己，别把里面的库提交进去。**23:50 加坑**：`/bank/api` 要 `webServer` / `webStartup`（web-app bundle 提供）。一开始写成了顶层 `inject`，那会让没有 web-app 的 profile 整行 pending、工具全不见；改成嵌套 `ctx.inject(['webServer', 'webStartup'], …)` 才能「路由晚到、工具先有」。教训：插件最不能丢的是工具，可选通道一律走嵌套 inject，别写进顶层 `inject`。接续的幂等记忆在浏览器 `localStorage`（键 `dsh-plugin-bankmanager:resume:<题 id>`），换机/清缓存就退回「再开一个」，不会错跳到别人的会话。首页入口的待接列表是挂载时取一次，不实时刷新。**2026-10-28 加坑**：① `corepack pnpm install` 在仓库内任何子目录都会被拒（『This project is configured to use yarn because E:\Projects\DHDL\package.json has a "packageManager" field』——corepack 一路向上找），校验 profile 要用 `COREPACK_ENABLE_PROJECT_SPEC=0 corepack pnpm install --offline --no-frozen-lockfile`；② 兄弟包按包名 import（`dsh-plugin-schedule` 用 `dsh-plugin-bankmanager/store`、`dsh-plugin-textbook/data`）必须对方**出 d.ts**：`exports` 写 `{ types, default }`、各自 `tsc` 出 `lib/types`（textbook 用 `tsconfig.build.json` 只出声明），拿 tsconfig `paths` 指向兄弟包源码会撞 TS6059『File … is not under rootDir』；③ `yarn workspace dsh-plugin-desktop verify:profile` 用的是合成 profile，**不装配 `profiles/ensure-ile/` 模板**，它过不等于新 bundle 行能加载——真要验就把模板拷进一个四级子目录里离线 install；④ 新增 bundle 后老数据根的 profile 不会自己长出来（`seedProfile()` 只在文件不存在时复制）：删掉 `.ensure-ile/home/profiles/desktop` 整个目录再启动；⑤ workspace 名单有第二处硬编码：`scripts/verify-layout.mjs` 第 29–39 行，加包忘了改会报『verify-layout: the root Yarn workspace must contain the plugin, desktop, and community-fabric packages』；⑥ **根 `yarn check` 不跑插件包自己的单测**：根 `package.json` 的 `test` 只 `yarn workspace dsh-plugin-desktop test`，`check` 只串 `check:layout` + community-fabric + 桌面包，所以 bank/textbook/schedule 几十个用例进不了那道门（历史一直如此）——改插件必须自己 `corepack yarn workspace <pkg> test`，全仓绿灯不代表插件没坏。
+## 坑
 
+### profile 与打包
+
+1. `profile-setup/<hash>/state.json.pending` 必须精确 `pending\n`（8 字节）；空文件会让主进程进恢复页。冷启动首屏「正在加载设置…」约 30 秒，不是卡死。
+2. 模板路径是**仓库根**的 `profiles/ensure-ile/`，不是 `dsh-plugin-desktop/profiles/`（后者是 `scripts/prepare-profile.mjs` 在 `build` 开头镜像出来的，gitignore）。
+3. **不能用 `build.extraResources`**（上游 `tests/package.spec.ts` 明确禁止顶层 extraResources）；用 `build.files` 加 `profiles/**`，`seedProfile()` 打包时读 `app.getAppPath()/profiles/ensure-ile`、开发时读仓库根。
+4. 九个本地包（含 teaching-commons——它在 profile 的 `dependencies` 里但不在 `bundles` 里）必须 **vendor 进 `profiles/ensure-ile/vendor/`**，并把包内 `package.json` 的依赖改写成 `file:./vendor/*`——原来的 `file:../../../../` 指到安装目录外，首启 install 必失败。仓库模板不动，开发仍链源码。
+5. **覆盖安装会删数据根**：`build/installer.nsh` 用 `$TEMP\ensure-ILE-upgrade.flag` 标记安装，旧卸载器把 `.ensure-ile` 挪到 `$TEMP\ensure-ILE-data`，`customInstall` 再挪回。手动卸载仍然全删。
+6. 补丁与 vendor 的运行时间也是死的：`patches/` 只留被根 `package.json` 的 `resolutions` 用 `patch:` 引用到的那些（2026-10-28 删了 155 个旧版本补丁、414 KB），`vendor/dsh-runtime/` 只留 `upstream.json` 指的那一个版本树（同日删了 8 个旧树、160 MB）。**`scripts/sync-vendored-runtime.mjs` 的 `--write` / `--check` 都只看当前版本目录**，旧版本堆积它结构上看不见——清完必须跑 `corepack yarn install --immutable` 证明没断。
+7. `materializeSeededProfile()` 在 `node_modules` 缺失时用内置 pnpm 跑 `install --offline --no-frozen-lockfile`——清掉 `.ensure-ile` 后首启会自己装，也可以在 `.ensure-ile/home/profiles/desktop` 手动跑一次。
+
+### 工具链
+
+1. C: 盘满过一次（Yarn 缓存 1.3G）——缓存已用 junction 指到 `D:\yarn-berry-cache`；pnpm store 也吃 C: 盘。
+2. `dsh-plugin-desktop/dist/` 会堆到 1.5G（Setup 262MB + `win-unpacked` 1.2G）；要腾地方先删 `win-unpacked`（可重建）。
+3. **根 `node_modules` 没有 `.bin`**：包内不能写 `../node_modules/.bin/vitest`，一律 `corepack yarn workspace <pkg> typecheck|test|build`。`build:client` 需要包内有 `vite`（bankmanager devDependencies 8.2.1，跟桌面包同版本）。
+4. **根 `corepack yarn check` 不跑插件包自己的单测**（根 `test` 只有 `yarn workspace dsh-plugin-desktop test`，`check` 只串 `check:layout` + community-fabric + 桌面包）——改插件必须自己跑，别拿全绿当验过了。`corepack yarn check:plugins` 是补的这一道（9 包 typecheck + setup/bankmanager/memory/textbook/schedule 的单测，串行约 100 s），但**故意不接进 `check`**：接进去意味着全量门从 346 s 涨到约 445 s，而且 memory 的 189 个用例在并行负载下会撞 5 s 超时（独占跑 23.5 s 全过）——那种红是调度抖动，不是缺陷。
+5. bilingual 哈希过期不用手改：`yarn docs:record` 会重算全部记录、只改过期行；`verify-bilingual-docs` 失败时也会提示这条命令。
+6. 26 个 Windows 基线单测的教训（已修，别改回去）：POSIX 字面量 `file:///tmp/...` 在 Windows 上 `fileURLToPath` 直接抛 `File URL path must be absolute`，而 `filePath()` 吞异常返回 `undefined` → Profile 边界识别全失效，fixture 要用 `pathToFileURL(join(tmpdir(), ...))`；PATH 用例不能拿 `D:` 喂按 `:` 切分的 PATH；`windowsNodeShim` 要用 `for %%I in ("%~dp0..") do set "X=%%~fI"` 规范化，否则留下未规范化的 `bin\..`。
+7. `scripts/verify-cli-runtime.mjs` 期望 `runAsNode: []` 是**断言写错了**：Windows 的私有 node shim 是批处理，子进程丢掉 `ELECTRON_RUN_AS_NODE` 就会起 GUI 而不是 Node，保留它是有意设计。
+8. CI 2026-10-25 剪到 Windows 平台：只留 `changes`、`check`、`desktop-windows`、`upstream-command-windows`；macOS/Linux 打包整段删掉（学生只装 Windows）。
+9. `.codegraph/` 是本机索引（索引整个仓库含上游子模块，740MB），进 `.gitignore`、不提交；它自带 `.gitignore` 只放行自己。
+10. Windows 上 `dsh-plugin-desktop/vitest.config.ts` 把 `testTimeout` 放到 60 s（其它平台仍 5 s）：三条起 `electron.exe` 的用例冷启动实测 22.4 s（Defender 冷扫 244 MB），5 s 默认会把机器成本当成缺陷。历史上 `tests/desktop-runtime-environment.spec.ts:247` 偶发红就是这个原因，不是回归。
+
+### 插件机制
+
+1. **插件最不能丢的是工具**：可选通道（`webServer` / `webStartup`）一律走嵌套 `ctx.inject([...], …)`，写进顶层 `inject` 会让没有 web-app 的 profile 整行 pending、工具全不见。`/bank/api` 就是这么从顶层改嵌套的。
+2. 各预设 `complete: true` → **共享段只能有一份**（在 `teaching-commons`），否则四份各自漂移。
+3. 上游那条 `required` 的 cwd 快照压不掉，用**同名空 context** 遮蔽。
+4. 兄弟包互相 import 只走 `exports` 子路径 + 对方出 `lib/types` 声明；`tsconfig paths` 指源码会撞 TS6059。
+5. 宿主侧「路由晚到、工具先有」：路由挂载要能缺席，工具注册不能受它牵连。
+
+### 上游与文档
+
+1. `deepseek-harness/` 禁止修改；子模块 pin 更新单独提交，别和桌面行为改动混在一起。
+2. 命名规矩：`README.md` 中文 / `README.en.md` 英文 / `README.zh.md` 只是兼容跳转；`PRIVACY.md`（中文）/ `PRIVACY.en.md`（英文）同规矩，哈希记在 `*.i18n.yaml`。
+3. `.dsh/storages/memory_project_*.json`（项目记忆）**进 git**，随仓库分享；代价是每个会话都会把它改脏，工作树几乎永远不干净。这是取舍不是 bug，别顺手 ignore 掉。
+4. 「以代码为第一信源」的反面教材：文档里写过「插件市场由内置 dshmarket bundle 提供」「Channels 是独立 roadmap」，两者代码里都已不存在，2026-10-28 全文清掉了——别再写回去。**但别把官方的 custom-market 一起删**：`src/desktop-market.ts`、`src/desktop-settings-route.ts`、`src/desktop-settings-contract.ts`、`src/safe-mode.ts`、`src/profile-preferences.ts`、`src/factory-reset.ts` 互相引用，HTTP 路由在 `src/index.ts:233/237` 注册，客户端链路 `src/client/api.ts:368` → `DesktopSettingsSection.tsx:473/684` 都通；`src/client/market-toggle.ts` 只被 `plugin-controls.tsx` 引用、由 `src/client/index.ts:141` 静态注册进 vite 单入口（`vite.client.config.ts:37`），产物里真实可达。死的只是**第三方 dshmarket 的残渣**，2026-10-28 已清（`vitest.config.ts` 的 inline、桌面 `package.json` 的 `dsh.optionalBundles`、`release-mac.ts:104` 那行调用已删脚本 `prepare-dsh-market.mjs` 的死调用）。
 
 ---
 
@@ -165,7 +212,6 @@ This repository owns the desktop product around an unmodified DeepSeek Harness c
 - Run the complete headless gate with `corepack yarn check`.
 - Desktop feature changes apply to `dsh-plugin-desktop/` only. The Beta and Next variant packages were removed, so there is no variant mirror to synchronize and no `check:desktop-variants` gate.
 - Run upstream operations through the root scripts, such as `corepack yarn upstream:build`.
-
 - `deepseek-harness/` is a pinned upstream Git submodule. Never edit files inside it from a desktop feature branch.
 - `dsh-plugin-desktop/` owns the Cordis Host and Client faces, Electron bootstrap, packaging, and release tests.
 - The separate experimental Desktop shell (`dsh-desktop-next/`) was removed; this repository now ships the Stable shell only.

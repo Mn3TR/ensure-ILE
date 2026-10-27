@@ -1,4 +1,10 @@
 .DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*~
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
@@ -9,8 +15,21 @@ node_modules/
 *.tsbuildinfo
 .build/
 
+# Build output. The desktop shell compiles into its own ignored lib/, while
+# every `dsh-plugin-*` plugin ships a committed lib/ on purpose: the seeded
+# profile links those packages from disk, so a checkout without lib/ cannot
+# boot. Never widen this to `dsh-plugin-*/lib/` or a bare `lib/`.
 dsh-plugin-desktop/dist/
 dsh-plugin-desktop/lib/
+
+# Temporary logs and local gate output.
+*.log
+
+# Test and build intermediates.
+coverage/
+test-results/
+*.orig
+*.rej
 
 .env.yarn
 .ensure-ile/

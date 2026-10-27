@@ -1,14 +1,27 @@
 # dsh-plugin-setup
 
-ensure-ILE 的**开学对话**：第一次见面时把学生的基本情况问清楚，并给出下一步。
+开学对话的预设包（`setup`「开学」）：第一次见面把年级、课表、作息、解题偏好问清楚，然后给出一个下一步——这个会话不做题。
 
-它是独立预设（id `setup`、显示「开学」），不是欢迎向导弹窗。理由和 OpenClaw 的 onboarding chat 一样：把「第一次启动的自我介绍」和日常做题分开，主会话上下文不被配置说明打乱。
+## 什么时候用
 
-## 它做什么
+| 项 | 值 |
+|---|---|
+| 预设 id | `setup` |
+| 显示名 | 开学（`cordis.patch.yml` 的 `setup-preset`，`order: 30`） |
+| 默认预设 | 不是——默认始终是 `guide`；想重过一遍开学问话时在空会话里选「开学」 |
 
-1. 把系统提示换成「开学文档」（共用片段 + `prompts/setup.md`）
-2. 注册两个工具：`setup_read` 读进度、`setup_update` 写进度
-3. 进度落在 `<DSH_HOME>/setup.json`，**字段级**，可中断：
+系统提示 = commons 的 `common` **一段** + 本包 `prompts/setup.md`（`src/index.ts:66`，`composePrompt(['common'], …)`）——开学会话不进题，所以不拼 `bank`。
+
+| 工具 | 用途 | 关键参数 |
+|---|---|---|
+| `setup_read` | 读进度（换会话/中断后接着问） | 无参数 |
+| `setup_update` | 字段级写进度 | `onboarding`（`pending`/`done`）、`grade`、`schedule`、`rhythm`、`preference`、`next`（下一步做什么） |
+
+**完成判据是「能说出下一步」**（`next` 有内容），不是四样问齐。问完就撒手等于没收尾。
+
+## 数据落在哪
+
+一个文件：`<DSH_HOME>/setup.json`（`DSH_HOME` 没设时退 `process.cwd()`；桌面壳里就是数据根的 `home`）。`Config` 可覆盖 `promptFile` 与 `stateFile`。
 
 ```json
 {
@@ -20,15 +33,35 @@ ensure-ILE 的**开学对话**：第一次见面时把学生的基本情况问�
 }
 ```
 
-## 完成判据
+- `schema`: 1；`onboarding` 只有 `pending` / `done`；`got` 就是那四样，缺就是空串。
+- 写入是原子的：先写 `setup.json.tmp` 再 `rename`。
+- 文件坏了（不是合法 JSON）退回 `pending` 空记录，工具不抛栈。
 
-不是「四样都问了」，是**能给出下一步**（`next` 有内容）。问完就撒手等于没收尾。
+## 和邻居的关系
 
-## 为什么默认预设还是 guide
+- **依赖** `dsh-plugin-teaching-commons`（只要 `common`）。
+- 不碰题库、不碰课表插件：开学的答案只落在 `setup.json`，**目前没有任何插件读它**——想让它生效得由人（或在后续版本里）搬进 `schedule_*`。
+- 与 guide / work / hrl 的区别：那三个处理具体的一道题，这个只处理「学生是谁」。
 
-学生开新会话默认就能做题；想重新过一遍开学问话时才在空会话里选「开学」。等 `seedProfile()` 有了打包分支，再考虑让首次启动自动进 setup。
+## 测试与构建
 
-## 调试
+```bash
+corepack yarn workspace dsh-plugin-setup typecheck
+corepack yarn workspace dsh-plugin-setup test     # 7 个用例（tests/state.spec.ts）
+corepack yarn workspace dsh-plugin-setup build
+```
 
-- 改 `prompts/setup.md` 不用重新构建，重启会话即生效（挂载时读盘）
-- 想看进度：`cat .ensure-ile/home/setup.json`
+`build` = `tsc -p tsconfig.json` + `tsdown`；`lib/` 是入库的构建产物，改完源码要一起提交。
+
+## 已知限制
+
+- 进度是「字段级」但**不校验内容**：`grade` 写「不知道」也能存，`rhythm` 长什么样由模型决定。
+- `setup.json` 与课表/记忆各存一份，三处没有同步机制（见上一节的「没人读它」）。
+- 完成判据靠模型自己判断 `next` 该不该写，代码只提供字段。
+- 没有「首次启动自动进 setup」：数据根的 profile 种下来时默认预设仍是 `guide`。
+
+## 不做什么
+
+- 不出题、不引导、不判卷——开学只问人，不做题。
+- 不问分数、不问排名、不问家里的事（写在 `prompts/setup.md` 里）。
+- 不接管配置：改年级/课表是重新开一次开学会话，不是改系统设置。

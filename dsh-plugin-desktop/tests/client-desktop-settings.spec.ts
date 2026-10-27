@@ -16,7 +16,7 @@ import {
   DesktopModeControl,
   DesktopVersionControl,
   selectDesktopFrameMode,
-} from '../src/client/ExtendedTitlebar.tsx'
+} from '../src/client/DesktopFrameTitlebarView.tsx'
 import {
   desktopBrowserUrlsShouldRender,
   DesktopSettingsSection,

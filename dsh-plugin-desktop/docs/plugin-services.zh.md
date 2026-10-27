@@ -177,7 +177,7 @@ interface DesktopPnpmHandle {
 | --- | --- | --- |
 | `run(argv, signal?)` | 直接执行已打包 pnpm JavaScript entry，以激活 Profile 目录为 `cwd`。 | 任意由调用方负责的 pnpm operation。 |
 | `runPlugin(argv, invokingDir, signal?)` | 从绝对调用方目录执行已打包的 `dsh plugin --profile <active>`，并传入插件 argv。 | 依赖 DSH bundle reconcile 的插件管理器兼容适配。 |
-| `runExternalMarketPluginInstall(argv, invokingDir, signal?)` | 使用同一套已打包 DSH plugin CLI，但只接受 `add`、flag 选项与一个精确版本 npm target。 | 内置 `dshmarket` runtime 的窄兼容适配。 |
+| `runExternalMarketPluginInstall(argv, invokingDir, signal?)` | 使用同一套已打包 DSH plugin CLI，但只接受 `add`、flag 选项与一个精确版本 npm target。 | 面向外部插件管理器的窄兼容适配。ensure-ILE 不再内置 `dshmarket` runtime，本包内没有调用方。 |
 
 新集成应优先直接传入 pnpm argv，例如：
 
@@ -334,9 +334,9 @@ yarn workspace dsh-plugin-desktop verify:profile
 9. 在所属 Cordis effect disposer 中 cancel 活跃工作；协调 teardown 时还要等待其结束。
 10. 把 `desktopProfiles.select()` 视为重启边界，不能继续假设目标已在旧 generation 中生效。
 
-## 内置 dshmarket 适配
+## 外部插件市场适配
 
-内置 `dshmarket` runtime 使用 `runPlugin()` 执行普通插件命令，并使用 `runExternalMarketPluginInstall()` 执行精确 npm add。后者会在跨越 service 前解析版本，并拒绝非精确或多 target 请求。两种操作都会使用当前 Desktop Profile 与已打包 DSH CLI；都不会创建安装 transaction、快照、receipt、自动回滚或恢复提示。
+`runExternalMarketPluginInstall()` 保留在 service 上供第三方插件管理器使用：它只接受 `add`、flag 选项与一个精确的 `name@x.y.z` target，并在跨越 service 前校验该 target（不做版本解析）。ensure-ILE 已不再内置 `dshmarket` runtime，因此本包内没有调用方。两条插件适配路径都使用当前 Desktop Profile 与已打包 DSH CLI；都不会创建安装 transaction、快照、receipt、自动回滚或恢复提示。
 
 ## 稳定性边界
 

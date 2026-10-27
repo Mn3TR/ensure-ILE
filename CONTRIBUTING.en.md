@@ -18,7 +18,7 @@ DSH is built around plugins. If you write plugins, start with:
 - [DSH plugin ecosystem manifesto](docs/plugin-ecosystem.en.md): our vision of an open, composable, sustainable ecosystem, and the three principles — composition first, declare clearly, compatibility first.
 - [DSH Community Fabric Draft](dsh-community-fabric/README.md): join the public discussion of manifests, capabilities, Host Descriptors, and event contracts.
 
-Plugins that follow the manifesto coexist better with other plugins and will be easier to discover and trust in the marketplace when it ships.
+Plugins that follow the manifesto coexist better with other plugins and are easier to evaluate for compatibility.
 
 ## Developers: contribute code
 

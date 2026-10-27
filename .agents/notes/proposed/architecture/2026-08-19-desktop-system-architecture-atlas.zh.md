@@ -1,6 +1,6 @@
 # 桌面端架构图册
 
-状态：当前版本架构快照
+状态：历史架构快照（部分已被取代，见「本快照之后的变更」）
 
 [English](2026-08-19-desktop-system-architecture-atlas.md) | 中文
 
@@ -11,6 +11,19 @@
 - 复核基线：`2d07129ee622`
 - 快照时间：`2026-08-19 21:20:57 +08:00`（Asia/Shanghai）
 - 有效范围：该基线上的桌面端仓库与运行时架构；后续架构变更可能使部分内容过期。
+
+## 本快照之后的变更
+
+本文件仍是 `2.0.1` 基线的记录。下面每一条都对照 `2.0.18` 的代码复核过，均已被取代；对应图示属于历史，不是当前架构。
+
+- **仓库归属（§2）不完整。** 根 workspace 现在有 11 个：`dsh-plugin-desktop`、`dsh-community-fabric`，以及九个 ensure-ILE 插件包（`dsh-plugin-teaching-commons`、`-setup`、`-work`、`-hrl`、`-guide`、`-bankmanager`、`-memory`、`-textbook`、`-schedule`）。它们的插件图、agent preset 与共享教学数据层在图里完全没有出现。
+- **插件市场没有可挂载的 provider。** `dshmarket` 已不是依赖、不再打补丁，`cordis.patch.yml` 里也没有 Market 行。§3 的 `Services` 子图里的 `market`、§1 的 `Catalog` 依赖边、§4 那句「Market keeps consumer-owned interfaces」，描述的是仍然存在（`dsh-plugin-desktop/src/desktop-market.ts`）但任何 profile 都无法激活的代码。
+- **只有 Windows 交付（§10）。** CI 只剩 Windows 安装包与 portable 归档，macOS 与 Linux 的打包作业都删了。`ElectronPlatformStrategy` 里 `MacPlatformStrategy` 与 `LinuxPlatformStrategy` 还在、`dist:mac` / `dist:linux` 脚本也还在，所以 §10 的代码描述成立，交付描述不成立。
+- **安装恢复已重构。** `dsh-plugin-desktop/src/install-recovery.ts` 与 `InstallRecoveryStore` 都不存在了；这份归属现在在 `startup-recovery-controller.ts`、`startup-recovery-window.ts`、`desktop-boot-recovery.ts`、`recovery-plugin-uninstall.ts`。§6「Plugin install recovery」状态机与 §7 的 `plugin-install-recovery/state.json` WAL 路径描述的都是旧形态。
+- **产品版本** 从 `2.0.1` 到了 `2.0.18`。
+- **仍然成立的：** §8 里 `compatibility` / `extended` / `advanced` 三个模式值（`dsh-plugin-desktop/src/profile.ts`）。
+
+本文件其余内容没有对照 `2.0.18` 复核过。引用任何一张图之前先看代码。
 
 ## 目的与读法
 

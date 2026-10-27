@@ -26,9 +26,9 @@ ensure-ILE is the first practitioner of this approach: the desktop shell itself 
 
 This manifesto is not a unilateral rulebook. It is a **living document**: it follows ecosystem practice and accepts community discussion and revision. Any author can propose changes through issues, discussions, or pull requests.
 
-## The plugin marketplace: making conventions the beneficial choice
+## Conventions: composing beats forking
 
-Once the plugin marketplace ships, plugins that follow this manifesto will be easier to discover, install, and trust. We want convention-driven development to be the beneficial choice for every author, not an extra burden.
+Plugins that follow this manifesto coexist more easily with other plugins and are easier to evaluate for compatibility. We want convention-driven development to be the beneficial choice for every author, not an extra burden.
 
 ## From a manifesto to a testable contract
 
@@ -36,7 +36,7 @@ Once the plugin marketplace ships, plugins that follow this manifesto will be ea
 
 Fabric capabilities begin as compatibility, consent, and audit declarations. They do not present in-process JavaScript as a security sandbox. Only a Host with evidence of real isolation may claim technical permission enforcement.
 
-The built-in `dshmarket` plugin marketplace provides plugin discovery, installation, and management. Catalog inclusion means that a project matched catalog rules; it is not a security review or endorsement.
+ensure-ILE ships no plugin market: plugins are installed explicitly by package name (through the plugin manager or a `dsh plugin` command that forwards to pnpm inside the profile) and then run with your local permissions. Being installable is not a security review or endorsement.
 
 ## How to participate
 

@@ -1,38 +1,57 @@
 # dsh-plugin-guide
 
-ensure-ILE 的第一个插件：把 agent 的系统提示换成**引导文档**，并给它一个读科目备注的工具。
+引导模式的预设包（`guide`「引导模式」，Profile 默认预设）：把系统提示整份换成「你是学生做题时的引导者」，并给模型一只读科目备注的手。
 
-它做两件事：
+## 什么时候用
 
-1. 打开一个预设叫 **引导模式**（preset id `guide`）。选中它开新会话时，系统提示**整份替换**成「`dsh-plugin-teaching-commons` 的共用片段（说话方式 + 安全边界 + 题库规则）+ 本包的 `prompts/guide.md`」，DSH 默认的人设、环境说明、工具使用提示都不再出现。
-2. 注册 `read_note` 工具，实现委托给 `dsh-plugin-teaching-commons`（备注放在它那里的 `skills/`，work / HRL 也会共用）。
-
-## 文件
-
-| 路径 | 作用 |
+| 项 | 值 |
 |---|---|
-| `prompts/guide.md` | 引导文档本身。**改这个文件不用重新构建**，重启会话即生效（挂载时读盘）。 |
-| `dsh-plugin-teaching-commons` | 安全边界、说话方式、题库规则、`math` / `arts` 备注都在那边，四个模式共用一份。 |
-| `src/index.ts` | 插件本体：注册提示段落 + `read_note` 工具。 |
-| `cordis.patch.yml` | 本包自带。作为 bundle 挂进 profile 时，这条 patch 把 `guide` 预设声明插到 profile 根。 |
+| 预设 id | `guide` |
+| 显示名 | 引导模式（`cordis.patch.yml` 的 `guide-preset`，`order: 40`） |
+| 默认预设 | 是——`profiles/ensure-ile` 的 profile patch 把默认预设设成 `guide` |
+| 学生状态 | 还没做出来，需要有人把他的注意力按住 |
 
-## 为什么系统提示要整份替换
+系统提示 = `dsh-plugin-teaching-commons` 的 `common` + `bank` 两段 + 本包 `prompts/guide.md`（`src/index.ts:52`，`composePrompt(['common', 'bank'], …)`）。
 
-`guide.md` 开头第一句就是「你是学生做题时的引导者」。如果它前面还压着 DSH 默认的「你是一个软件工程 agent」，两套身份会打架，模型会时不时滑回「帮你把代码写好」的语气。
+| 工具 | 用途 | 关键参数 |
+|---|---|---|
+| `read_note` | 读一个科目的引导备注，开始引导前按科目调一次 | `note`（必填）：`math`（理科）或 `arts`（文科） |
 
-DeepSeek Harness 的提示词服务允许**恰好一个** `complete` 段落。声明了它，装配时就只保留这一段，其余段落全部让位。运行上下文（日期、cwd）也一并关掉——引导一个学生做一道题，这两样是噪声。
+实现委托给 `dsh-plugin-teaching-commons.readNote`：只收小写字母，找不到就回「没有 X 这个科目的备注。可用的有：…」，不抛栈。
 
-代价是工具的使用说明段落也没了。工具定义本身还在（走 API 的 `tools` 参数，不在提示里），所以模型仍然知道有哪些工具，只是少了「用 read 而不是 cat」这类提示。
+## 数据落在哪
 
-## 怎么改
+本包**不写盘**。
 
-- **改引导的说法**：直接编辑 `prompts/guide.md`，重启会话。
-- **加一个科目**：在 `dsh-plugin-teaching-commons/skills/` 放 `<name>.md`，同时在 `guide.md` 的「这道题有它的科目」那节加一行。
-- **换掉整个预设**：改本包 `cordis.patch.yml` 里 `guide-preset` 那段。壳不再参与。
+- 提示词在 `prompts/guide.md`，用 `fileURLToPath(new URL('../prompts/guide.md', import.meta.url))` 定位（默认路径 `src/index.ts:40`），**挂载时同步读盘**（`:52`）——改文件不用重建，重启会话即生效；`Config.promptFile` 可换路径。
+- 备注在 `dsh-plugin-teaching-commons/skills/`，不在本包。
+- 题、课表、教材分别由 `bank_*` / `schedule_*` / `textbook_*` 工具读写，本包不碰这些文件。
 
-## 还没做的
+## 和邻居的关系
 
-- 会话记录的归档与压缩角色（原始对话留档 + 固定字段摘要）
-- RL 场景（在学生的走法之外给第二种解法，供比较）
-- work 场景（学生直接交答案和思路，判不过就转引导）
-- 归档库聚类出变式、隔天重解提醒
+- **依赖** `dsh-plugin-teaching-commons`（按包名 import `composePrompt` / `readNote`），是唯一的编译期依赖。
+- 进题与写状态走题库的工具（`bank_add` / `bank_update`），不 import `dsh-plugin-bankmanager` 的源码。
+- 和 work / HRL 交接靠题库里的 `handoff` 段 + 交接卡片，不靠提示注入。
+- 段落声明 `complete: true`（`order: 0`）：装配时只留这一段，其它 bundle 的提示段全让位——包括 memory 的提示段，所以模型只能靠工具描述理解 `memory_*`。
+
+## 测试与构建
+
+```bash
+corepack yarn workspace dsh-plugin-guide typecheck
+corepack yarn workspace dsh-plugin-guide build
+```
+
+没有单测：唯一行为是「读两个文件、拼字符串、注册一个工具」。`build` = `tsc -p tsconfig.json`（出 `lib/types`）+ `tsdown`（出 `lib/index.js`）；**`lib/` 是入库的构建产物**（profile 用 `file:` 链源码后靠它跑），改完源码要把重建结果一起提交。
+
+## 已知限制
+
+- 整份替换的代价：DSH 默认的工具使用提示段没了（工具定义走 API 的 `tools` 参数，仍可见）；运行上下文（日期、cwd）一并关掉——带一道题时它们是噪声。
+- 上游的 `working-directory:current` 段落是 `required`，删不掉，只能用同名空 context（`interpolate: false`、`text: ''`）遮蔽。
+- 加科目要动两处：`dsh-plugin-teaching-commons/skills/` 放 `<name>.md`，并在 `prompts/guide.md` 里加一行告诉模型有这个科目。
+- 提示词是全仓唯一「改文本即改产品」的地方，没有测试兜着，改坏了只有真机才发现。
+
+## 不做什么
+
+- 不给答案、不给动作，只给注意力——这条只写在 `prompts/guide.md` 里，代码不强制。
+- 不批改、不评价学生（那是 `dsh-plugin-hrl`）。
+- 不做会话归档与压缩、变式聚类、第二种解法的对照（记在 AGENTS 待办里，不在这包）。

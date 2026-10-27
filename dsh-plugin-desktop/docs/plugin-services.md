@@ -177,7 +177,7 @@ The actual stream type is Node's `Readable`. Every method validates non-empty, N
 | --- | --- | --- |
 | `run(argv, signal?)` | Runs the packaged pnpm JavaScript entry directly, with the active Profile directory as `cwd`. | Any caller-owned pnpm operation. |
 | `runPlugin(argv, invokingDir, signal?)` | Runs packaged `dsh plugin --profile <active>` with the supplied plugin argv from an absolute caller directory. | Compatibility adapter for plugin managers that rely on DSH bundle reconciliation. |
-| `runExternalMarketPluginInstall(argv, invokingDir, signal?)` | Uses the same packaged DSH plugin CLI but accepts only `add`, flag-style options, and one exact-version npm target. | Narrow compatibility adapter for the bundled `dshmarket` runtime. |
+| `runExternalMarketPluginInstall(argv, invokingDir, signal?)` | Uses the same packaged DSH plugin CLI but accepts only `add`, flag-style options, and one exact-version npm target. | Narrow compatibility adapter for external plugin managers. ensure-ILE ships no `dshmarket` runtime, so nothing in this package calls it. |
 
 New integrations should prefer direct pnpm argv, for example:
 
@@ -335,9 +335,9 @@ This fixture is under `tests/`, is absent from the npm `files` list and Electron
 9. Cancel active work from the owning Cordis effect disposer and wait for its completion when coordinating teardown.
 10. Treat `desktopProfiles.select()` as a restart boundary. Do not continue assuming the selected target is live in the old generation.
 
-## Bundled dshmarket adapter
+## External-market plugin adapter
 
-The bundled `dshmarket` runtime consumes `runPlugin()` for ordinary plugin commands and `runExternalMarketPluginInstall()` for an exact npm add. The latter resolves the version before it crosses the service and rejects non-exact or multi-target requests. Both operations use the active Desktop Profile and the packaged DSH CLI; neither creates an install transaction, snapshot, receipt, automatic rollback, or recovery prompt.
+`runExternalMarketPluginInstall()` remains on the service for third-party plugin managers: it accepts only `add`, flag-style options, and one exact `name@x.y.z` target, and it validates that target before it crosses the service instead of resolving it. ensure-ILE no longer bundles a `dshmarket` runtime, so this package itself has no caller. Both plugin adapters use the active Desktop Profile and the packaged DSH CLI; neither creates an install transaction, snapshot, receipt, automatic rollback, or recovery prompt.
 
 ## Stability boundary
 

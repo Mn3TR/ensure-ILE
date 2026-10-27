@@ -18,7 +18,7 @@ DSH 的核心是插件。如果你写插件，请先阅读：
 - [DSH 插件生态倡议书](docs/plugin-ecosystem.md)：开放、可组合、可持续的生态愿景，以及组合优先、声明清晰、兼容优先三条原则。
 - [DSH Community Fabric Draft](dsh-community-fabric/README.zh.md)：参与 Manifest、Capability、Host Descriptor 和事件 contract 的公开讨论。
 
-遵循倡议书的插件更容易与其他插件共存，也会在未来上线时更容易在插件市场中被发现和信任。
+遵循倡议书的插件更容易与其他插件共存，也更容易被判断兼容性。
 
 ## 开发者：贡献代码
 

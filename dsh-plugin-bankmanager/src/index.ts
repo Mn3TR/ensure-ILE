@@ -1,7 +1,7 @@
 /**
  * Problem bank for ensure-ILE — the shared record every mode reads.
  *
- * One row registers five model tools over {@link ./store.ts}; the bank itself
+ * One row registers six model tools over {@link ./store.ts}; the bank itself
  * lives under `<DSH_HOME>/bank/problems`, one JSON file per problem, so guide,
  * work, HRL and schedule all see the same data. The bundle patch mounts this
  * row at the profile root, which makes the tools visible to every session.

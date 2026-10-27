@@ -183,6 +183,27 @@
         ],
         "createdAt": 1792891954029,
         "updatedAt": 1792891954029
+      },
+      "96c13291-bc8c-4320-9078-d269709966a8": {
+        "namespace": "project",
+        "status": "approved",
+        "injected": true,
+        "source": "agent",
+        "injectedAuto": false,
+        "content": "E:\\Projects\\DHDL（ensure-ILE）根 `corepack yarn check` **不跑插件包自己的单测**：根 package.json 的 test 只有 `yarn workspace dsh-plugin-desktop test`，check 只串 check:layout + community-fabric + 桌面包。所以 bank / textbook / schedule / guide / work / hrl 等几十个用例全绿也不代表没坏——改了插件必须另跑 `corepack yarn workspace <pkg> test`（还有 typecheck、build）。2026-10-28 加两包时发现的：全量 check 前后用例数一模一样（139 文件 / 1766 通过 / 28 跳过）才意识到新包测试根本没进门。",
+        "keywords": [
+          "yarn check",
+          "插件单测",
+          "workspace test",
+          "corepack",
+          "ensure-ile",
+          "dhdl",
+          "验证门",
+          "test gate",
+          "vitest"
+        ],
+        "createdAt": 1793119009624,
+        "updatedAt": 1793119009624
       }
     }
   }

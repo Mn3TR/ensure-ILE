@@ -1,5 +1,5 @@
 # Third-Party Notices
-DSH Desktop distributes the following third-party packages inside its installers.
+ensure-ILE distributes the following third-party packages inside its installers.
 Each package ships with its own license text in the application files; this list records
 the package names, versions, and licenses for transparency.
 | Package | Version | License |
@@ -28,7 +28,6 @@ the package names, versions, and licenses for transparency.
 | @babel/code-frame | 7.29.7 | MIT |
 | @babel/helper-validator-identifier | 7.29.7 | MIT |
 | @babel/runtime | 7.29.7 | MIT |
-| @dataiku/uv | 0.12.0 | MIT |
 | @dataiku/uv-darwin-arm64 | 0.12.0 | MIT |
 | @dataiku/uv-darwin-x64 | 0.12.0 | MIT |
 | @deepseek-ai/cordis | 4.0.5 | MIT |
@@ -432,7 +431,6 @@ the package names, versions, and licenses for transparency.
 | bytestreamjs | 2.0.1 | BSD-3-Clause |
 | cacheable-lookup | 7.0.0 | MIT |
 | cacheable-request | 13.0.19 | MIT |
-| camelcase | 5.3.1 | MIT |
 | chokidar | 5.0.0 | MIT |
 | cliui | 6.0.0 | ISC |
 | clone | 2.1.2 | MIT |
@@ -446,7 +444,6 @@ the package names, versions, and licenses for transparency.
 | cross-spawn | 7.0.6 | MIT |
 | data-uri-to-buffer | 4.0.1 | MIT |
 | debug | 2.6.9 | MIT |
-| decamelize | 1.2.0 | MIT |
 | decompress-response | 10.0.0 | MIT |
 | default-browser | 5.5.1 | MIT |
 | default-browser-id | 5.0.1 | MIT |
@@ -455,8 +452,6 @@ the package names, versions, and licenses for transparency.
 | detect-libc | 2.1.2 | Apache-2.0 |
 | dfa | 1.2.0 | MIT |
 | diff | 9.0.0 | BSD-3-Clause |
-| dijkstrajs | 1.0.3 | MIT |
-| dshmarket | 1.66.34 | MIT |
 | ecdsa-sig-formatter | 1.0.11 | Apache-2.0 |
 | ee-first | 1.1.1 | MIT |
 | emoji-regex | 8.0.0 | MIT |
@@ -554,7 +549,6 @@ the package names, versions, and licenses for transparency.
 | picomatch | 4.0.7 | MIT |
 | pkce-challenge | 5.0.1 | MIT |
 | pkijs | 3.4.0 | BSD-3-Clause |
-| pngjs | 5.0.0 | MIT |
 | pnpm | 11.8.0 | MIT |
 | powershell-utils | 0.2.1 | MIT |
 | pretty-ms | 9.3.1 | MIT |
@@ -562,7 +556,6 @@ the package names, versions, and licenses for transparency.
 | proxy-agent-negotiate | 1.1.0 | MIT |
 | pvtsutils | 1.3.6 | MIT |
 | pvutils | 1.2.0 | MIT |
-| qrcode | 1.5.4 | MIT |
 | quick-lru | 5.1.1 | MIT |
 | range-parser | 1.3.0 | MIT |
 | react | 18.3.1 | MIT |
@@ -570,7 +563,6 @@ the package names, versions, and licenses for transparency.
 | reflect-metadata | 0.2.2 | Apache-2.0 |
 | require-directory | 2.1.1 | MIT |
 | require-from-string | 2.0.2 | MIT |
-| require-main-filename | 2.0.0 | ISC |
 | resolve-alpn | 1.2.1 | MIT |
 | resolve.exports | 2.0.3 | MIT |
 | responselike | 4.0.2 | MIT |
@@ -583,7 +575,6 @@ the package names, versions, and licenses for transparency.
 | semver | 7.8.5 | ISC |
 | send | 1.2.1 | MIT |
 | serve-static | 2.2.1 | MIT |
-| set-blocking | 2.0.0 | ISC |
 | setprototypeof | 1.2.0 | ISC |
 | sharp | 0.35.5 | Apache-2.0 |
 | shebang-command | 2.0.0 | MIT |
@@ -615,7 +606,6 @@ the package names, versions, and licenses for transparency.
 | web-streams-polyfill | 3.3.3 | MIT |
 | which | 2.0.2 | ISC |
 | which-command | 0.1.0 | MIT |
-| which-module | 2.0.1 | ISC |
 | wrap-ansi | 6.2.0 | MIT |
 | ws | 8.22.0 | MIT |
 | wsl-utils | 1.0.0 | MIT |

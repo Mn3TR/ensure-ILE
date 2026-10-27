@@ -1,6 +1,6 @@
 # Desktop system architecture atlas
 
-Status: current-version architecture snapshot
+Status: historical architecture snapshot (partly superseded; see "Changes since this snapshot")
 
 English | [中文](2026-08-19-desktop-system-architecture-atlas.zh.md)
 
@@ -11,6 +11,19 @@ English | [中文](2026-08-19-desktop-system-architecture-atlas.zh.md)
 - Reviewed commit: `2d07129ee622`
 - Snapshot time: `2026-08-19 21:20:57 +08:00` (Asia/Shanghai)
 - Valid scope: the desktop repository and runtime architecture at that commit; later architecture changes may make parts of this document stale.
+
+## Changes since this snapshot
+
+This file stays a record of the `2.0.1` baseline. Each item below was re-checked against the `2.0.18` tree and is now superseded, so the corresponding diagram is history rather than the current architecture.
+
+- **Repository ownership (§2) is incomplete.** The root workspace now holds 11 workspaces: `dsh-plugin-desktop`, `dsh-community-fabric`, and nine ensure-ILE plugin packages (`dsh-plugin-teaching-commons`, `-setup`, `-work`, `-hrl`, `-guide`, `-bankmanager`, `-memory`, `-textbook`, `-schedule`). Their plugin graph, agent presets, and shared teaching data layer appear nowhere in the diagrams.
+- **The plugin market has no mountable provider.** `dshmarket` is no longer a dependency, no longer patched, and has no `cordis.patch.yml` row. The `market` member of the §3 `Services` subgraph, the `Catalog` edge in §1, and the "Market keeps consumer-owned interfaces" sentence in §4 describe code that still exists (`dsh-plugin-desktop/src/desktop-market.ts`) but that no profile can activate.
+- **Delivery is Windows only (§10).** CI keeps only the Windows installer and the portable archive; the macOS and Linux packaging jobs were removed. `ElectronPlatformStrategy` still carries `MacPlatformStrategy` and `LinuxPlatformStrategy` and the `dist:mac` / `dist:linux` scripts still exist, so §10's code claims hold while its delivery claim does not.
+- **Install recovery was restructured.** `dsh-plugin-desktop/src/install-recovery.ts` and `InstallRecoveryStore` no longer exist; that ownership now lives in `startup-recovery-controller.ts`, `startup-recovery-window.ts`, `desktop-boot-recovery.ts`, and `recovery-plugin-uninstall.ts`. The §6 "Plugin install recovery" state machine and the §7 `plugin-install-recovery/state.json` WAL path both describe the old shape.
+- **Product version** moved from `2.0.1` to `2.0.18`.
+- **Still current:** the `compatibility` / `extended` / `advanced` mode values in §8 (`dsh-plugin-desktop/src/profile.ts`).
+
+Nothing else in this note was re-verified against `2.0.18`. Check the code before quoting a diagram.
 
 ## Purpose and notation
 

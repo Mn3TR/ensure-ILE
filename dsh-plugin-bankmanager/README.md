@@ -1,172 +1,105 @@
 # dsh-plugin-bankmanager
 
-> **已实现（2026-10-25，schema v2.1）。** `src/store.ts` 管文件，`src/index.ts` 挂五个工具；
-> 20 个单测 + `scripts/verify-bank.mjs` 挂载 smoke。记录按模式分块（`guide` / `work` / `hrl`），
-> 另有一个跨模式的 `handoff`。
+题库：一道题一个 JSON 文件，六个工具，guide / work / HRL / schedule 共用同一本账——它不引导、不判卷、不评价，只记录和调度。
 
-## 这个插件做什么
+## 什么时候用
 
-管一道题从进来到掌握的整个过程——错题、待引导题、待优化题、待复习题，都在这一本账里。它是几个模式之间共享的那份数据：不引导、不改答案，只负责记录和调度。
+不是 agent preset：`cordis.patch.yml` 往 profile 根插一行 `dsh-plugin-bankmanager`，所以**所有会话**都能看到这六个工具。它是「题」的唯一事实来源。
 
-## 一道题的一生（状态机）
+| 工具 | 用途 | 关键参数 |
+|---|---|---|
+| `bank_add` | 新建一道题，返回 id | `statement`（必填，题干原文）、`subject`（必填，自由字符串）、`tags`（可省略） |
+| `bank_list` | 按条件列题 | `status`、`subject`、`due`（`true` 只看今天到期）、`limit`（默认 20，夹到 1–100，取**最后** N 条） |
+| `bank_show` | 看一道题的全部记录 | `id`（必填） |
+| `bank_update` | 增量改，只合并传了的字段 | `id` + 任意：`status`、`guideOutcome`、`whereStuck`、`guideResult`、`insight`、`reviewNextAt`、`reviewInterval`、`reviewPassed`、`affect`、`effectiveHint`、`workAttempt{answer,verdict}`、`hrl{input,teacher,step,result}`、`handoff{from,to,why,state,detail}`、`handoffConsume`、`patch`（自由字段浅合并） |
+| `bank_resume` | 不带 `id` 列待接交接；带 `id` 返回题干 + 交接包 + `insight` + 最后一次作答 | `id`（可省略） |
+| `bank_stats` | 各状态计数，另有「待接交接：N」 | 无参数 |
+
+一道题的一生：
 
 ```
 new ──> guide ──> review ──> mastered
          │           ▲
          └──> hrl ───┘
               │
-              └──> parked（历史遗留 / 暂不处理）
+              └──> parked
 ```
 
-- `new`：刚进来，还没处理
-- `guide`：待引导 / 引导中（对应 guide 模式）
-- `hrl`：已经解出，但答得不漂亮，待优化（对应 HRL 模式）
-- `review`：解出来了，等着按间隔复习
-- `mastered`：连续几次复习都过了
-- `parked`：暂时放下，但留在「历史遗留」里提醒
+- `new` 刚进来 / `guide` 待引导或引导中 / `hrl` 待优化 / `review` 等复习 / `mastered` 复习爬满 / `parked` 暂时放下。
+- `bank_update(status: 'review', reviewPassed: true)` 按 `REVIEW_LADDER = [1, 3, 7, 14, 30, 60, 120]`（天）升一档；`false` 回到第一档；爬到最后一档自动转 `mastered`。
+- 「状态谁说了算」：模型自己判断，但收尾必须问学生一句「这题你自己做出来了吗」再写回（规矩在 commons 的 `prompts/bank.md` 与 `guide.md` 里，代码不校验）。
 
-## 存储：一道题一个 JSON 文件
+## 数据落在哪
 
 ```
 <DSH_HOME>/bank/problems/<id>.json
 ```
 
-`DSH_HOME` 是 `.ensure-ile/home`（`run()` 设的），数据跟着数据根走，清空 `.ensure-ile` 就整份消失。
-
-**id 格式**：`YYYYMMDD-<subject>-<6 位 hex>`，例如 `20261023-math-a3f91c`。
-日期段让文件按名排序就等于按录入时间排序，6 位 hex 是人看不出来但不会撞的那部分。
-
-**一道题一个文件**，把这道题身上发生过的全部事情装进去（李 2026-10-23 定）：
+- `<DSH_HOME>` 没设时退 `USERPROFILE` / `HOME` 下的 `.dsh`；桌面壳里是数据根的 `home`。`Config.directory` 可覆盖。
+- id = `YYYYMMDD-<subject 归一化>-<6 位 hex>`（`randomBytes(3)`），例如 `20261023-math-a3f91c`。日期段让文件名排序等于录入顺序。
+- `schema: 2`，按模式分块 + 跨模式的 `handoff`：
 
 ```jsonc
 {
-  "schema": 2,
-  "id": "20261023-math-a3f91c",
-  "subject": "math",
-  "tags": ["函数单调性"],
-  "statement": "题干文本",
-  "attachments": [],
-  "status": "guide",
-  "createdAt": "…", "updatedAt": "…",
-
-  // 引导模式
-  "guide": {
-    "sessions": [{ "sessionId": "…", "startedAt": "…", "endedAt": "…",
-                   "outcome": "solved|stuck|abandoned", "whereStuck": "第二问的换元",
-                   "result": "他最后写出来的原稿" }],
-    "insight": "这题的关键转折：……"
-  },
-
-  // 独立做题：只有没人帮忙的那份卷
-  "work": {
-    "attempts": [{ "at": "…", "answer": "…", "verdict": "ok|partial|wrong", "source": "text" }]
-  },
-
-  // 答案优化：教师轨迹一次写全，A/B 逐步落
-  "hrl": {
-    "input": { "at": "…", "from": "work|pasted", "attemptAt": "…", "answer": "…" },
-    "teacher": { "writtenAt": "…", "answer": "…", "note": "可空",
-                 "steps": [{ "index": 1, "body": "…", "reason": "…" }] },
-    "pairings": [{
-      "at": "…", "attemptAt": "…",
-      "steps": [{ "index": 1, "studentQuote": "学生原句", "teacherStep": 1,
-                  "match": "same|partial|missing", "chosen": "student|teacher|merged",
-                  "mergedText": "选 merged 时他重写的", "chosenAt": "…", "note": "…" }],
-      "result": "逐条选完之后拼出的解"
-    }]
-  },
-
-  // 交给下一个模式的包；同一道题最多一个未接收的
-  "handoff": {
-    "id": "hlt-…", "at": "…", "from": "work", "to": "guide",
-    "why": "一句", "state": "这题到哪了",
-    "detail": { "lastWords": "…", "blocker": "…", "nextStep": "…" },
-    "consumedAt": null, "consumerSessionId": null
-  },
-
-  "review": { "nextAt": "…", "interval": 3, "count": 1, "history": [] },
-  "history": [{ "at": "…", "event": "created" }]
+  "schema": 2, "id": "…", "subject": "math", "tags": [], "statement": "题干", "attachments": [],
+  "status": "new|guide|hrl|review|mastered|parked", "createdAt": "…", "updatedAt": "…",
+  "guide":     { "sessions": [{ "sessionId", "startedAt", "endedAt", "outcome", "whereStuck", "result", "affect", "effectiveHint" }], "insight": "…" },
+  "work":      { "attempts": [{ "at", "answer", "verdict": "ok|partial|wrong", "source" }] },
+  "hrl":       { "input": {…}, "teacher": { "answer", "note", "steps": [{ "index", "body", "reason" }] }, "pairings": [{ "steps": [...], "result" }] },
+  "handoff":   { "id": "hlt-…", "at", "from", "to", "why", "state", "detail": { "lastWords", "blocker", "nextStep" }, "consumedAt", "consumerSessionId" },
+  "review":    { "nextAt", "interval", "count", "history": [] },
+  "history":   [{ "at", "event", "detail" }]
 }
 ```
 
-`schema: 1` 的文件会解析失败并被跳过（`listProblems` 只跳过、不迁移）——目前没有存量数据，
-真出现 v1 文件先手工迁移。
+固定枚举（`src/store.ts:51` 起）：`PROBLEM_STATUSES` 六个状态、`GUIDE_OUTCOMES`（`solved`/`stuck`/`abandoned`）、`AFFECTS`（`frustrated`/`neutral`/`excited`）、`HINT_LEVELS`（`confirm`/`position`/`feature`/`structure`/`result`）、`PAIRING_MATCHES`（`same`/`partial`/`missing`）、`PAIRING_CHOICES`（`student`/`teacher`/`merged`）。
 
-写文件用原子写（`@deepseek-ai/dsh-atomic-write`）；写之前先读、只合并自己认识的字段，
-不整份覆盖——手改过的文件不能被冲掉。单文件解析失败只跳过那个文件并记日志，不能让 `bank_list` 全挂。
+写法上的三条规矩：
 
-## 工具
+- **原子写 + 跨进程锁**（`@deepseek-ai/dsh-atomic-write` 的 `writeFileAtomic` / `withFileLock`）：中途断掉不会留半个文件。
+- **写前先读、只合并自己认识的字段**：手改过的文件不会被整份冲掉。
+- **单文件坏了只跳过那一个**并记日志，不让 `bank_list` 全挂。`schema: 1` 的老文件解析失败会被跳过，**不迁移**。
 
-- `bank_add`：新建一道题（题干、科目、标签），返回 id
-- `bank_list(status?)`：按状态列题
-- `bank_show(id)`：看一道题的全部记录
-- `bank_update(id, …)`：改状态、guide 结局与 `result`、`workAttempt`、`hrl`（input/teacher/step/result 增量）、`handoff` 与 `handoffConsume`、review 时间
-- `bank_due(date?)`：到期该复习的题（schedule 模式用）
-- `bank_stats`：各状态计数
+## 和邻居的关系
 
-五个都已实现；`bank_due` 等复习调度落地再加（见 AGENTS 待办）。
-
-## 状态谁说了算（2026-10-23 定）
-
-**模型判断 + 每轮问一句**，融合两版方案：
-
-- guide 收尾时模型自己判断这题走没走通，写回 `status` 和 `guide.sessions[].outcome`
-- 但判断之前要**问学生一句**「这题你自己做出来了吗」——guide 的价值就在「他自己做出来」，
-  模型没资格替他回答
-- 独立审计（再用一个模型/规则复核状态）先不做，记在待办里
-- 每轮静默记 `updatedAt` 兜底，模型忘了写回也能从时间上看出来
-
-## 和别的插件怎么配合
-
-| 插件 | 怎么用这本库 |
+| 邻居 | 怎么用这本库 |
 |---|---|
-| `dsh-plugin-guide` | 开始引导前 `bank_list`/`bank_show` 看这题以前走到哪；收尾写回 |
-| `dsh-plugin-hrl` | 从 `hrl` 队列取题；优化完写回 `review` |
-| `dsh-plugin-work` | 学生交出答案后判卷：过了进 `review`，没过进 `guide` |
-| `dsh-plugin-schedule` | 只读：按 `nextReviewAt` 和遗留状态排每日清单 |
+| `dsh-plugin-guide` / `-work` / `-hrl` | 经 `bank_*` 工具读写；写操作只由「正在处理那道题的模式」做 |
+| `dsh-plugin-schedule` | 只读：`import { defaultBankDirectory, listProblems } from 'dsh-plugin-bankmanager/store'`（子路径，不深引 `src/` / `lib/` 文件） |
 | `dsh-plugin-memory` | 不互相引用：记忆存「这个学生的稳定事实」，题库存「这道题的过程」 |
 
-写操作只由「正在处理那道题的模式」做，别的插件不替它改状态——免得两边打架。
+浏览器半边（`src/client/`，产物 `lib/client.js`，按上游客户端插件协议包成 `window.__ModuleLoader__.load({ id, factory })`）：
 
-## 还没定的问题
+- `tool.call.toolview` 的 `bank_resume` → **交接卡片**（题干宋体、学生原话楷体、卡点、下一步、一个按钮）。字段缺一块就静默不渲染，退回通用工具行。
+- `conversation.hero.options` 的 `ile-resume` → 空白会话首页列出待接交接，点一下只把「接着上次那道题：<id>（<状态>）」填进输入框，不替学生发。
+- 「接着做」= `sessions.create({ agentPreset })`（按交接的 `to`，也认中文显示名）+ `uiWorkspace.openSession` + `conversation.input.requestDraftInitialization`。幂等靠会话列表 + `localStorage` 里「这道交接开过的会话 id」。
+- 宿主侧路由 `/bank/api`（`src/api.ts`）：`handoff.pending` / `handoff.consume`；信任围栏同 `/api`（loopback / `trustedHosts`、拒 cross-site）。通道走嵌套 `ctx.inject(['webServer', 'webStartup'])`，路由缺席时工具一个不少。
 
-- **题怎么进来**：现在走「会话里模型收题 + `bank_add`」；拍照/粘贴的入口按钮后续再做，
-  图片的存储与压缩整条链路李 2026-10-23 明确「记下来之后搞」
-- **`bankmanager` 这个名字**：偏长，`dsh-plugin-bank` 更短；但 bank 也容易被读成银行
-- **间隔重复表**：固定 1 / 3 / 7 / 15 / 30 天，还是按对错自适应
-- **一个库还是多个**：目前单用户单库；将来能不能按科目、学期分
-- **独立审计**：状态由模型判断之后，要不要再上一道复核（先不做）
+## 测试与构建
 
-## 组织
+```bash
+corepack yarn workspace dsh-plugin-bankmanager typecheck
+corepack yarn workspace dsh-plugin-bankmanager test        # 45 个用例 / 6 个文件
+corepack yarn workspace dsh-plugin-bankmanager build
+corepack yarn workspace dsh-plugin-bankmanager build:client
+corepack yarn workspace dsh-plugin-bankmanager verify       # node scripts/verify-bank.mjs：挂载冒烟，断言六个工具 + bank_add 真写了一道题
+```
 
-EnSure Lab / 因需。包名 `dsh-plugin-bankmanager`。它多半也不是 agent preset，而是 Host 侧服务 + 界面入口，这条待定。
+- `build` = `tsc -p tsconfig.json` + `tsdown`；`build:client` = `vite build --config vite.client.config.ts`。两者产物（`lib/`）都入库。
+- `bank_resume` 是第六个工具，2026-10-25 之后才加；`scripts/verify-bank.mjs` 的期望列表跟着它。
 
-## 浏览器半边：交接卡片与接续入口
+## 已知限制
 
-`src/client/` 是这个插件的浏览器面，构建产出 `lib/client.js`，按上游客户端插件的装载协议包成
-`window.__ModuleLoader__.load({ id, factory })`（React 与 `@deepseek-ai/*` 全部交给宿主模块表）。
+- `bank_list(limit)` 取的是**最后** `limit` 条（按文件名排序后的尾部），不是最早或最紧急的；到期筛选走 `due: true`。
+- 到期口径是「本地当天 24:00」为界（`endOfToday()` = 次日 0 点），不是 UTC。
+- 状态是模型判断的，没有独立审计；「每轮问学生一句」也只是提示词里的规矩。
+- 卡片里的楷体在客户端构建面看不到原生字体文件，本机会回退成宋体；首页的待接列表是挂载时取一次，不随别的会话实时刷新。
+- 同一道题最多一个未接收的 `handoff`；`consumedAt` 写失败时卡片会提示「还会出现在待接里」，不假装成功。
+- `schema: 1` 的存量文件不迁移（目前没有存量数据）。
 
-两个注册点：
+## 不做什么
 
-- `tool.call.toolview` 的 `bank_resume` 键 → **交接卡片**：题干（宋体）、学生上次的原话（楷体）、
-  下一步、一个「接着做」按钮。模型改字段时卡片静默不渲染，退回通用工具行，不会把会话渲染炸掉。
-- `conversation.hero.options` 的 `ile-resume` → **空白会话首页的接续入口**：列出待接的交接，
-  点一下只把「接着上次那道题：<id>（<状态>）」填进输入框——不替学生发，输入框原样由他改。
-
-「接着做」不是复制了事：`sessions.create({ agentPreset })` 按交接里的 `to` 开新会话（`guide` /
-`work` / `hrl`，也认中文显示名），`uiWorkspace.openSession` 跳过去，再用
-`conversation.input.requestDraftInitialization` 把上面那句塞进输入框；同一道交接记进
-`localStorage`，重复点击是跳回那个会话，不再新开。卡片与首页入口都靠 `session.create` 前的列表
-查询 + 这条记忆做幂等（`consumedAt` 失败只在卡片上提示，不假装成功）。
-
-宿主侧配套一条 HTTP 路由 `/bank/api`（`src/api.ts`，与 `dsh-plugin-memory` 的面板同一套路）：
-`handoff.pending` 列出待接、`handoff.consume` 标成已被某个会话接走。信任围栏同 `/api`：
-只认 loopback / `trustedHosts`、拒绝 cross-site。路由缺席（headless profile 没有 `webServer`）
-时插件照常工作，只是首页入口不会出现。
-
-- 构建：`yarn workspace dsh-plugin-bankmanager build:client`（devDependencies 里的 `vite`）
-- 数据模型：`src/client/handoff-model.ts`（纯函数，有单测）
-- 样式：运行时注入一次 `<style>`，类名前缀 `.ile-handoff` / `.ile-resume`，随 effect 清理
-
-**已知限制**：客户端构建面看不到原生窗口的字体文件，卡片里的楷体在本机会回退成宋体；
-首页入口的待接列表是挂载时取一次，不随别的会话改动实时刷新（切会话/重开空白会话才更新）。
+- 不引导、不判卷、不评价——那些是各模式的事；本包只记录、调度、把交接递给下一个模式。
+- 不采集偏好信号、不做打分界面。
+- 不做图片链路：`attachments` 字段留着，拍照/粘贴入口未做。
+- 不做多用户 / 多库 / 按学期分库。
