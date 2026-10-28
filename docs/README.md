@@ -47,6 +47,7 @@
 | 文档 | 你会得到什么 |
 | --- | --- |
 | [2026-10-25 开源 AI 学习伴侣调研](research/2026-10-25-开源AI学习伴侣调研.md) | 13 个开源项目的对照调研，带核实记录与自我修正；`⚠️ 仅描述` 标的是还没落地的部分 |
+| [2026-10-29 单会话内修改 / 清空上下文](research/2026-10-29-单会话上下文重写.md) | 四条路径的可行性、代价与推荐，附机制笔记：历史怎么组装、谁能改、system prompt 为什么清不掉 |
 
 ### 开发者与维护者文档
 
@@ -59,6 +60,7 @@
 | [Fabric 框架与插件需求调研](../dsh-community-fabric/docs/research/mature-plugin-frameworks.zh.md) | Koishi、Chrome、VS Code 的成熟模式，以及真实 DSH 插件的功能需求 |
 | [VS Code 扩展模型调研](../dsh-community-fabric/docs/research/vscode-extension-model.zh.md) | VS Code 已实现的声明、Provider、UI、运行位置和生命周期模式，以及它们对 Fabric RFC 的具体约束 |
 | [架构说明](architecture.md) | Electron、Host、Web carrier、profile 和打包之间的关系 |
+| [上游同步指南](upstream-sync.md) | 四层身份（子模块 / npm 包 / 桌面壳 fork / profile）、29 个补丁清单、四类同步流程与失败信号表 |
 | [Desktop service 参考](../dsh-plugin-desktop/docs/plugin-services.md) | `desktopProfiles`、`desktopPnpm` 的稳定 contract 和 TypeScript 示例 |
 | [包级参考](../dsh-plugin-desktop/README.md) | 完整的构建、运行、发布和已知限制 |
 

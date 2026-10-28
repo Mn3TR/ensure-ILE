@@ -1,0 +1,28 @@
+{
+ "A": {
+  "xheight": 100.0,
+  "stroke": 16.0,
+  "int_ink_h": 148.0,
+  "int_ink_w": 42.0,
+  "int_ratio_to_x": 1.48,
+  "int_reach": [
+   26.0,
+   16.0
+  ],
+  "stroke_pct_of_x": 0.16
+ },
+ "B": {
+  "xheight": 100.0,
+  "stroke_source": "Source Han Serif (ILE Song)",
+  "int_ink_h": 152.0,
+  "int_ratio_to_x": 1.52
+ },
+ "C": {
+  "xheight": 92.0,
+  "stroke": 17.0,
+  "advance": 92.0,
+  "int_ink_h": 122.8,
+  "int_ratio_to_x": 1.335,
+  "stroke_pct_of_x": 0.18478260869565216
+ }
+}

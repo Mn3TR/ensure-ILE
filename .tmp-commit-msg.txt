@@ -1,0 +1,52 @@
+上游同步文档、en∫ure 字标设计稿与单会话上下文研究
+
+三件事一起落盘，都是 2026-10-29 李指的方向。
+
+一、上游同步流程固定成文档
+docs/upstream-sync.md / .en.md + docs/README 索引。把「上游」拆成四层，因为四层
+的同步节奏完全不同：深探底座子模块（pin 687f282e86，工作树零改动）、npm 包层
+（52 条 patch: 指向 patches/ 里 29 个文件）、桌面壳（anywhere-labs/dsh-desktop 的
+fork，共享历史，当前相对 upstream/master 落后 33 领先 60，同步是 rebase 不是
+checkout）、profile 运行时组合（4 行全覆写 0 insert，name 是守卫不是身份）。
+29 个补丁逐条从 hunk 读出并按用途归类：平台适配 15 / 功能 6 / 打包 3 / 上游 bug
+fix 5。另附四个同步场景的操作步骤、失败信号表（静默不生效的几种长相）与同步后
+固定事项清单。
+
+二、scripts/verify-patch-references.mjs
+补上一道缺的检查：resolutions 里写了 patch: 不代表补丁生效，判据是 yarn.lock 里
+有没有 @patch: 条目。当前实测 29 份补丁 28 有效，1 份无施主
+（dsh-experimental-computer-use-cua-driver-native——整个 computer-use 分支不在依赖
+图里，补丁本身是活的，留着等它回来）。pi-ai 那份是 2026-10-28 修好的现成案例。
+脚本故意还没接进 check:layout：接进去会把「vendor 里留着一个没人装的包」这种合法
+状态也判成失败。
+
+三、字标 en∫ure 设计稿（docs/design/brand/）
+把 ensure 的 s 换成 LaTeX 积分号 ∫。三版：serif（从仓库自带的 ILE Song 取轮廓，
+和「视觉层＝演算纸」同一套语言，推荐主选）、geometric（手绘，现代产品名备选）、
+mono（小尺寸）。generate.py 出轮廓、render.mjs 用 sharp 出 PNG、preview.html 离线
+可看。第一版 geometric 与 mono 的 x-height 不齐（n 顶端高 16px、u 底端低于基线
+16px），根因是手绘把拱顶/碗底中线当成了墨迹边，已修；实测 e/n/u/r 与 ∫ 的比例
+落在 1.34–1.48×。16px 托盘只有 serif 与 mono 可用，geometric 的上钩只剩 2px。
+只出稿不落地：build/ 下的图标仍是 DeepSeek 鲸鱼，macOS 的 app-icon.icon 与 icns
+必须靠 macOS 的 ictool 导出，Windows 上改会让 icons:check 直接红。
+
+四、单会话内改上下文的可行性研究（docs/research/）
+只研究不动手。结论：改历史 = append 一条带 surfaceOp 的事件（surface 投影，
+messages 的唯一来源是 session.deriveMessages），节点 0 是 system prompt 只能被一条
+只盖住它自己的 system/message 重写；没有 truncate/rewind；替换副本是 model-only，
+学生屏幕上的历史不会变。四条路径里「开新会话 + 摘要当第一句」是主路径
+（bankmanager 的三段式已经能做），「插件调 ctx.compaction.compactRegion」是兜底，
+改 harness 加 resetHistory 每次升 pin 都要重打，不建议。
+顺手查到一个现存缺口：四个预设都没装压缩引擎（compaction-basic / command-compact
+被 web-app 在 host 平面 disabled，真实例在 standard 预设的隔离组里），所以没有
+/compact 也没有自动压缩，长会话撞窗口会硬失败——已记进 AGENTS 的「还没做」。
+
+五、AGENTS.md
+按上面四件事重写：新增「上游是谁、我们在哪一层改它」一节（四层 + 只有 desktop 与
+memory 有上游）、仓库地图补 patches/ 与 vendor/、视觉层加字标条目、验证现状换成
+今天复跑的数字、坑里补「被引用 ≠ 生效」「桌面壳同步是 rebase」「bilingual 门看不见
+没 git add 的 i18n 文件」。
+
+门：corepack yarn check EXIT=0（138 文件 / 1781 用例 / 1753 通过 / 28 跳过），
+corepack yarn check:plugins EXIT=0，check:layout 与 install --immutable 均绿，
+bilingual 44 记录 88 文档一致。dist:win 自 2026-10-25 起没重打。

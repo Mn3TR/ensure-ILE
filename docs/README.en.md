@@ -47,6 +47,7 @@ All four presets use `complete: true`, which replaces the whole system prompt, s
 | Document | Covers |
 | --- | --- |
 | [Open-source AI study-companion survey, 2026-10-25](research/2026-10-25-开源AI学习伴侣调研.md) | A comparison of 13 open-source projects, with verification records and self-corrections; entries marked `⚠️ 仅描述` are designs that are not shipped yet |
+| [Rewriting or clearing context inside one session, 2026-10-29](research/2026-10-29-单会话上下文重写.md) | Four candidate paths with costs and a recommendation, plus mechanism notes: how history is assembled, who may rewrite it, and why the system prompt cannot be cleared |
 
 ### Developer and maintainer documentation
 
@@ -59,6 +60,7 @@ All four presets use `complete: true`, which replaces the whole system prompt, s
 | [Fabric framework and plugin-needs research](../dsh-community-fabric/docs/research/mature-plugin-frameworks.md) | Mature Koishi, Chrome, and VS Code patterns plus requirements observed in real DSH plugins |
 | [VS Code extension-model research](../dsh-community-fabric/docs/research/vscode-extension-model.md) | Implemented declaration, Provider, UI, placement, and lifecycle patterns, with concrete constraints for the Fabric RFC |
 | [Architecture](architecture.en.md) | Electron, Host, the Web carrier, profiles, and packaging |
+| [Upstream sync guide](upstream-sync.en.md) | The four identities (submodule, npm packages, forked shell, profile), the 29-patch inventory, four sync procedures, and a failure-signal table |
 | [Desktop service reference](../dsh-plugin-desktop/docs/plugin-services.md) | Stable `desktopProfiles` and `desktopPnpm` contracts with TypeScript examples |
 | [Package reference](../dsh-plugin-desktop/README.md) | Detailed build, runtime, release, and limitation notes |
 

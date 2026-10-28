@@ -26,8 +26,12 @@
 | `dsh-plugin-memory/` | `@max-null/dsh-memory` v0.18.0 的 fork（14 工具），同步规则见其 `UPSTREAM.md` | 改记忆 / 提示词模板 |
 | `dsh-community-fabric/` | 社区互操作 RFC，**纯文档**，不声明可加载入口 | 社区协作 |
 | `profiles/ensure-ile/` | 唯一的 profile 模板：`package.json` / `cordis.patch.yml` / `pnpm-workspace.yaml` | 加 bundle、改预设 |
+| `patches/` | 上游 npm 包的补丁（29 份，被根 `resolutions` 用 `patch:` 引用；其中 1 份暂无施主） | 改上游包行为 / 升 pin 后重打 |
+| `vendor/dsh-runtime/<version>/` | 上游运行时 tarball 树，只留 `upstream.json` 指的那一个版本 | 换 pin 时同步 |
+| `upstream.json` | 上游 pin 的唯一记录：`commit` / `sourceVersion` / `runtimePackageVersion` / `runtimeSource` | 换 pin |
 | `scripts/` | 根级校验脚本（bilingual、layout、icons、vendored runtime、run-parallel） | 改门禁 |
 | `docs/` | 产品文档；`research/` 研究、`design/` 设计稿与 `screenshots/`、`evidence/` 证据 | 写面向人的文档 |
+| `docs/upstream-sync.md` | 四层身份、29 个补丁清单、四类同步流程与失败信号表——**同步上游前必读** | 换 pin / 接上游修复 |
 | `assets/` | 产品截图、社区二维码、图标源 | 发版素材 |
 | `.agents/notes/` | 日期化的维护者决策记录（`implemented/` / `proposed/`） | 追溯某个取舍的来龙去脉 |
 | `deepseek-harness/` | 固定上游子模块（`dsh-v0.2.1-rc.2`），**禁止修改** | 只读，查上游行为 |
@@ -42,6 +46,16 @@
 - **`seedProfile()` 只在文件不存在时复制，存在就不覆盖**：改完 `profiles/ensure-ile/` 要删掉 `.ensure-ile/home/profiles/desktop` 再启动，然后手动跑一次 `pnpm install --offline`（校验用 `COREPACK_ENABLE_PROJECT_SPEC=0 corepack pnpm install --offline --no-frozen-lockfile`；直接 `corepack pnpm` 会被根的 `packageManager` 挡住）。
 - 会话工作区也在数据根里：`workspace-controller` 的 `documentsDirectory` 被 patch 成 `!!js dshHomePath('..')`，默认工作区落在 `.ensure-ile/deepseek-harness/default-workspace`（上游把叶子目录名写死，拿不到更短的名字）。
 - 打包：`corepack yarn dist:win` → `dsh-plugin-desktop/dist/`；**打包后的数据根 = `dirname(ensure-ILE.exe)\.ensure-ile`**，就在安装目录里。
+
+## 上游是谁、我们在哪一层改它（2026-10-29）
+
+不是三层而是**四层**，同步节奏完全不同——换 pin 不等于重打补丁，改壳不等于改插件。完整流程与 29 个补丁的逐条清单在 `docs/upstream-sync.md`，这里只记判断：
+
+- **① 源码底座**：`deepseek-harness/` 子模块，pin `687f282e86`=`dsh-v0.2.1-rc.2`，**工作树零改动**（`git -C deepseek-harness status --short` 必须为空，`verify-layout` 会查）。它自带 pnpm 工作区，根经 `corepack yarn upstream:*` 进入。
+- **② 运行时包**：所有 `@deepseek-ai/*` 从 registry 装，行为改动只能落在 `resolutions` + `patches/`（52 条 `patch:` → 29 个文件）与 `vendor/dsh-runtime/` 的 tarball 上。**不碰子模块**是硬约定：子模块必须与 `upstream.json` 的 commit 完全一致，改它下一次换 pin 就冲掉了。
+- **③ 桌面壳是 fork，不是子模块**：`git remote -v` 的 `upstream` = `anywhere-labs/dsh-desktop`，两边**共享历史**（分叉点 `6a63b9730b`，2026-10-18）。所以「上游发新版」是 `git fetch upstream` + rebase/cherry-pick，不是 checkout；2026-10-29 快照相对 `upstream/master`（`092e2ecef7`）**落后 33 / 领先 60**，冲突热点是 `src/index.ts`、`cordis.patch.yml`、`build/installer.nsh`、`scripts/prepare-profile.mjs`。
+- **④ 运行时组合**：`profiles/ensure-ile/cordis.patch.yml` 是**运行时 patch**，4 行**全是覆写、0 个 insert**（插行在包层 `dsh-plugin-desktop/cordis.patch.yml`）。`name` 是**守卫不是身份**：对不上就打 `patch: name mismatch … skipping` 并跳过，`id` 没命中打 `patch: entry … not found`——上游改 row id 或包 specifier 时这里**静默不生效**，症状见 `docs/upstream-sync.md` 的失败信号表。
+- 11 个 workspace 里**只有 `dsh-plugin-desktop`（fork）与 `dsh-plugin-memory`（`@max-null/dsh-memory` 的 fork）有上游**，其余九个的上游就是我们自己。
 
 ## 数据落在哪
 
@@ -121,18 +135,24 @@
 - **颜色只编码状态**：墨蓝 `primary`、朱批 `destructive`、印章青 `seal`。不做装饰性用色。
 - 霞鹜文楷 v1.530 与思源宋体 2.003R 子集到 GB2312 + 数理符号；因 OFL 保留字体名条款改名 `ILE Kai` / `ILE Song`，许可证在 `dsh-plugin-desktop/src/native-ui/assets/fonts/`。
 - 画廊入口 `dsh-plugin-desktop/src/native-ui/gallery.html`（进 `vite.native-ui.config.ts` 的 input）；设计稿与截图在 `docs/design/`。
+- **字标 `en∫ure`（2026-10-29 李定）**：ensure 的 s 换成 LaTeX 积分号 ∫（`\int`）。稿在 `docs/design/brand/`——`NOTES.md` 是三版对比与实测度量，`preview.html` 离线可看。**还没落地**：`build/` 下的图标仍是 DeepSeek 鲸鱼。Windows 上能换的是 `tray-icon.svg`（`corepack yarn icons:tray`）、`build/icons/*.png` 与 `app-icon.ico`；macOS 的 `app-icon.icon/`（Icon Composer）与 `app-icon.icns` 必须靠 macOS 的 `ictool` 导出，**在 Windows 上改那个目录会让 `icons:check` 直接红**。
 
-## 验证现状（2026-10-28 重整后复跑，全绿）
+## 验证现状（2026-10-29 复跑，全绿）
 
-- 全量 `corepack yarn check` `EXIT=0`：139 个测试文件 / 1794 用例，1766 通过 / 28 跳过（21 个原有 skip + 7 个 Linux 打包门在 Windows 上整组 skip），104 s。它 = `check:layout` + community-fabric + 桌面包，**不含插件包单测**。
+- 全量 `corepack yarn check` `EXIT=0`：138 个测试文件 / 1781 用例，1753 通过 / 28 跳过（21 个原有 skip + 7 个 Linux 打包门在 Windows 上整组 skip），149 s。它 = `check:layout` + community-fabric + 桌面包，**不含插件包单测**。比 10-28 少 13 个用例，是桌面壳收窄到单渠道时删掉的多渠道用例。
 - `corepack yarn check:plugins` `EXIT=0`：setup 7 / bankmanager 45 / memory 189 / textbook 37 / schedule 40 全过，guide / work / hrl / teaching-commons 只 typecheck + build。
-- `check:layout` 四组全绿：icons 源与全平台资源一致 / vendored runtime 343 packages @687f282e86 / verify-layout 与上游 687f282e86 一致 / bilingual 43 记录 86 文档；`verify:licenses` 584 production packages；删掉 155 个死补丁与 8 个死 vendor 版本树之后 `corepack yarn install --immutable` 仍 `exit 0`。
-- 打包链路只做过离线 install 模拟（profile 模板拷进四级子目录能装出 9 个包、`require.resolve('dsh-plugin-textbook/data')` 在 schedule 的视角下指到 `lib/data.js`）；没重打 `dist:win`。
+- `check:layout`：icons 源与全平台资源一致 / vendored runtime 343 packages @687f282e86 / verify-layout 与上游 687f282e86 一致 / bilingual **44 记录 88 文档**；`verify:licenses` 584 production packages；`corepack yarn install --immutable` `exit 0`。
+- `node scripts/verify-patch-references.mjs`：29 个补丁、28 有效、1 无施主（`dsh-experimental-computer-use-cua-driver-native`，见坑·profile 与打包 6）。pi-ai 那份 2026-10-28 已重新对准 1.2.0 并真在 lock 里生效。
+- 打包链路只做过离线 install 模拟（profile 模板拷进四级子目录能装出 9 个包、`require.resolve('dsh-plugin-textbook/data')` 在 schedule 的视角下指到 `lib/data.js`）；`dist:win` 自 2026-10-25 起没重打，图标也还没换。
 
 ## 还没做
 
 - **教材锚定最后一步**：真机让模型实读一次教材。要先删 `.ensure-ile/home/profiles/desktop` 再启动（`seedProfile()` 不覆盖）并手动 `pnpm install --offline`。
 - **重打 `dist:win`**：`dsh-plugin-textbook` 与 `dsh-plugin-schedule` 进包的 vendor 链路只做了模拟，没跑真实打包。
+- **字标定稿与图标落地**：`docs/design/brand/` 里三版稿（serif / geometric / mono）等李挑一版，然后按 `NOTES.md` 的落地表走——Windows 能做的（托盘、ico、png 目录）与必须 macOS 的（`app-icon.icon`、icns）分开。
+- **四个预设都没装压缩引擎**：`compaction-basic` / `command-compact` 被 web-app 在 host 平面设了 `disabled: true`（`deepseek-harness/packages/bundle/web-app/cordis.patch.yml:539-543`），真正跑实例的是预设内部的隔离组（`presets/standard.patch.yml:66-82`），而我们四个预设各只有一个插件 → **没有 `/compact`、没有自动压缩，长会话撞上下文窗口会硬失败**。补法：在每个预设的 patch 里加一个 `cordis:group isolate compaction`。
+- **单会话内改上下文**：只研究没动手，结论与四条路径的代价在 `docs/research/2026-10-29-单会话上下文重写.md`。要做的话正路是「插件调 `ctx.compaction.compactRegion`」或「开新会话」（bankmanager 的三段式），不是改 harness。
+- **`scripts/verify-patch-references.mjs` 要不要接进 `check:layout`**：现在是孤儿脚本。接进去的好处是补丁失配当天就红；代价是它会把「vendor 里留着一个没人装的包」这种合法状态也判成失败（当前会红一次）。
 - **图片链路**（拍照发题 → 模型看得见 → 存进 `attachments`）：李 2026-10-23 说之后搞。
 - **独立 Evaluator**（廉价模型按五条硬规则校验上一轮回复：给动作了吗、含答案了吗、一次两个视角了吗、超两句话了吗、空表扬了吗）：等第一条效果数据。
 
@@ -148,6 +168,8 @@
 | A/B 投票打分界面 | 先存证（`hrl.pairings`），不采集信号。没有并排阅读的界面之前，打分只会变成噪声 |
 | 模型自己切模式 | 预设锁定，模型也不能替学生重启会话；切换只能由学生点 |
 | 一次会话内换提示词 | flash 的 `toolUpdate` 是 `addition-only`，换工具集做不到；静态全集等于隐式预设 |
+| 提示词里写「忽略以上内容」当清空上下文 | token 一分不省；学生屏幕与模型看到的东西不一致；审计与回放断裂 |
+| 模型自己触发「清空上下文」 | 与「模型自己切模式」同类越权；清空会把卡点线索一起扔掉，触发只能由学生 |
 
 ## 坑
 
@@ -158,7 +180,7 @@
 3. **不能用 `build.extraResources`**（上游 `tests/package.spec.ts` 明确禁止顶层 extraResources）；用 `build.files` 加 `profiles/**`，`seedProfile()` 打包时读 `app.getAppPath()/profiles/ensure-ile`、开发时读仓库根。
 4. 九个本地包（含 teaching-commons——它在 profile 的 `dependencies` 里但不在 `bundles` 里）必须 **vendor 进 `profiles/ensure-ile/vendor/`**，并把包内 `package.json` 的依赖改写成 `file:./vendor/*`——原来的 `file:../../../../` 指到安装目录外，首启 install 必失败。仓库模板不动，开发仍链源码。
 5. **覆盖安装会删数据根**：`build/installer.nsh` 用 `$TEMP\ensure-ILE-upgrade.flag` 标记安装，旧卸载器把 `.ensure-ile` 挪到 `$TEMP\ensure-ILE-data`，`customInstall` 再挪回。手动卸载仍然全删。
-6. 补丁与 vendor 的运行时间也是死的：`patches/` 只留被根 `package.json` 的 `resolutions` 用 `patch:` 引用到的那些（2026-10-28 删了 155 个旧版本补丁、414 KB），`vendor/dsh-runtime/` 只留 `upstream.json` 指的那一个版本树（同日删了 8 个旧树、160 MB）。**`scripts/sync-vendored-runtime.mjs` 的 `--write` / `--check` 都只看当前版本目录**，旧版本堆积它结构上看不见——清完必须跑 `corepack yarn install --immutable` 证明没断。
+6. 补丁与 vendor 的运行时是死的：`patches/` 只留被根 `package.json` 的 `resolutions` 用 `patch:` 引用到的那些（2026-10-28 删了 155 个旧版本补丁、414 KB），`vendor/dsh-runtime/` 只留 `upstream.json` 指的那一个版本树（同日删了 8 个旧树、160 MB）。**`scripts/sync-vendored-runtime.mjs` 的 `--write` / `--check` 都只看当前版本目录**，旧版本堆积它结构上看不见——清完必须跑 `corepack yarn install --immutable` 证明没断。**被 resolutions 引用 ≠ 生效**：判据是 `yarn.lock` 里有没有 `@patch:` 条目（见坑·上游与文档 4），`node scripts/verify-patch-references.mjs` 会打印 29 份各自的有效性；`dsh-experimental-computer-use-cua-driver-native` 那份当前「无施主」是**合法状态**（整个 computer-use 分支不在依赖图里，补丁留着等它回来），别当垃圾删。
 7. `materializeSeededProfile()` 在 `node_modules` 缺失时用内置 pnpm 跑 `install --offline --no-frozen-lockfile`——清掉 `.ensure-ile` 后首启会自己装，也可以在 `.ensure-ile/home/profiles/desktop` 手动跑一次。
 
 ### 工具链
@@ -187,8 +209,10 @@
 1. `deepseek-harness/` 禁止修改；子模块 pin 更新单独提交，别和桌面行为改动混在一起。
 2. 命名规矩：`README.md` 中文 / `README.en.md` 英文 / `README.zh.md` 只是兼容跳转；`PRIVACY.md`（中文）/ `PRIVACY.en.md`（英文）同规矩，哈希记在 `*.i18n.yaml`。
 3. `.dsh/storages/memory_project_*.json`（项目记忆）**进 git**，随仓库分享；代价是每个会话都会把它改脏，工作树几乎永远不干净。这是取舍不是 bug，别顺手 ignore 掉。
-4. **`resolutions` 的 patch 选择器是 `标识@描述符` 精确匹配**：写下 `@earendil-works/pi-ai@npm:^1.0.2`，而依赖方声明的是 `npm:^1.1.0`，Yarn 就**静默忽略**这条补丁（lock 里连 `patch:` 标记都没有，安装零告警）——pi-ai 的流式工具参数补丁因此从锁到 1.2.0 起一直没生效，2026-10-28 才被 grep 到。改依赖版本时要 grep 一遍 `patches/` 的选择器是否还匹配实际描述符；现在的对应关系是 `@earendil-works/pi-ai@npm:^1.1.0` → `patches/pi-ai@1.2.0.patch`（删掉每次 delta 的 `block.arguments = parseStreamingJson(...)`，terminating 的 `toolcall_end`/`content_block_stop` 解析保留；副作用是流式过程中的 `partial` 快照拿不到半成品 arguments）。
-5. 「以代码为第一信源」的反面教材：文档里写过「插件市场由内置 dshmarket bundle 提供」「Channels 是独立 roadmap」，两者代码里都已不存在，2026-10-28 全文清掉了——别再写回去。**但别把官方的 custom-market 一起删**：`src/desktop-market.ts`、`src/desktop-settings-route.ts`、`src/desktop-settings-contract.ts`、`src/safe-mode.ts`、`src/profile-preferences.ts`、`src/factory-reset.ts` 互相引用，HTTP 路由在 `src/index.ts:233/237` 注册，客户端链路 `src/client/api.ts:368` → `DesktopSettingsSection.tsx:473/684` 都通；`src/client/market-toggle.ts` 只被 `plugin-controls.tsx` 引用、由 `src/client/index.ts:141` 静态注册进 vite 单入口（`vite.client.config.ts:37`），产物里真实可达。死的只是**第三方 dshmarket 的残渣**，2026-10-28 已清（`vitest.config.ts` 的 inline、桌面 `package.json` 的 `dsh.optionalBundles`、`release-mac.ts:104` 那行调用已删脚本 `prepare-dsh-market.mjs` 的死调用）。
+4. **`resolutions` 的 patch 选择器是 `标识@描述符` 精确匹配**：写下 `@earendil-works/pi-ai@npm:^1.0.2`，而依赖方声明的是 `npm:^1.1.0`，Yarn 就**静默忽略**这条补丁（lock 里连 `patch:` 标记都没有，安装零告警）——pi-ai 的流式工具参数补丁因此从锁到 1.2.0 起一直没生效，2026-10-28 才被 grep 到。改依赖版本时要 grep 一遍 `patches/` 的选择器是否还匹配实际描述符；`node scripts/verify-patch-references.mjs` 就是干这个的（打印每份补丁有没有施主，退出码非 0 表示有失效项）；现在的对应关系是 `@earendil-works/pi-ai@npm:^1.1.0` → `patches/pi-ai@1.2.0.patch`（删掉每次 delta 的 `block.arguments = parseStreamingJson(...)`，terminating 的 `toolcall_end`/`content_block_stop` 解析保留；副作用是流式过程中的 `partial` 快照拿不到半成品 arguments）。
+5. **桌面壳的同步不是 checkout 而是 rebase**：`upstream` remote = `anywhere-labs/dsh-desktop`，两边共享历史（分叉点 `6a63b9730b`）。换新版是 `git fetch upstream` 再 rebase / cherry-pick，冲突热点是 `src/index.ts`、`cordis.patch.yml`、`build/installer.nsh`、`scripts/prepare-profile.mjs`；整套四层流程与失败信号表在 `docs/upstream-sync.md`。
+6. `scripts/bilingual-docs.mjs:87` 用 `git ls-files '*.i18n.yaml'` 枚举记录——**没 `git add` 的 i18n 文件对双语门完全不可见**，`docs:record` 与 `check:bilingual-docs` 会绿着放行。新增成对文档后先 `git add` 再跑门，别信第一次的绿。
+7. 「以代码为第一信源」的反面教材：文档里写过「插件市场由内置 dshmarket bundle 提供」「Channels 是独立 roadmap」，两者代码里都已不存在，2026-10-28 全文清掉了——别再写回去。**但别把官方的 custom-market 一起删**：`src/desktop-market.ts`、`src/desktop-settings-route.ts`、`src/desktop-settings-contract.ts`、`src/safe-mode.ts`、`src/profile-preferences.ts`、`src/factory-reset.ts` 互相引用，HTTP 路由在 `src/index.ts:233/237` 注册，客户端链路 `src/client/api.ts:368` → `DesktopSettingsSection.tsx:473/684` 都通；`src/client/market-toggle.ts` 只被 `plugin-controls.tsx` 引用、由 `src/client/index.ts:141` 静态注册进 vite 单入口（`vite.client.config.ts:37`），产物里真实可达。死的只是**第三方 dshmarket 的残渣**，2026-10-28 已清（`vitest.config.ts` 的 inline、桌面 `package.json` 的 `dsh.optionalBundles`、`release-mac.ts:104` 那行调用已删脚本 `prepare-dsh-market.mjs` 的死调用）。
 
 ---
 

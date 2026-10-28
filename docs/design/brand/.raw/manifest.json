@@ -1,0 +1,82 @@
+{
+ "wordmark/geometric": {
+  "pad": 6,
+  "note": "en∫ure"
+ },
+ "wordmark/geometric-ile-smallcaps": {
+  "pad": 6,
+  "note": "en∫ure + ILE (smallcaps)"
+ },
+ "wordmark/geometric-ile-rule": {
+  "pad": 6,
+  "note": "en∫ure + ILE (rule)"
+ },
+ "wordmark/geometric-ile-toned": {
+  "pad": 6,
+  "note": "en∫ure + ILE，ILE 用品牌蓝区分"
+ },
+ "wordmark/serif": {
+  "pad": 6,
+  "note": "en∫ure"
+ },
+ "wordmark/serif-ile-smallcaps": {
+  "pad": 6,
+  "note": "en∫ure + ILE (smallcaps)"
+ },
+ "wordmark/serif-ile-rule": {
+  "pad": 6,
+  "note": "en∫ure + ILE (rule)"
+ },
+ "wordmark/serif-ile-toned": {
+  "pad": 6,
+  "note": "en∫ure + ILE，ILE 用品牌蓝区分"
+ },
+ "wordmark/mono": {
+  "pad": 6,
+  "note": "en∫ure"
+ },
+ "wordmark/mono-ile-smallcaps": {
+  "pad": 6,
+  "note": "en∫ure + ILE (smallcaps)"
+ },
+ "wordmark/mono-ile-rule": {
+  "pad": 6,
+  "note": "en∫ure + ILE (rule)"
+ },
+ "wordmark/mono-ile-toned": {
+  "pad": 6,
+  "note": "en∫ure + ILE，ILE 用品牌蓝区分"
+ },
+ "mark/geometric": {
+  "pad": 0,
+  "note": "∫ 白字 + 品牌蓝圆角底"
+ },
+ "mark/serif": {
+  "pad": 0,
+  "note": "∫ 衬线（Source Serif 轮廓加粗）"
+ },
+ "mark/mono": {
+  "pad": 0,
+  "note": "∫ 斜杆带脚（等宽技术体）"
+ },
+ "mark/geometric-cjk": {
+  "pad": 0,
+  "note": "∫ + 因需（对照：小尺寸会糊）"
+ },
+ "tray/geometric": {
+  "pad": "square",
+  "note": "托盘 16/32 单色 ∫（保持 50×50 画布）"
+ },
+ "tray/mono": {
+  "pad": "square",
+  "note": "托盘 16/32 单色 ∫（保持 50×50 画布）"
+ },
+ "tray/serif": {
+  "pad": "square",
+  "note": "托盘 16/32 单色 ∫（保持 50×50 画布）"
+ },
+ "tray/geometric-template": {
+  "pad": "square",
+  "note": "Template 版（黑），仅供预览；正式产物由 generate-tray-icons.mjs 换色"
+ }
+}
