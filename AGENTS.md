@@ -135,7 +135,6 @@
 - **重打 `dist:win`**：`dsh-plugin-textbook` 与 `dsh-plugin-schedule` 进包的 vendor 链路只做了模拟，没跑真实打包。
 - **图片链路**（拍照发题 → 模型看得见 → 存进 `attachments`）：李 2026-10-23 说之后搞。
 - **独立 Evaluator**（廉价模型按五条硬规则校验上一轮回复：给动作了吗、含答案了吗、一次两个视角了吗、超两句话了吗、空表扬了吗）：等第一条效果数据。
-- **pi-ai 补丁已失效**（2026-10-28 发现）：`resolutions` 里 `@earendil-works/pi-ai@npm:^1.1.0` 解析到 1.2.0，而 `patches/pi-ai@0.87.1.patch`、`patches/pi-ai@1.0.2.patch` 停在旧版——补丁里那个流式 JSON 性能修复（删掉每次 delta 的 `block.arguments = parseStreamingJson(block.partialJson)`）**已经静默不生效**。要么补一份 1.2.0 的补丁，要么把选择器钉回 1.0.2。
 
 ## 明确不做
 
@@ -188,7 +187,8 @@
 1. `deepseek-harness/` 禁止修改；子模块 pin 更新单独提交，别和桌面行为改动混在一起。
 2. 命名规矩：`README.md` 中文 / `README.en.md` 英文 / `README.zh.md` 只是兼容跳转；`PRIVACY.md`（中文）/ `PRIVACY.en.md`（英文）同规矩，哈希记在 `*.i18n.yaml`。
 3. `.dsh/storages/memory_project_*.json`（项目记忆）**进 git**，随仓库分享；代价是每个会话都会把它改脏，工作树几乎永远不干净。这是取舍不是 bug，别顺手 ignore 掉。
-4. 「以代码为第一信源」的反面教材：文档里写过「插件市场由内置 dshmarket bundle 提供」「Channels 是独立 roadmap」，两者代码里都已不存在，2026-10-28 全文清掉了——别再写回去。**但别把官方的 custom-market 一起删**：`src/desktop-market.ts`、`src/desktop-settings-route.ts`、`src/desktop-settings-contract.ts`、`src/safe-mode.ts`、`src/profile-preferences.ts`、`src/factory-reset.ts` 互相引用，HTTP 路由在 `src/index.ts:233/237` 注册，客户端链路 `src/client/api.ts:368` → `DesktopSettingsSection.tsx:473/684` 都通；`src/client/market-toggle.ts` 只被 `plugin-controls.tsx` 引用、由 `src/client/index.ts:141` 静态注册进 vite 单入口（`vite.client.config.ts:37`），产物里真实可达。死的只是**第三方 dshmarket 的残渣**，2026-10-28 已清（`vitest.config.ts` 的 inline、桌面 `package.json` 的 `dsh.optionalBundles`、`release-mac.ts:104` 那行调用已删脚本 `prepare-dsh-market.mjs` 的死调用）。
+4. **`resolutions` 的 patch 选择器是 `标识@描述符` 精确匹配**：写下 `@earendil-works/pi-ai@npm:^1.0.2`，而依赖方声明的是 `npm:^1.1.0`，Yarn 就**静默忽略**这条补丁（lock 里连 `patch:` 标记都没有，安装零告警）——pi-ai 的流式工具参数补丁因此从锁到 1.2.0 起一直没生效，2026-10-28 才被 grep 到。改依赖版本时要 grep 一遍 `patches/` 的选择器是否还匹配实际描述符；现在的对应关系是 `@earendil-works/pi-ai@npm:^1.1.0` → `patches/pi-ai@1.2.0.patch`（删掉每次 delta 的 `block.arguments = parseStreamingJson(...)`，terminating 的 `toolcall_end`/`content_block_stop` 解析保留；副作用是流式过程中的 `partial` 快照拿不到半成品 arguments）。
+5. 「以代码为第一信源」的反面教材：文档里写过「插件市场由内置 dshmarket bundle 提供」「Channels 是独立 roadmap」，两者代码里都已不存在，2026-10-28 全文清掉了——别再写回去。**但别把官方的 custom-market 一起删**：`src/desktop-market.ts`、`src/desktop-settings-route.ts`、`src/desktop-settings-contract.ts`、`src/safe-mode.ts`、`src/profile-preferences.ts`、`src/factory-reset.ts` 互相引用，HTTP 路由在 `src/index.ts:233/237` 注册，客户端链路 `src/client/api.ts:368` → `DesktopSettingsSection.tsx:473/684` 都通；`src/client/market-toggle.ts` 只被 `plugin-controls.tsx` 引用、由 `src/client/index.ts:141` 静态注册进 vite 单入口（`vite.client.config.ts:37`），产物里真实可达。死的只是**第三方 dshmarket 的残渣**，2026-10-28 已清（`vitest.config.ts` 的 inline、桌面 `package.json` 的 `dsh.optionalBundles`、`release-mac.ts:104` 那行调用已删脚本 `prepare-dsh-market.mjs` 的死调用）。
 
 ---
 
