@@ -61,7 +61,7 @@ import {
   type DesktopUpdateArtifact,
   type UpdateArtifactResponse,
 } from './update-download.ts'
-import { parseCanonicalChannelVersion, type UpdateCheckResult } from './update-checker.ts'
+import type { UpdateCheckResult } from './update-checker.ts'
 import type { DesktopInstallationId } from './desktop-installation-id.ts'
 import { DESKTOP_RELEASE_CHANNEL } from './product-identity.ts'
 import type { DesktopReleaseChannel } from './update-checker.ts'
@@ -233,7 +233,7 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
       get statePath() { return join(app.getPath('userData'), 'updates', 'state.json') },
       ...(installationId === undefined ? {} : { installationId }),
       request: (url, init) => net.fetch(url, init),
-      confirmDownload: (version, channel) => this.confirmUpdateDownload(version, channel),
+      confirmDownload: version => this.confirmUpdateDownload(version),
       showManualCheckResult: result => this.showManualUpdateCheckResult(result),
       downloadAndOpen: (version, signal, channel, installerSha256) => this.downloadAndOpenUpdate(version, signal, channel, installerSha256),
       notify: notification => { this.showNotification(notification) },
@@ -777,18 +777,13 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
   }
 
   /** Ask before making the fixed download endpoint's counted request. */
-  private async confirmUpdateDownload(
-    version: string,
-    channel: DesktopReleaseChannel = 'stable',
-  ): Promise<boolean> {
+  private async confirmUpdateDownload(version: string): Promise<boolean> {
     const copy = desktopNativeCopy(this.currentLocale)
     const result = await this.showUpdateMessageBox({
       type: 'info',
       title: copy.updateAvailableTitle,
       message: copy.updateAvailableMessage(version),
-      detail: parseCanonicalChannelVersion(version, 'next') !== null
-        ? copy.installNext
-        : channel === DESKTOP_RELEASE_CHANNEL ? copy.downloadUpdate : copy.installStableAlongsideBeta,
+      detail: copy.downloadUpdate,
       buttons: [copy.download, copy.later],
       defaultId: 1,
       cancelId: 1,
@@ -849,7 +844,7 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
     if (platform === undefined) {
       throw new Error(`dsh-plugin-desktop: updates are unavailable on ${this.platform}`)
     }
-    const destinationPath = await this.chooseUpdateDestination(version, channel)
+    const destinationPath = await this.chooseUpdateDestination(version)
     if (destinationPath === undefined) return
     signal.throwIfAborted()
     const artifactPath = await downloadDesktopUpdate({
@@ -877,7 +872,7 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
         type: 'info',
         title: copy.updateDownloadedTitle,
         message: copy.updateReady(version),
-        detail: parseCanonicalChannelVersion(version, 'next') !== null ? copy.macNextInstallInstructions : copy.macInstallInstructions,
+        detail: copy.macInstallInstructions,
         buttons: [copy.ok],
         defaultId: 0,
         noLink: true,
@@ -905,13 +900,10 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
     spec.requestQuit(0)
   }
 
-  private async chooseUpdateDestination(
-    version: string,
-    channel: DesktopReleaseChannel = 'stable',
-  ): Promise<string | undefined> {
+  private async chooseUpdateDestination(version: string): Promise<string | undefined> {
     if (this.platform !== 'darwin' && this.platform !== 'win32') return undefined
     const copy = desktopNativeCopy(this.currentLocale)
-    const filename = desktopUpdateFilename(this.platform, version, channel)
+    const filename = desktopUpdateFilename(this.platform, version)
     const extension = this.platform === 'darwin' ? 'dmg' : 'exe'
     const result = await this.showUpdateSaveDialog({
       title: copy.saveInstallerTitle,

@@ -57,7 +57,7 @@ export function createHostRuntime(rpc: HostRpc, snapshot: RuntimeSnapshot): Desk
           [url, { ...options, headers: [...new Headers(init.headers).entries()] }], signal ?? undefined)
         return new Response([204, 205, 304].includes(response.status) ? null : response.body, { status: response.status, headers: response.headers })
       },
-      confirmDownload: (version, channel) => send('update:confirmDownload', [version, channel]),
+      confirmDownload: version => send('update:confirmDownload', [version]),
       showManualCheckResult: result => send('update:showManualCheckResult', [result]),
       downloadAndOpen: (version, signal, channel) => send('update:downloadAndOpen', [version, channel], signal),
       notify: notification => { void send('update:notify', [notification]) },
@@ -192,7 +192,7 @@ export function bindNativeRuntime(rpc: HostRpc, runtime: DesktopRuntime): () => 
     const response = await runtime.updates.request(url, { ...init, signal })
     return { body: await response.text(), status: response.status, headers: [...response.headers.entries()] }
   })
-  handle('update:confirmDownload', ([version, channel]) => runtime.updates.confirmDownload(version, channel))
+  handle('update:confirmDownload', ([version]) => runtime.updates.confirmDownload(version))
   handle('update:showManualCheckResult', ([result]) => runtime.updates.showManualCheckResult(result))
   handle('update:downloadAndOpen', ([version, channel], signal) => runtime.updates.downloadAndOpen(version, signal, channel))
   handle('update:notify', ([value]) => runtime.updates.notify(value))

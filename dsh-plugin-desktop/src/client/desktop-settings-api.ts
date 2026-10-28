@@ -10,7 +10,6 @@ const SETTINGS_PATH = '/api/desktop/settings'
 const PROFILE_CREATE_PATH = '/api/desktop/profiles/create'
 const PROFILE_SELECT_PATH = '/api/desktop/profiles/select'
 const PROFILE_DELETE_PATH = '/api/desktop/profiles/delete'
-const MARKET_SELECT_PATH = '/api/desktop/market/select'
 const TERMINAL_OPEN_PATH = '/api/desktop/terminal/open'
 const RESTART_PATH = '/api/desktop/restart'
 const RECOVERY_RESTART_PATH = '/api/desktop/restart/recovery'
@@ -27,9 +26,6 @@ const LAN_CA_PATH = '/.well-known/dsh-desktop-ca.crt'
 const LAN_ERROR_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u
 const SHA256_FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/u
 
-/** Launcher-supported plugin market implementations. */
-export type DesktopMarketProvider = 'disabled' | 'dsh-market'
-
 /** Safe profile projection returned to the renderer. */
 export interface DesktopProfileView {
   readonly name: string
@@ -37,13 +33,6 @@ export interface DesktopProfileView {
   readonly webCapable: boolean
   readonly selectable: boolean
   readonly deletable: boolean
-}
-
-/** Market selection fixed for the running generation. */
-export interface DesktopMarketView {
-  readonly requested: DesktopMarketProvider
-  readonly effective: DesktopMarketProvider
-  readonly legacyDefaulted: boolean
 }
 
 /** Authenticated ordinary-browser URLs for the running Desktop generation. */
@@ -63,7 +52,6 @@ export interface DesktopWebView {
 export interface DesktopSettingsView {
   readonly current: string
   readonly profiles: readonly DesktopProfileView[]
-  readonly market: DesktopMarketView
   readonly web: DesktopWebView
 }
 
@@ -79,7 +67,6 @@ export interface DesktopSettingsApi {
   createProfile(name: string): Promise<DesktopSettingsView>
   selectProfile(name: string): Promise<DesktopRestartAcceptance>
   deleteProfile(name: string): Promise<DesktopSettingsView>
-  selectMarket(provider: DesktopMarketProvider): Promise<DesktopRestartAcceptance>
   /** Optional native actions for individual browser login URLs. */
   openBrowser?(url: string): Promise<void>
   copyBrowser?(url: string): Promise<void>
@@ -96,10 +83,6 @@ type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respo
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
-
-function isMarketProvider(value: unknown): value is DesktopMarketProvider {
-  return value === 'disabled' || value === 'dsh-market'
 }
 
 function isLanState(value: unknown): value is DesktopLanState {
@@ -211,10 +194,6 @@ export function parseDesktopSettingsView(value: unknown): DesktopSettingsView {
     || value.current.length > MAX_PROFILE_NAME_LENGTH
     || !Array.isArray(value.profiles)
     || value.profiles.length > MAX_PROFILES
-    || !isObject(value.market)
-    || !isMarketProvider(value.market.requested)
-    || !isMarketProvider(value.market.effective)
-    || typeof value.market.legacyDefaulted !== 'boolean'
     || !isObject(value.web)
     || !hasExactKeys(value.web, [
       'localUrl',
@@ -252,11 +231,6 @@ export function parseDesktopSettingsView(value: unknown): DesktopSettingsView {
   return Object.freeze({
     current: value.current,
     profiles: Object.freeze(profiles),
-    market: Object.freeze({
-      requested: value.market.requested,
-      effective: value.market.effective,
-      legacyDefaulted: value.market.legacyDefaulted,
-    }),
     web: Object.freeze({
       localUrl,
       lanUrls: Object.freeze(lanUrls),
@@ -365,9 +339,6 @@ export function createDesktopSettingsApi(
     async deleteProfile(name: string) {
       return parseDesktopSettingsView(await readResponse(await post(fetcher, PROFILE_DELETE_PATH, { name })))
     },
-    async selectMarket(provider: DesktopMarketProvider) {
-      return parseDesktopRestartAcceptance(await readResponse(await post(fetcher, MARKET_SELECT_PATH, { provider })))
-    },
     async openTerminal() {
       await native('terminal', () => post(fetcher, TERMINAL_OPEN_PATH, {}))
     },
@@ -397,7 +368,6 @@ export const desktopSettingsPaths = Object.freeze({
   profileCreate: PROFILE_CREATE_PATH,
   profileSelect: PROFILE_SELECT_PATH,
   profileDelete: PROFILE_DELETE_PATH,
-  marketSelect: MARKET_SELECT_PATH,
   terminalOpen: TERMINAL_OPEN_PATH,
   restart: RESTART_PATH,
   recoveryRestart: RECOVERY_RESTART_PATH,

@@ -21,7 +21,6 @@ import {
 import {
   DESKTOP_DIAGNOSTICS_EXPORT_PATH,
   DESKTOP_DEVELOPER_TOOLS_TOGGLE_PATH,
-  DESKTOP_MARKET_SELECT_PATH,
   DESKTOP_PROFILE_CREATE_PATH,
   DESKTOP_PROFILE_DELETE_PATH,
   DESKTOP_PROFILE_SELECT_PATH,
@@ -34,7 +33,6 @@ import {
 import {
   handleDesktopDiagnosticsExportRequest,
   handleDesktopDeveloperToolsToggleRequest,
-  handleDesktopMarketSelectRequest,
   handleDesktopProfileCreateRequest,
   handleDesktopProfileDeleteRequest,
   handleDesktopProfileSelectRequest,
@@ -234,7 +232,6 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
       [DESKTOP_PROFILE_CREATE_PATH, handleDesktopProfileCreateRequest],
       [DESKTOP_PROFILE_DELETE_PATH, handleDesktopProfileDeleteRequest],
       [DESKTOP_PROFILE_SELECT_PATH, handleDesktopProfileSelectRequest],
-      [DESKTOP_MARKET_SELECT_PATH, handleDesktopMarketSelectRequest],
       [DESKTOP_TERMINAL_OPEN_PATH, handleDesktopTerminalOpenRequest],
       [DESKTOP_RESTART_PATH, handleDesktopRestartRequest],
       [DESKTOP_RECOVERY_RESTART_PATH, handleDesktopRecoveryRestartRequest],

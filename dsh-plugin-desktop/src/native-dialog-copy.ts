@@ -20,9 +20,6 @@ export interface DesktopNativeCopy {
   readonly updateAvailableTitle: string
   readonly updateAvailableMessage: (version: string) => string
   readonly downloadUpdate: string
-  readonly installNext: string
-  readonly macNextInstallInstructions: string
-  readonly installStableAlongsideBeta: string
   readonly download: string
   readonly later: string
   readonly updateCheckFailedTitle: string
@@ -101,9 +98,6 @@ const COPY: Record<DesktopLocale, DesktopNativeCopy> = {
     updateAvailableTitle: 'ensure-ILE Update Available',
     updateAvailableMessage: version => `ensure-ILE ${version} is available.`,
     downloadUpdate: 'Download this update now?',
-    installNext: 'Download DSH NEXT, the successor to the current stable desktop app? It installs as a separate app.',
-    macNextInstallInstructions: 'The disk image has opened. Drag DSH NEXT into Applications, then open DSH NEXT.',
-    installStableAlongsideBeta: 'Install the stable edition alongside ensure-ILE Beta? The Beta app will remain installed.',
     download: 'Download',
     later: 'Later',
     updateCheckFailedTitle: 'Unable to Check for Updates',
@@ -180,9 +174,6 @@ const COPY: Record<DesktopLocale, DesktopNativeCopy> = {
     updateAvailableTitle: 'ensure-ILE 有可用更新',
     updateAvailableMessage: version => `ensure-ILE ${version} 已可用。`,
     downloadUpdate: '现在下载此更新？',
-    installNext: '是否下载 DSH NEXT？它将接替当前稳定版桌面端，将作为独立应用安装。',
-    macNextInstallInstructions: '磁盘映像已打开。请将 DSH NEXT 拖入“应用程序”，然后打开 DSH NEXT。',
-    installStableAlongsideBeta: '是否同时安装稳定版？ensure-ILE Beta 将继续保留。',
     download: '下载',
     later: '稍后',
     updateCheckFailedTitle: '无法检查更新',

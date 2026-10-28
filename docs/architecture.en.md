@@ -65,9 +65,9 @@ The outer workspace uses Yarn. The pinned `deepseek-harness/` submodule keeps it
 
 Desktop is one physical npm package and one system application; Git branches do not define the channel. It uses `dsh-plugin-desktop`, `ensure-ILE`, and `com.ensurelab.ensureile`. `upstream.json` records the upstream version, commit, and vendored-runtime manifest; exact root resolutions ensure that each workspace resolves only its own DSH runtime.
 
-Version checks and installer downloads send `X-ensure-ILE-Channel: stable|beta`. A check also sends the current version, while a download sends `X-ensure-ILE-Target-Version`; the service must echo the requested channel and version. Legacy clients without the channel header are treated as stable. A Beta client requires an explicit `channel: "beta"` response. Stable accepts only release SemVer, while Beta accepts only `-beta.N`. Automatic Beta updates query only Beta. **Install Stable Edition** is a separate explicit operation that may select a lower version and installs Stable alongside Beta.
+Version checks and installer downloads send `X-ensure-ILE-Channel: stable`. A check also sends the current version, while a download sends `X-ensure-ILE-Target-Version`; the service must echo the requested channel and version. Legacy clients without the channel header are treated as stable too. ensure-ILE publishes one channel, so the client accepts only release SemVer: a response carrying a `-beta.N` or `-next` prerelease, or declaring another `channel`, is an invalid version.
 
-The service must implement these selection and echo rules, with complete platform artifacts for both channels, before a Beta release becomes discoverable. Otherwise the client treats the response as invalid and will not silently cross channels.
+The service must echo the requested channel and provide complete platform artifacts. Otherwise the client treats the response as invalid and will not download.
 
 ## Maintainer reading
 

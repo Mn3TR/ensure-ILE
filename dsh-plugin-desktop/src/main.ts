@@ -106,7 +106,6 @@ import { logInactiveStartupEntries } from './startup-audit.ts'
 import { DesktopActionsService } from './desktop-actions.ts'
 import { clearDesktopProfilePluginState, DesktopPluginsService } from './desktop-plugins.ts'
 import {
-  desktopMarketSnapshotWithEffective,
   readDesktopMarketStateForUserData,
   selectDesktopMarketProvider,
   type DesktopMarketProvider,
@@ -1675,9 +1674,6 @@ async function start(): Promise<void> {
       // durable file so its Market and AA choices are neither reverted nor hidden.
       const latestProfilePreferences = (): DesktopProfilePreferences =>
         readDesktopProfilePreferences(marketUserDataDir, prepared.profile.dir) ?? currentProfilePreferences
-      const readProfilePreferences = (): DesktopProfilePreferences => {
-        try { return latestProfilePreferences() } catch { return currentProfilePreferences }
-      }
       const enqueueProfilePreferencesWrite = (
         update: (current: DesktopProfilePreferences) => DesktopProfilePreferences,
       ): Promise<DesktopProfilePreferencesStateV1> => {
@@ -1703,11 +1699,9 @@ async function start(): Promise<void> {
       }
       startupStage = 'host-boot'
       lifecycleRecorder.transitionStartupStage(startupStage)
-      let effectiveMarket = prepared.market.effective
       const releasePackageResolver = installProfilePackageResolver(prepared.bareModuleBaseUrl)
       const profileBoot = createDesktopProfileBoot(prepared, desktopPnpmBootstrap, {
         onManagedBundlesChanged: state => {
-          effectiveMarket = state.effectiveMarket
           void enqueueProfilePreferencesWrite(current => desktopProfilePreferencesFromSettings(
             current,
             current.notifications,
@@ -1817,13 +1811,8 @@ async function start(): Promise<void> {
             if (pendingSettingsRestart !== undefined) clearImmediate(pendingSettingsRestart)
             pendingSettingsRestart = undefined
           }, 'dsh-plugin-desktop: pending Desktop settings restart')
-          const readMarket = () => desktopMarketSnapshotWithEffective(
-            desktopProfileMarketSnapshot(readProfilePreferences().market),
-            effectiveMarket,
-          )
           hostCtx.provide('desktopSettingsController', new DesktopSettingsController({
             profiles: hostCtx.desktopProfiles,
-            readMarket,
             readWeb: () => {
               const port = hostCtx.webServer.port
               if (port === undefined) {
@@ -1845,17 +1834,6 @@ async function start(): Promise<void> {
                   return new URL(DESKTOP_LAN_HTTPS_CA_PATH, origin).href
                 }),
               }
-            },
-            selectMarket: async provider => {
-              await enqueueProfilePreferencesWrite(current => desktopProfilePreferencesFromSettings(
-                current,
-                current.notifications,
-                provider,
-              ))
-              return desktopMarketSnapshotWithEffective(
-                await selectDesktopMarketProvider(marketUserDataDir, provider),
-                effectiveMarket,
-              )
             },
             scheduleRestart: scheduleSettingsRestart,
             scheduleRecoveryRestart: () => {

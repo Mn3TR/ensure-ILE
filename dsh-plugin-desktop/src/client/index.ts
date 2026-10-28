@@ -40,8 +40,6 @@ export {
   parseDesktopSettingsView,
 } from './desktop-settings-api.ts'
 export type {
-  DesktopMarketProvider,
-  DesktopMarketView,
   DesktopProfileView,
   DesktopRestartAcceptance,
   DesktopSettingsApi,

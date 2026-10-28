@@ -8,8 +8,7 @@ import {
   compareSemVerVersions,
   DESKTOP_RELEASE_CHANNEL_HEADER,
   parseSemVer,
-  parseCanonicalChannelVersion,
-  parseCanonicalUpdateVersion,
+  parseCanonicalStableVersion,
   type DesktopReleaseChannel,
 } from './update-checker.ts'
 
@@ -137,7 +136,7 @@ const UPDATE_ARTIFACT_STATE_FILENAME = 'pending-installer.json'
 export async function downloadDesktopUpdate(options: DownloadDesktopUpdateOptions): Promise<string> {
   const platform = validatedPlatform(options.platform)
   const channel = options.channel ?? 'stable'
-  validatedVersion(options.version, channel)
+  validatedVersion(options.version)
   const destinationPath = validatedArtifactPath(options.destinationPath, platform)
   const expectedSha256 = normalizedExpectedDigest(options.expectedSha256)
   const paths = await prepareDownloadPaths(destinationPath)
@@ -214,14 +213,12 @@ export async function downloadDesktopUpdate(options: DownloadDesktopUpdateOption
 export function desktopUpdateFilename(
   platform: DesktopDownloadPlatform,
   version: string,
-  channel: DesktopReleaseChannel = 'stable',
 ): string {
   validatedPlatform(platform)
-  validatedVersion(version, channel)
+  validatedVersion(version)
   const extension = platform === 'darwin' ? 'dmg' : 'exe'
   const platformName = platform === 'darwin' ? 'mac' : 'windows'
-  const product = parseCanonicalChannelVersion(version, 'next') !== null ? 'DSH-NEXT' : channel === 'beta' ? 'ensure-ILE-Beta' : 'ensure-ILE'
-  return `${product}-${version}-${platformName}.${extension}`
+  return `ensure-ILE-${version}-${platformName}.${extension}`
 }
 
 /** Remember a downloaded installer until an upgraded application resolves its retention. */
@@ -297,22 +294,17 @@ function validatedPlatform(platform: DesktopDownloadPlatform): DesktopDownloadPl
   return platform
 }
 
-function validatedVersion(version: string, channel: DesktopReleaseChannel = 'stable'): string {
-  if (parseCanonicalUpdateVersion(version, channel) === null) {
-    throw new UpdateDownloadError('invalid-options', `The update version must match the ${channel} channel.`)
+function validatedVersion(version: string): string {
+  if (parseCanonicalStableVersion(version) === null) {
+    throw new UpdateDownloadError('invalid-options', 'The update version must be a canonical stable version.')
   }
   return version
 }
 
 function validatedReleaseVersion(version: string): string {
   const parsed = parseSemVer(version)
-  const isStable = parsed?.prerelease.length === 0
-  const isBeta = parsed?.prerelease.length === 2
-    && parsed.prerelease[0] === 'beta'
-    && /^[0-9]+$/u.test(parsed.prerelease[1]!)
-  const isNext = parseCanonicalChannelVersion(version, 'next') !== null
-  if (parsed === null || parsed.version !== version || (!isStable && !isBeta && !isNext)) {
-    throw new UpdateDownloadError('invalid-options', 'The update version must belong to a supported release channel.')
+  if (parsed === null || parsed.version !== version || parsed.prerelease.length !== 0) {
+    throw new UpdateDownloadError('invalid-options', 'The update version must be a canonical stable version.')
   }
   return version
 }

@@ -25,7 +25,6 @@ async function mount(
     t: (key: keyof typeof zh) => zh[key],
     api: {
       read: async () => ({ current: 'desktop', profiles: [],
-        market: { requested: 'disabled', effective: 'disabled', legacyDefaulted: false },
         web: { localUrl: '', lanUrls: [], lanState: 'inactive', lanError: null, lanCaFingerprint: null, lanCaUrls: [] },
       }),
       checkForUpdates,

@@ -54,14 +54,14 @@ async function createHarness(options: {
   readonly canDownload?: boolean
   readonly config?: UpdateConfig
   readonly request?: DesktopRuntime['updates']['request']
-  readonly releaseChannel?: 'stable' | 'beta'
+  readonly releaseChannel?: 'stable'
   readonly currentVersion?: string
-  readonly confirmDownload?: (version: string, channel?: 'stable' | 'beta') => Promise<boolean>
+  readonly confirmDownload?: (version: string) => Promise<boolean>
   readonly showManualCheckResult?: (result: UpdateCheckResult | null) => Promise<void>
   readonly downloadAndOpen?: (
     version: string,
     signal: AbortSignal,
-    channel?: 'stable' | 'beta',
+    channel?: 'stable',
     installerSha256?: Readonly<Partial<Record<'win32' | 'darwin', string>>>,
   ) => Promise<void>
   readonly notify?: (notification: DesktopNotification) => void
@@ -150,76 +150,43 @@ afterEach(() => {
 })
 
 describe('desktop update Host plugin', () => {
-  it('remembers notifications for the promoted Next release across launches', async () => {
+  it('remembers notifications for the advertised release across launches', async () => {
     vi.useFakeTimers()
     const harness = await createHarness({ currentVersion: '2.0.19', releaseChannel: 'stable',
-      state: JSON.stringify({ version: 3, lastNotifiedVersion: '2.0.20-next' }),
-      request: async () => Response.json({ version: '2.0.20-next', channel: 'stable' }) })
+      state: JSON.stringify({ version: 3, lastNotifiedVersion: '2.0.20' }),
+      request: async () => Response.json({ version: '2.0.20', channel: 'stable' }) })
     try {
       await vi.advanceTimersByTimeAsync(testConfig.initialDelayMs)
       expect(harness.notifications).toEqual([])
-      expect(JSON.parse(await readFile(harness.statePath, 'utf8'))).toEqual({ version: 3, lastNotifiedVersion: '2.0.20-next' })
+      expect(JSON.parse(await readFile(harness.statePath, 'utf8'))).toEqual({ version: 3, lastNotifiedVersion: '2.0.20' })
     } finally { await harness.dispose() }
   })
 
-  it('rechecks Stable after confirmation and downloads its promoted Next release', async () => {
+  it('rechecks the advertised release after confirmation and downloads it', async () => {
     const request = vi.fn(async (_url: string, init: RequestInit) => {
       expect(new Headers(init.headers).get(DESKTOP_RELEASE_CHANNEL_HEADER)).toBe('stable')
-      return Response.json({ version: '2.0.20-next', channel: 'stable' })
+      return Response.json({ version: '2.0.20', channel: 'stable' })
     })
     const harness = await createHarness({ currentVersion: '2.0.19', releaseChannel: 'stable',
       config: { ...testConfig, enabled: false }, request, confirmDownload: async () => true })
     try {
       await harness.tray.invoke()
       expect(request).toHaveBeenCalledTimes(2)
-      expect(harness.confirmDownload).toHaveBeenCalledWith('2.0.20-next', 'stable')
-      expect(harness.downloadAndOpen).toHaveBeenCalledWith('2.0.20-next', expect.any(AbortSignal), 'stable')
+      expect(harness.confirmDownload).toHaveBeenCalledWith('2.0.20')
+      expect(harness.downloadAndOpen).toHaveBeenCalledWith('2.0.20', expect.any(AbortSignal), 'stable')
     } finally { await harness.dispose() }
   })
 
-  it('does not download when the promoted Next release changes after confirmation', async () => {
-    let version = '2.0.20-next'
+  it('does not download when the advertised release changes after confirmation', async () => {
+    let version = '2.0.20'
     const harness = await createHarness({ currentVersion: '2.0.19', releaseChannel: 'stable',
       config: { ...testConfig, enabled: false }, request: async () => Response.json({ version, channel: 'stable' }),
-      confirmDownload: async () => { version = '2.0.21-next'; return true } })
+      confirmDownload: async () => { version = '2.0.21'; return true } })
     try {
       await harness.tray.invoke()
       expect(harness.downloadAndOpen).not.toHaveBeenCalled()
     } finally { await harness.dispose() }
   })
-
-
-  it('checks Beta automatically and installs an older stable release only through the explicit action', async () => {
-    const request = vi.fn(async (_url: string, init: RequestInit) => {
-      const channel = new Headers(init.headers).get(DESKTOP_RELEASE_CHANNEL_HEADER)
-      return Response.json(channel === 'beta'
-        ? { version: '2.0.6-beta.1', channel: 'beta' }
-        : { version: '2.0.4', channel: 'stable' })
-    })
-    const harness = await createHarness({
-      releaseChannel: 'beta',
-      currentVersion: '2.0.6-beta.1',
-      request,
-      confirmDownload: async () => true,
-    })
-
-    expect(harness.trays).toHaveLength(2)
-    await harness.tray.invoke()
-    expect(harness.downloadAndOpen).not.toHaveBeenCalled()
-
-    await harness.trays[1]!.invoke()
-    expect(harness.confirmDownload).toHaveBeenCalledWith('2.0.4', 'stable')
-    expect(harness.downloadAndOpen).toHaveBeenCalledWith(
-      '2.0.4',
-      expect.any(AbortSignal),
-      'stable',
-    )
-    const channels = request.mock.calls.map(([, init]) => new Headers(init.headers).get(DESKTOP_RELEASE_CHANNEL_HEADER))
-    expect(channels).toContain('beta')
-    expect(channels).toContain('stable')
-    await harness.dispose()
-  })
-
   it('exposes the packaged 60-second and six-hour background policy', () => {
     expect(inject).toEqual(['desktopRuntime', 'webServer', 'connection'])
     expect(Config({} as UpdateConfig)).toEqual({

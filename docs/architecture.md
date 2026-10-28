@@ -65,9 +65,9 @@ Launcher 私有的 `desktopRuntime`、`desktopPnpmBootstrap`、Electron executab
 
 桌面是一个实体 npm 包和一个系统应用，不由 Git 分支区分：`dsh-plugin-desktop`、`ensure-ILE` 与 `com.ensurelab.ensureile`。`upstream.json` 记录上游版本、提交和 vendored runtime 清单，根级精确 resolution 保证每个 workspace 只能解析自己的 DSH 运行时。
 
-版本检查和安装包下载均携带 `X-ensure-ILE-Channel: stable|beta`。检查请求还携带当前版本；下载请求携带 `X-ensure-ILE-Target-Version`，服务端必须返回与请求一致的通道与版本。没有通道 header 的旧客户端按稳定版处理；Beta 客户端则必须收到明确的 `channel: "beta"` 响应。稳定通道只接受正式 SemVer，Beta 通道只接受 `-beta.N`。Beta 自动更新只查询 Beta；“安装稳定版”是独立的显式操作，允许选择较低版本并将稳定版安装在 Beta 旁边。
+版本检查和安装包下载均携带 `X-ensure-ILE-Channel: stable`。检查请求还携带当前版本；下载请求携带 `X-ensure-ILE-Target-Version`，服务端必须返回与请求一致的通道与版本。没有通道 header 的旧客户端同样按稳定版处理。ensure-ILE 只发布一个通道，所以客户端只接受正式 SemVer：响应里带 `-beta.N` 或 `-next` 预发布、或声明了别的 `channel`，都会被判为无效版本。
 
-服务端必须在 Beta 发布前先支持上述选择与回显规则，并为两个通道分别准备完整的平台产物。否则客户端会把响应视为无效，不会静默跨通道下载。
+服务端必须让版本响应里的 `channel` 与请求一致，并给出完整的平台产物。否则客户端会把响应视为无效，不会下载。
 
 ## 维护者深入阅读
 

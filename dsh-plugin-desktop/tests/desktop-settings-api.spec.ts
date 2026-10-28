@@ -1,14 +1,12 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Readable } from 'node:stream'
 import { describe, expect, it, vi } from 'vitest'
-import type { DesktopMarketSnapshot } from '../src/desktop-market.ts'
 import DesktopSettingsController, {
   type DesktopSettingsControllerBootstrap,
 } from '../src/desktop-settings-controller.ts'
 import {
   handleDesktopDeveloperToolsToggleRequest,
   handleDesktopDiagnosticsExportRequest,
-  handleDesktopMarketSelectRequest,
   handleDesktopProfileCreateRequest,
   handleDesktopProfileDeleteRequest,
   handleDesktopProfileSelectRequest,
@@ -49,14 +47,6 @@ const BROKEN: DesktopProfileSummary = {
   problem: 'failed to read /private/profiles/broken/package.json',
 }
 
-function market(
-  requested: DesktopMarketSnapshot['requested'] = 'disabled',
-  effective: DesktopMarketSnapshot['effective'] = requested,
-  legacyDefaulted = false,
-): DesktopMarketSnapshot {
-  return { requested, effective, legacyDefaulted }
-}
-
 type DesktopSettingsControllerBootstrapOverrides = Omit<
   Partial<DesktopSettingsControllerBootstrap>,
   'profiles'
@@ -66,7 +56,6 @@ type DesktopSettingsControllerBootstrapOverrides = Omit<
 
 function bootstrap(overrides: DesktopSettingsControllerBootstrapOverrides = {}): DesktopSettingsControllerBootstrap {
   return {
-    readMarket: () => market(),
     readWeb: () => ({
       localUrl: 'http://127.0.0.1:43120/',
       lanUrls: [],
@@ -75,7 +64,6 @@ function bootstrap(overrides: DesktopSettingsControllerBootstrapOverrides = {}):
       lanCaFingerprint: null,
       lanCaUrls: [],
     }),
-    selectMarket: async provider => market(provider),
     scheduleRestart: () => {},
     scheduleRecoveryRestart: () => {},
     openTerminal: () => {},
@@ -158,7 +146,6 @@ describe('desktop settings controller', () => {
         { name: 'work', exists: true, webCapable: true, selectable: true, deletable: false },
         { name: 'broken', exists: true, webCapable: false, selectable: false, deletable: false },
       ],
-      market: { requested: 'disabled', effective: 'disabled', legacyDefaulted: false },
       web: {
         localUrl: 'http://127.0.0.1:43120/',
         lanUrls: [],
@@ -192,7 +179,6 @@ describe('desktop settings controller', () => {
         { name: 'desktop', exists: true, webCapable: true, selectable: true, deletable: false },
         { name: 'work', exists: true, webCapable: true, selectable: true, deletable: false },
       ],
-      market: { requested: 'disabled', effective: 'disabled', legacyDefaulted: false },
       web: {
         localUrl: 'http://127.0.0.1:43120/',
         lanUrls: [],
@@ -225,7 +211,6 @@ describe('desktop settings controller', () => {
         { name: 'desktop', exists: true, webCapable: true, selectable: true, deletable: false },
         { name: 'work', exists: true, webCapable: true, selectable: true, deletable: true },
       ],
-      market: { requested: 'disabled', effective: 'disabled', legacyDefaulted: false },
       web: {
         localUrl: 'http://127.0.0.1:43120/',
         lanUrls: [],
@@ -269,52 +254,16 @@ describe('desktop settings controller', () => {
     await expect(controller.selectProfile('broken')).rejects.toThrow('is not selectable')
   })
 
-  it('keeps the generation-effective Market fixed and schedules only after persistence', async () => {
-    const events: string[] = []
-    const selectMarket = vi.fn(async (provider: DesktopMarketSnapshot['requested']) => {
-      events.push(`persist:${provider}`)
-      return market(provider, provider, false)
-    })
-    const scheduleRestart = vi.fn(() => { events.push('schedule') })
-    const controller = new DesktopSettingsController(bootstrap({
-      readMarket: () => market('disabled'),
-      selectMarket,
-      scheduleRestart,
-    }))
-
-    const operation = await controller.selectMarket('dsh-market')
-    expect(operation.response).toEqual({ accepted: true, restartRequired: true })
-    expect(events).toEqual(['persist:dsh-market'])
-    operation.afterResponse?.()
-    expect(events).toEqual(['persist:dsh-market', 'schedule'])
-  })
-
-  it('persists an explicit legacy-default choice without restarting the same provider', async () => {
-    const scheduleRestart = vi.fn()
-    const controller = new DesktopSettingsController(bootstrap({
-      readMarket: () => market('disabled', 'disabled', true),
-      selectMarket: async provider => market(provider, provider, false),
-      scheduleRestart,
-    }))
-
-    await expect(controller.selectMarket('disabled')).resolves.toEqual({
-      response: { accepted: true, restartRequired: false },
-    })
-    expect(scheduleRestart).not.toHaveBeenCalled()
-  })
-
   it('does not expose a restart callback when persistence fails', async () => {
     const scheduleRestart = vi.fn()
     const controller = new DesktopSettingsController(bootstrap({
       profiles: {
         prepareSelection: async () => { throw new Error('state is read-only') },
       },
-      selectMarket: async () => { throw new Error('state is read-only') },
       scheduleRestart,
     }))
 
     await expect(controller.selectProfile('work')).rejects.toThrow('state is read-only')
-    await expect(controller.selectMarket('dsh-market')).rejects.toThrow('state is read-only')
     expect(scheduleRestart).not.toHaveBeenCalled()
   })
 
@@ -387,15 +336,19 @@ describe('desktop settings HTTP boundary', () => {
     ['non-loopback socket', { remoteAddress: '192.0.2.10' }],
     ['cross-site metadata', { headers: { 'sec-fetch-site': 'cross-site' } }],
   ] as const)('rejects a %s request before reading settings', async (_label, options) => {
-    const readMarket = vi.fn(() => market())
-    const controller = new DesktopSettingsController(bootstrap({ readMarket }))
-    readMarket.mockClear()
+    const readWeb = vi.fn()
+    const controller = new DesktopSettingsController(bootstrap({
+      readWeb: () => {
+        readWeb()
+        return { localUrl: '', lanUrls: [], lanState: 'inactive', lanError: null, lanCaFingerprint: null, lanCaUrls: [] }
+      },
+    }))
     const res = response()
 
     await handleDesktopSettingsRequest(request('GET', options), res, ORIGIN, controller)
 
     expect(res.statusCode).toBe(403)
-    expect(readMarket).not.toHaveBeenCalled()
+    expect(readWeb).not.toHaveBeenCalled()
   })
 
   it('creates a profile from an exact bounded JSON body', async () => {
@@ -418,7 +371,6 @@ describe('desktop settings HTTP boundary', () => {
         { name: 'desktop', exists: true, webCapable: true, selectable: true, deletable: false },
         { name: 'work', exists: true, webCapable: true, selectable: true, deletable: false },
       ],
-      market: { requested: 'disabled', effective: 'disabled', legacyDefaulted: false },
       web: {
         localUrl: 'http://127.0.0.1:43120/',
         lanUrls: [],
@@ -459,30 +411,21 @@ describe('desktop settings HTTP boundary', () => {
     [{ name: '' }, 400],
     [{ name: '../escape' }, 400],
     [{ name: 'work', extra: true }, 400],
-    [{ provider: 'unknown' }, 400],
-    [{ provider: 'disabled', extra: true }, 400],
   ])('rejects a non-exact or invalid mutation body', async (body, statusCode) => {
     const create = vi.fn(() => WORK)
-    const selectMarket = vi.fn(async () => market())
     const controller = new DesktopSettingsController(bootstrap({
       profiles: {
         current: { name: DESKTOP.name, dir: DESKTOP.dir },
         list: () => [],
         create,
       },
-      selectMarket,
     }))
     const res = response()
 
-    if ('provider' in body) {
-      await handleDesktopMarketSelectRequest(jsonRequest(body), res, ORIGIN, controller)
-    } else {
-      await handleDesktopProfileCreateRequest(jsonRequest(body), res, ORIGIN, controller)
-    }
+    await handleDesktopProfileCreateRequest(jsonRequest(body), res, ORIGIN, controller)
 
     expect(res.statusCode).toBe(statusCode)
     expect(create).not.toHaveBeenCalled()
-    expect(selectMarket).not.toHaveBeenCalled()
   })
 
   it('rejects unsupported media types and declared or streamed oversized bodies', async () => {
@@ -525,14 +468,12 @@ describe('desktop settings HTTP boundary', () => {
     expect(streamed.statusCode).toBe(413)
   })
 
-  it('selects a profile and persists a Market provider through their fixed endpoints', async () => {
+  it('selects a profile through its fixed endpoint', async () => {
     const restartProfile = vi.fn(async () => {})
     const prepareSelection = vi.fn(async () => ({
       restartRequired: true,
       restart: restartProfile,
     }))
-    const selectMarket = vi.fn(async () => market('dsh-market'))
-    const scheduleRestart = vi.fn()
     const controller = new DesktopSettingsController(bootstrap({
       profiles: {
         current: { name: DESKTOP.name, dir: DESKTOP.dir },
@@ -540,29 +481,18 @@ describe('desktop settings HTTP boundary', () => {
         create: () => WORK,
         prepareSelection,
       },
-      selectMarket,
-      scheduleRestart,
     }))
     const profileResponse = response()
-    const marketResponse = response()
 
     await handleDesktopProfileSelectRequest(
       jsonRequest({ name: 'work' }), profileResponse, ORIGIN, controller,
     )
-    await handleDesktopMarketSelectRequest(
-      jsonRequest({ provider: 'dsh-market' }), marketResponse, ORIGIN, controller,
-    )
 
     expect(profileResponse.statusCode).toBe(202)
     expect(JSON.parse(profileResponse.body)).toEqual({ accepted: true, restartRequired: true })
-    expect(marketResponse.statusCode).toBe(202)
-    expect(JSON.parse(marketResponse.body)).toEqual({ accepted: true, restartRequired: true })
     expect(prepareSelection).toHaveBeenCalledWith('work')
-    expect(selectMarket).toHaveBeenCalledWith('dsh-market')
-    expect(scheduleRestart).not.toHaveBeenCalled()
     await new Promise<void>(resolve => { setImmediate(resolve) })
     expect(restartProfile).toHaveBeenCalledOnce()
-    expect(scheduleRestart).toHaveBeenCalledOnce()
   })
 
   it('reports a Profile restart failure after the selection response is sent', async () => {
@@ -752,15 +682,19 @@ describe('desktop settings HTTP boundary', () => {
   })
 
   it('rejects another method before invoking the controller', async () => {
-    const readMarket = vi.fn(() => market())
-    const controller = new DesktopSettingsController(bootstrap({ readMarket }))
-    readMarket.mockClear()
+    const readWeb = vi.fn()
+    const controller = new DesktopSettingsController(bootstrap({
+      readWeb: () => {
+        readWeb()
+        return { localUrl: '', lanUrls: [], lanState: 'inactive', lanError: null, lanCaFingerprint: null, lanCaUrls: [] }
+      },
+    }))
     const res = response()
 
     await handleDesktopSettingsRequest(request('POST'), res, ORIGIN, controller)
 
     expect(res.statusCode).toBe(405)
     expect(res.setHeader).toHaveBeenCalledWith('allow', 'GET')
-    expect(readMarket).not.toHaveBeenCalled()
+    expect(readWeb).not.toHaveBeenCalled()
   })
 })

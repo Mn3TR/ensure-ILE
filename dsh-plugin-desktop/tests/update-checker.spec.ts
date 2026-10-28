@@ -1,11 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   DESKTOP_CURRENT_VERSION_HEADER,
-  DESKTOP_RELEASE_CHANNEL_HEADER,
   DESKTOP_VERSION_ENDPOINT,
   MAX_VERSION_RESPONSE_BYTES,
   checkForStableUpdate,
-  checkForDesktopUpdate,
   compareSemVerVersions,
   desktopVersionRequestHeaders,
   parseSemVer,
@@ -62,24 +60,16 @@ describe('strict SemVer parsing', () => {
 })
 
 describe('public Desktop version check', () => {
-  it.each(['2.0.20-next', '2.0.20-next.1'])('accepts a Next successor published through Stable: %s', async version => {
-    const request = vi.fn<UpdateRequest>(async () => Response.json({ version, channel: 'stable' }))
-    await expect(checkForStableUpdate({ currentVersion: '2.0.19', request })).resolves.toMatchObject({
-      status: 'update-available', latestVersion: version,
-    })
-    expect(new Headers(request.mock.calls[0]?.[1].headers).get(DESKTOP_RELEASE_CHANNEL_HEADER)).toBe('stable')
-  })
-
-  it('keeps channel labels and version precedence authoritative during the transition', async () => {
-    await expect(checkForStableUpdate({ currentVersion: '2.0.20',
-      request: async () => Response.json({ version: '2.0.20-next', channel: 'stable' }),
-    })).resolves.toMatchObject({ status: 'up-to-date' })
+  it('rejects a release that declares another channel or a prerelease version', async () => {
     await expect(checkForStableUpdate({ currentVersion: '2.0.19',
-      request: async () => Response.json({ version: '2.0.20-next', channel: 'next' }),
+      request: async () => Response.json({ version: '2.0.20', channel: 'beta' }),
     })).resolves.toBeNull()
     await expect(checkForStableUpdate({ currentVersion: '2.0.19',
       request: async () => Response.json({ version: '2.0.20-beta.1', channel: 'stable' }),
     })).resolves.toBeNull()
+    await expect(checkForStableUpdate({ currentVersion: '2.0.19',
+      request: async () => Response.json({ version: '2.0.20' }),
+    })).resolves.toMatchObject({ status: 'update-available' })
   })
 
 
@@ -261,14 +251,3 @@ describe('public Desktop version check', () => {
   })
 })
 
-
-describe('Next release isolation', () => {
-  it.each(['2.0.14-next', '2.0.14-next.1'])('accepts installed %s and preserves its version header', async currentVersion => {
-    const request = vi.fn<UpdateRequest>(async () => Response.json({ version: '2.0.18-next.1', channel: 'next' }));
-    expect(await checkForDesktopUpdate({ currentVersion, channel: 'next', request })).toMatchObject({ status: 'update-available' });
-    expect(new Headers(request.mock.calls[0]?.[1]?.headers).get(DESKTOP_CURRENT_VERSION_HEADER)).toBe(currentVersion);
-  });
-  it.each([{version:'2.0.18',channel:'stable'}, {version:'2.0.18-beta.1',channel:'next'}, {version:'2.0.18-next.1'}, {version:'2.0.18-next.01',channel:'next'}])('rejects a wrong or ambiguous Next release %j', async body => {
-    expect(await checkForDesktopUpdate({ currentVersion:'2.0.14-next', channel:'next', request:async()=>Response.json(body) })).toBeNull();
-  });
-});

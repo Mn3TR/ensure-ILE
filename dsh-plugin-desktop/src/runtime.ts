@@ -117,7 +117,7 @@ export interface DesktopUpdateAdapter {
   /** Request adapter backed by Electron's native network session. */
   readonly request: UpdateRequest
   /** Ask whether one strictly newer version may be downloaded. */
-  confirmDownload(version: string, channel?: DesktopReleaseChannel): Promise<boolean>
+  confirmDownload(version: string): Promise<boolean>
   /** Present the outcome of a user-triggered version check. */
   showManualCheckResult(result: UpdateCheckResult | null): Promise<void>
   /**

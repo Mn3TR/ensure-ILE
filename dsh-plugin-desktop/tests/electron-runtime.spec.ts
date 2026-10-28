@@ -2614,15 +2614,15 @@ describe('Electron desktop runtime', () => {
     expect(restart).toHaveBeenLastCalledWith('safe-mode')
   })
 
-  it('explains a Next installer during local development', async () => {
+  it('asks to download the single stable update stream', async () => {
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
     electron.app.isPackaged = false
     const runtime = new ElectronDesktopRuntime(async () => {})
     const release = runtime.schedule(spec)
     await runtime.mountScheduled()
-    await runtime.updates.confirmDownload('2.0.20-next', 'stable')
+    await runtime.updates.confirmDownload('2.0.20')
     expect(electron.dialog.showMessageBox).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({
-      detail: expect.stringContaining('DSH NEXT'),
+      detail: 'Download this update now?',
     }))
     await release()
   })

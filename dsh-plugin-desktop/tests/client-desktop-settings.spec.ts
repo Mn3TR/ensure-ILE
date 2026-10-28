@@ -57,7 +57,6 @@ const VIEW: DesktopSettingsView = {
     { name: 'headless', exists: true, webCapable: false, selectable: false, deletable: false },
     { name: 'work', exists: true, webCapable: true, selectable: true, deletable: true },
   ],
-  market: { requested: 'disabled', effective: 'disabled', legacyDefaulted: true },
   web: {
     localUrl: `http://127.0.0.1:43120/?token=${BROWSER_AUTH_TOKEN}`,
     lanUrls: [],
@@ -80,8 +79,6 @@ describe('Desktop settings API', () => {
     expect(parseDesktopSettingsView(VIEW)).toEqual(VIEW)
     expect(() => parseDesktopSettingsView({ ...VIEW, profiles: [...VIEW.profiles, VIEW.profiles[0]] }))
       .toThrow('duplicate profile')
-    expect(() => parseDesktopSettingsView({ ...VIEW, market: { ...VIEW.market, requested: 'unknown' } }))
-      .toThrow('invalid Desktop settings response')
     expect(() => parseDesktopSettingsView({ ...VIEW, web: { ...VIEW.web, localUrl: 'https://example.com/' } }))
       .toThrow('invalid browser URL')
     expect(parseDesktopRestartAcceptance({ accepted: true, restartRequired: true }))
@@ -384,7 +381,6 @@ describe('Desktop settings API', () => {
     await expect(api.createProfile('work')).resolves.toEqual(VIEW)
     await expect(api.selectProfile('work')).resolves.toEqual({ accepted: true, restartRequired: true })
     await expect(api.deleteProfile('work')).resolves.toEqual(VIEW)
-    await expect(api.selectMarket('dsh-market')).resolves.toEqual({ accepted: true, restartRequired: true })
     await expect(api.openTerminal()).resolves.toBeUndefined()
     await expect(api.restart()).resolves.toBeUndefined()
     await expect(api.restartToRecovery()).resolves.toBeUndefined()
@@ -398,7 +394,6 @@ describe('Desktop settings API', () => {
       desktopSettingsPaths.profileCreate,
       desktopSettingsPaths.profileSelect,
       desktopSettingsPaths.profileDelete,
-      desktopSettingsPaths.marketSelect,
       desktopSettingsPaths.terminalOpen,
       desktopSettingsPaths.restart,
       desktopSettingsPaths.recoveryRestart,
@@ -417,13 +412,10 @@ describe('Desktop settings API', () => {
       body: JSON.stringify({ name: 'work' }),
     })
     expect(fetcher.mock.calls[4]?.[1]).toMatchObject({
-      body: JSON.stringify({ provider: 'dsh-market' }),
-    })
-    expect(fetcher.mock.calls[5]?.[1]).toMatchObject({
       method: 'POST',
       body: JSON.stringify({}),
     })
-    expect(fetcher.mock.calls[6]?.[1]).toMatchObject({
+    expect(fetcher.mock.calls[5]?.[1]).toMatchObject({
       method: 'POST',
       body: JSON.stringify({}),
     })
