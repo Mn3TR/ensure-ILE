@@ -135,7 +135,10 @@
 - **颜色只编码状态**：墨蓝 `primary`、朱批 `destructive`、印章青 `seal`。不做装饰性用色。
 - 霞鹜文楷 v1.530 与思源宋体 2.003R 子集到 GB2312 + 数理符号；因 OFL 保留字体名条款改名 `ILE Kai` / `ILE Song`，许可证在 `dsh-plugin-desktop/src/native-ui/assets/fonts/`。
 - 画廊入口 `dsh-plugin-desktop/src/native-ui/gallery.html`（进 `vite.native-ui.config.ts` 的 input）；设计稿与截图在 `docs/design/`。
-- **字标 `en∫ure`（2026-10-29 李定）**：ensure 的 s 换成 LaTeX 积分号 ∫（`\int`）。稿在 `docs/design/brand/`——`NOTES.md` 是三版对比与实测度量，`preview.html` 离线可看。**还没落地**：`build/` 下的图标仍是 DeepSeek 鲸鱼。Windows 上能换的是 `tray-icon.svg`（`corepack yarn icons:tray`）、`build/icons/*.png` 与 `app-icon.ico`；macOS 的 `app-icon.icon/`（Icon Composer）与 `app-icon.icns` 必须靠 macOS 的 `ictool` 导出，**在 Windows 上改那个目录会让 `icons:check` 直接红**。
+- **字标 `en∫ure`（2026-10-29 李定）**：ensure 的 s 换成 LaTeX 积分号 ∫（`\int`）。稿在 `docs/design/brand/`——`NOTES.md` 是三版对比与实测度量，`preview.html` 离线可看。
+- **应用图标与托盘已换 geometric（2026-10-30 李定：geometric、不带 ILE、只落地 Windows）**，仿 JetBrains 风格：圆角方块 + 斜向品牌渐变 + 白 ∫ + 底部白条，托盘是 50×50 纯 ∫。生成器 `docs/design/brand/build-icon.mjs`（读 `generate-tray-icons.mjs` 的硬要求：tray-icon.svg 里必须有字面 `fill="#4D6BFE"`、禁 `<style>`，所以把描边 ∫ 采样转成**填充轮廓**）。产物：`build/app-icon.png`、`build/icons/*.png`、`build/app-icon.ico`、`build/tray-icon.svg` + 6 个托盘 PNG。
+- **换图标的完整动作**：跑 `build-icon.mjs` → `build/app-icon.resources.json` 里更新 `outputs.app-icon.png` 与 `outputs.app-icon.ico` 两个 sha256（`assetIcons.pretty.app-icon.png` 同理）→ `corepack yarn icons:check`。`sourceSha256` 只 digest `app-icon.icon/`，别动。
+- **macOS 三件（`app-icon.icon/`、`app-icon-mac.png`、`app-icon.icns`）仍是上游 Icon Composer 原件**，必须在 macOS 用 `ictool` 重导；**在 Windows 上改那个目录会让 `icons:check` 直接红**。
 
 ## 验证现状（2026-10-29 复跑，全绿）
 
@@ -143,15 +146,17 @@
 - `corepack yarn check:plugins` `EXIT=0`：setup 7 / bankmanager 45 / memory 189 / textbook 37 / schedule 40 全过，guide / work / hrl / teaching-commons 只 typecheck + build。
 - `check:layout`：icons 源与全平台资源一致 / vendored runtime 343 packages @687f282e86 / verify-layout 与上游 687f282e86 一致 / bilingual **44 记录 88 文档**；`verify:licenses` 584 production packages；`corepack yarn install --immutable` `exit 0`。
 - `node scripts/verify-patch-references.mjs`：29 个补丁、28 有效、1 无施主（`dsh-experimental-computer-use-cua-driver-native`，见坑·profile 与打包 6）。pi-ai 那份 2026-10-28 已重新对准 1.2.0 并真在 lock 里生效。
-- 打包链路只做过离线 install 模拟（profile 模板拷进四级子目录能装出 9 个包、`require.resolve('dsh-plugin-textbook/data')` 在 schedule 的视角下指到 `lib/data.js`）；`dist:win` 自 2026-10-25 起没重打，图标也还没换。
+- 打包链路只做过离线 install 模拟（profile 模板拷进四级子目录能装出 9 个包、`require.resolve('dsh-plugin-textbook/data')` 在 schedule 的视角下指到 `lib/data.js`）；`dist:win` 自 2026-10-25 起没重打（图标已换，下次打包会带进去）。
 
 ## 还没做
 
 - **教材锚定最后一步**：真机让模型实读一次教材。要先删 `.ensure-ile/home/profiles/desktop` 再启动（`seedProfile()` 不覆盖）并手动 `pnpm install --offline`。
 - **重打 `dist:win`**：`dsh-plugin-textbook` 与 `dsh-plugin-schedule` 进包的 vendor 链路只做了模拟，没跑真实打包。
-- **字标定稿与图标落地**：`docs/design/brand/` 里三版稿（serif / geometric / mono）等李挑一版，然后按 `NOTES.md` 的落地表走——Windows 能做的（托盘、ico、png 目录）与必须 macOS 的（`app-icon.icon`、icns）分开。
+- **macOS 图标重导**：`docs/design/brand/mark/geometric-app.svg` 已定稿，但 `app-icon.icon/`、`app-icon-mac.png`、`app-icon.icns` 还是鲸鱼；要一台 macOS + Icon Composer 按 `NOTES.md` 的落地表重导。
+- **图标真机验收**：`icons:check` 与 `check:layout` 都绿了，但没人真看过任务栏 / 托盘 / 开始菜单里的小尺寸效果（16px 的 ∫ 只有 2px 笔画）。
+- **会话内上下文切换**：方案见 `docs/research/2026-10-30-会话内上下文切换.md`，技术路已验证可行（pre-step 换历史 + system prompt 原地归一 + 自建卡），等李拍板要不要落成 `dsh-plugin-context`。
 - **四个预设都没装压缩引擎**：`compaction-basic` / `command-compact` 被 web-app 在 host 平面设了 `disabled: true`（`deepseek-harness/packages/bundle/web-app/cordis.patch.yml:539-543`），真正跑实例的是预设内部的隔离组（`presets/standard.patch.yml:66-82`），而我们四个预设各只有一个插件 → **没有 `/compact`、没有自动压缩，长会话撞上下文窗口会硬失败**。补法：在每个预设的 patch 里加一个 `cordis:group isolate compaction`。
-- **单会话内改上下文**：只研究没动手，结论与四条路径的代价在 `docs/research/2026-10-29-单会话上下文重写.md`。要做的话正路是「插件调 `ctx.compaction.compactRegion`」或「开新会话」（bankmanager 的三段式），不是改 harness。
+- **单会话内改上下文**：只研究没动手。旧结论（`docs/research/2026-10-29-单会话上下文重写.md`：不建议改历史）已作废，新方案在 `docs/research/2026-10-30-会话内上下文切换.md`：不改 harness，靠 `agent/pre-step` + `replace` + `startsRequestSeries` 就能在一个会话内换题、换模式。
 - **`scripts/verify-patch-references.mjs` 要不要接进 `check:layout`**：现在是孤儿脚本。接进去的好处是补丁失配当天就红；代价是它会把「vendor 里留着一个没人装的包」这种合法状态也判成失败（当前会红一次）。
 - **图片链路**（拍照发题 → 模型看得见 → 存进 `attachments`）：李 2026-10-23 说之后搞。
 - **独立 Evaluator**（廉价模型按五条硬规则校验上一轮回复：给动作了吗、含答案了吗、一次两个视角了吗、超两句话了吗、空表扬了吗）：等第一条效果数据。

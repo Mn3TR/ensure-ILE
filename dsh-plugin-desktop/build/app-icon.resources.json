@@ -7,15 +7,19 @@
     "catalogName": "Icon"
   },
   "png": {
-    "platform": "macOS",
-    "rendition": "Default",
-    "designGeneration": 27,
+    "platform": "Windows",
+    "rendition": "vector",
+    "source": "docs/design/brand/mark/geometric-app.svg",
     "size": 1024
   },
   "outputs": {
-    "app-icon.png": "5f3397c1cf30178c355c3de2570e305ecc954830b30949ba6d4ff4c893d9343c",
+    "app-icon.png": "1e746d96c690d4b478bfd5c5cc8fc702450fd8b7e2eed646f7669d5382b51036",
     "app-icon-mac.png": "8eeb7303491caf58687e52d69098b7c102691f1c6d16b99b2c0f5d35a69031a3",
-    "app-icon.ico": "dd3770edac0bfb64197866f3bb76b64933ab600e95e3fcafe3ed994656642a27",
+    "app-icon.ico": "3a78c7d3188ff291e3708f479cb2b78c7ffb8015622b9d1014bcd3caf1ad25f0",
     "app-icon.icns": "0d4afe6df8887d73e5b9031e485b9e4ffa6071097b570cbbf6195241bda968e8"
+  },
+  "windows": {
+    "generatedBy": "docs/design/brand/build-icon.mjs → scripts/generate-windows-app-icon.mjs → scripts/generate-tray-icons.mjs",
+    "note": "app-icon.png 与 app-icon.ico 在 Windows 侧从 mark/geometric-app.svg 重新生成（2026-10-30 换 en∫ure 字标）；mac 的 app-icon.icon、app-icon-mac.png、app-icon.icns 仍是 Icon Composer 原件，必须在 macOS 上重导才会跟上。"
   }
 }

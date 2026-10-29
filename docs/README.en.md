@@ -48,6 +48,7 @@ All four presets use `complete: true`, which replaces the whole system prompt, s
 | --- | --- |
 | [Open-source AI study-companion survey, 2026-10-25](research/2026-10-25-开源AI学习伴侣调研.md) | A comparison of 13 open-source projects, with verification records and self-corrections; entries marked `⚠️ 仅描述` are designs that are not shipped yet |
 | [Rewriting or clearing context inside one session, 2026-10-29](research/2026-10-29-单会话上下文重写.md) | Four candidate paths with costs and a recommendation, plus mechanism notes: how history is assembled, who may rewrite it, and why the system prompt cannot be cleared |
+| [Switching context inside one conversation, 2026-10-30](research/2026-10-30-会话内上下文切换.md) | Replacing the history and prompt the model sees without leaving the conversation: four mechanism facts, a graded plan, and the costs |
 
 ### Developer and maintainer documentation
 
