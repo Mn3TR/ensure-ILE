@@ -17,6 +17,7 @@
     "dsh-plugin-memory",
     "dsh-plugin-textbook",
     "dsh-plugin-schedule",
+    "dsh-plugin-coreset",
     "dsh-plugin-desktop",
     "dsh-community-fabric"
   ],
@@ -758,7 +759,7 @@
     "check:vendored-runtime": "node scripts/sync-vendored-runtime.mjs --check --channel stable",
     "check:layout": "node scripts/run-parallel.mjs \"node --test scripts/bilingual-docs.test.mjs scripts/inspector-compat.test.mjs scripts/export-app-icons.test.mjs\" \"node scripts/verify-bilingual-docs.mjs\" \"node scripts/sync-vendored-runtime.mjs --check --channel stable\" \"node scripts/export-app-icons.mjs --check\" \"node scripts/verify-layout.mjs\"",
     "check": "node scripts/run-parallel.mjs \"yarn check:layout\" \"yarn workspace dsh-community-fabric check\" && node scripts/run-parallel.mjs \"yarn workspace dsh-plugin-desktop check\"",
-    "check:plugins": "yarn workspace dsh-plugin-teaching-commons typecheck && yarn workspace dsh-plugin-setup typecheck && yarn workspace dsh-plugin-setup test && yarn workspace dsh-plugin-work typecheck && yarn workspace dsh-plugin-hrl typecheck && yarn workspace dsh-plugin-guide typecheck && yarn workspace dsh-plugin-bankmanager typecheck && yarn workspace dsh-plugin-bankmanager test && yarn workspace dsh-plugin-memory typecheck && yarn workspace dsh-plugin-memory test && yarn workspace dsh-plugin-textbook typecheck && yarn workspace dsh-plugin-textbook test && yarn workspace dsh-plugin-schedule typecheck && yarn workspace dsh-plugin-schedule test",
+    "check:plugins": "yarn workspace dsh-plugin-coreset typecheck && yarn workspace dsh-plugin-coreset test && yarn workspace dsh-plugin-coreset build && yarn workspace dsh-plugin-teaching-commons typecheck && yarn workspace dsh-plugin-setup typecheck && yarn workspace dsh-plugin-setup test && yarn workspace dsh-plugin-work typecheck && yarn workspace dsh-plugin-hrl typecheck && yarn workspace dsh-plugin-guide typecheck && yarn workspace dsh-plugin-bankmanager typecheck && yarn workspace dsh-plugin-bankmanager test && yarn workspace dsh-plugin-memory typecheck && yarn workspace dsh-plugin-memory test && yarn workspace dsh-plugin-textbook typecheck && yarn workspace dsh-plugin-textbook test && yarn workspace dsh-plugin-schedule typecheck && yarn workspace dsh-plugin-schedule test",
     "dev": "yarn workspace dsh-plugin-desktop dev",
     "start": "yarn workspace dsh-plugin-desktop start",
     "package:dir": "yarn workspace dsh-plugin-desktop package:dir",

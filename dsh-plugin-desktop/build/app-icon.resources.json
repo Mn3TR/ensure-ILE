@@ -14,12 +14,12 @@
   },
   "outputs": {
     "app-icon.png": "1e746d96c690d4b478bfd5c5cc8fc702450fd8b7e2eed646f7669d5382b51036",
-    "app-icon-mac.png": "8eeb7303491caf58687e52d69098b7c102691f1c6d16b99b2c0f5d35a69031a3",
+    "app-icon-mac.png": "258cca99853a57dcf490a11ade1ad70d8b9158256f43f70c4acec831cf4224a8",
     "app-icon.ico": "3a78c7d3188ff291e3708f479cb2b78c7ffb8015622b9d1014bcd3caf1ad25f0",
     "app-icon.icns": "0d4afe6df8887d73e5b9031e485b9e4ffa6071097b570cbbf6195241bda968e8"
   },
   "windows": {
     "generatedBy": "docs/design/brand/build-icon.mjs → scripts/generate-windows-app-icon.mjs → scripts/generate-tray-icons.mjs",
-    "note": "app-icon.png 与 app-icon.ico 在 Windows 侧从 mark/geometric-app.svg 重新生成（2026-10-30 换 en∫ure 字标）；mac 的 app-icon.icon、app-icon-mac.png、app-icon.icns 仍是 Icon Composer 原件，必须在 macOS 上重导才会跟上。"
+    "note": "app-icon.png 与 app-icon.ico 从 mark/geometric-app.svg 重新生成（2026-10-30 换 en∫ure 字标），app-icon-mac.png 是 scripts/generate-mac-app-icon.mjs 从 app-icon.png 派生的开发用图（同一天一并重生，ICC 与源逐字节相同）；只有 app-icon.icon 与 app-icon.icns 还是 Icon Composer 原件，必须在 macOS 上重导才会跟上。"
   }
 }

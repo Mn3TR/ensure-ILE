@@ -15,11 +15,12 @@
 | 路径 | 是什么 | 什么时候读它 |
 | --- | --- | --- |
 | `dsh-plugin-desktop/` | 上游桌面壳 2.0.18 + 我们的改动（数据根、OOBE 裁剪、预设、视觉层、打包） | 改外壳 / 窗口 / 设置 / 打包 |
-| `dsh-plugin-teaching-commons/` | 四个模式共用的教学文字：安全边界、说话方式、题库规则 + 学科备注 `skills/` + `readNote` | 改「怎么说话」的规矩 |
-| `dsh-plugin-setup/` | 开学对话，预设 `setup`「开学」，状态落 `setup.json` | 改开学问话 |
-| `dsh-plugin-guide/` | 引导模式，预设 `guide`「引导模式」，**Profile 默认** | 改引导流程 |
-| `dsh-plugin-work/` | 独立做题，预设 `work`「独立做题」 | 改判卷 / 重交规则 |
-| `dsh-plugin-hrl/` | 答案优化，预设 `hrl`「答案优化」 | 改 A/B 配对 |
+| `dsh-plugin-teaching-commons/` | 各模式共用的教学文字：安全边界、说话方式、题库规则 + 学科备注 `skills/` + `readNote` | 改「怎么说话」的规矩 |
+| `dsh-plugin-coreset/` | **会话的核**：唯一的 `complete` 提示段、模式注册表 `ctx.ileModes`、`read_note`、`context_switch` 与切换时的历史折叠；预设 `work` / `chat` 也在这里声明 | 改共享行为 / 加一个模式 / 改预设 |
+| `dsh-plugin-setup/` | 开学**人格** + `setup_read` / `setup_update` + 条件注册 `setup` 预设（入学办完就消失） | 改开学问话 |
+| `dsh-plugin-guide/` | 引导模式**人格**（mode `guide`），只登记文本 | 改引导流程 |
+| `dsh-plugin-work/` | 独立做题**人格**（mode `work`，`work` 预设的起步模式是 guide） | 改判卷 / 重交规则 |
+| `dsh-plugin-hrl/` | 答案优化**人格**（mode `hrl`） | 改 A/B 配对 |
 | `dsh-plugin-bankmanager/` | 题库：6 工具 + `/bank/api` + 浏览器卡片与首页接续入口 | 改题目账本 |
 | `dsh-plugin-textbook/` | 教材语料（7 本入库）+ 3 个读端工具 | 改教材检索 |
 | `dsh-plugin-schedule/` | 课表与进度 + 3 个工具（含 `schedule_plan`） | 改「今天讲什么」 |
@@ -72,22 +73,23 @@
 
 **已知不一致**：老会话的 `identity.cwd` 记过 `C:\Users\libai\Documents\deepseek-harness\default-workspace`，而 `workspace.json` 登记的是数据根那份；教材两边各有一份（Documents 那份 183MB 留作备份）。真机前先确认会话落在哪边。
 
-## 八个插件包怎么接在一起
+## 九个插件包怎么接在一起
 
-- **能力面**：web-app 关掉了 base 的工具行，工具只由 preset 挂载，`preset-standard` 禁用后学生只能开这四个预设（setup / guide / work / hrl）。
-- **guide 会话实际 28 个工具**：`read_note` + 残留的 `working_directory` + `bank_*`×6 + `textbook_*`×3 + `schedule_*`×3 + memory 注册的 14 个（`memory_*`×8 + `prompt_*`×4 + `profile_*`×2）。`ask_user_question` 只在 standard/ptc/cordis 预设里挂，guide 没有。
-- **提示词拼法**：四个模式都 `complete: true` 整份替换，所以共用段（安全边界 / 说话方式 / 题库规则）只在 `teaching-commons` 存一份，各预设 mount 时拼自己的 md。
-- **cwd 快照**：上游那条 `required` 的 cwd 快照压不掉，两个预设都用**同名空 context** 盖住它。
-- **跨包依赖**：全部本地 `file:` / `link:` 链接、零注册表依赖；兄弟包之间只走 `exports` 子路径（`dsh-plugin-bankmanager/store`、`dsh-plugin-textbook/data`），对方必须出 `lib/types` 声明（tsconfig `paths` 指源码会撞 TS6059）。
+- **三层**：**核**（`coreset`，一个会话一个）+ **人格**（guide / work / hrl / setup / chat，各自只登记一段文本）+ **工具包**（bank / textbook / schedule / memory）。预设负责把核、人格和工具包装进同一条会话。
+- **能力面**：web-app 关掉了 base 的工具行，工具只由 preset 挂载，`preset-standard` 禁用后学生只能开 `work`（做题）/ `chat`（聊天）/ `setup`（开学，仅入学期间）。
+- **做题会话实际 29 个工具**：`read_note` + `context_switch` + 残留的 `working_directory` + `bank_*`×6 + `textbook_*`×3 + `schedule_*`×3 + memory 注册的 14 个（`memory_*`×8 + `prompt_*`×4 + `profile_*`×2）。`ask_user_question` 只在 standard/ptc/cordis 预设里挂，我们没有。
+- **提示词拼法**：核用一条 `complete: true` 的段整份替换（`name: ile`、`order: 0`），渲染**当前模式**的人格 + 末尾「## 切换模式」脚注；共用段（安全边界 / 说话方式 / 题库规则）只在 `teaching-commons` 存一份，各人格 mount 时拼自己的 md。**一个 scope 只能有一条 `complete` 段**，所以段落、`read_note`、cwd 遮蔽必须集中在核里。
+- **cwd 快照**：上游那条 `required` 的 cwd 快照压不掉，核用**同名空 context** 盖住它。
+- **跨包依赖**：全部本地 `file:` / `link:` 链接、零注册表依赖；兄弟包之间只走 `exports` 子路径（`dsh-plugin-bankmanager/store`、`dsh-plugin-textbook/data`、`dsh-plugin-coreset/presets`、`dsh-plugin-setup/presets`），对方必须出 `lib/types` 声明（tsconfig `paths` 指源码会撞 TS6059）。
 
 ## 模式与交接（2026-10-25 定稿，关键事实都有代码出处）
 
-- **模式 = 预设，切换 = 新会话**。`agentPresets.select` 只认空会话（`boundary.lastTurn > 0` 即锁，`deepseek-harness/packages/preset/agent-preset-registry/src/index.ts:351`）；UI 只给空会话挂选择器（`client/ui-agent-preset/src/client/seat-store.ts:214`）；resume 按 `meta.agentPreset` 还原，缺预设直接拒绝恢复。
-- **模型切不了自己的模式**。`recompose()` 内部能动但不写 `agent-preset/selected`、不更新投影，重启回到旧预设——所以不做。
-- **不做「一个预设内换提示词」**：技术上可行（DeepSeek flash 声明 `systemPromptUpdate: 'in-history'`，新 system 作为历史追加、不重写第 0 条，缓存前缀不破），但 flash 的 `toolUpdate` 是 `addition-only`——只能加工具不能删，按模式换工具集做不到；静态全集又等于隐式预设。所以一个模式一个预设。
+- **预设管「组队」，模式管「姿态」（2026-10-30 落成）**。预设只有两个加一个：`work`（做题，起步 `guide`，挂 guide + work + hrl 三个人格）、`chat`（聊天）、`setup`（开学，入学办完就条件不注册）。换**预设**仍然等于开新会话：`agentPresets.select` 只认空会话（`boundary.lastTurn > 0` 即锁，`deepseek-harness/packages/preset/agent-preset-registry/src/index.ts:351`），UI 只给空会话挂选择器（`client/ui-agent-preset/src/client/seat-store.ts:214`），resume 按 `meta.agentPreset` 还原，缺预设直接拒绝恢复。
+- **会话内换的是人格，不是工具集**：`context_switch({ to, summary })` 只置一个待办意图（不改历史、不动工具表），**学生下一次开口的第一个 pre-step** 才落——把 `nodes[1] … nodes.at(-1)` 折成一条交接 `user/message`（`surfaceOp: replace`，node 0 不碰，runtime 随后用新模式的文本原地归一 system），同时 append log-only 的 `ile/mode` 事件（重启靠它恢复）。`step !== 1` 一律放过，否则会把进行中的 tool call 折掉、留下没有 result 的孤儿。
+- **工具集只能加不能减**（flash 的 `toolUpdate: 'addition-only'`），所以同一预设里任何模式看到的工具都是并集；换模式只换 `complete` 段渲染的那段文本。**模型不自己决定切模式**：提示词与工具描述都写死「学生没提，不要主动切」，`setup` 更是 `switchable: false`（它的两个工具只挂在开学预设里）。
 - **跨会话只靠 bank + memory，零注入**。新会话靠提示词让模型开场先 `bank_list` 找 pending `handoff`，不用 `agent.inject()`（要额外 host 插件、注入时机含糊、永久占 user 位）。代价是模型可能忘记读。
 - **交接卡片**：模型写 `handoff` → 壳渲染卡片 → 学生点 → 客户端 `session.create` + `uiWorkspace.openSession` + `conversation.input.requestDraftInitialization` 把「接着上次那道题：<id>（<状态>）」填进输入框（学生自己按回车，零注入不变）+ `/bank/api` 的 `handoff.consume`。幂等靠列表 + 浏览器 `localStorage`（Host 的 `sessionId` 不能自己命名）。`create` 拿一个已开始过的 sessionId 会静默新开（`api/session-controller/src/agent.ts:488`），所以点之前先查列表。
-- **OOBE = 独立 `setup` 预设**，状态 `<DSH_HOME>/setup.json`，**字段级** `{ onboarding, got: { grade, schedule, rhythm, preference } }`，可中断续问；完成判据是「能给出下一步」，不是「问够四样」。
+- **OOBE = 条件注册的 `setup` 预设**（`dsh-plugin-setup/presets`，`shouldRegisterSetup(stateFile)` 为假就不注册——registry 没有 hidden 字段，「不注册」就是消失，重启后生效），状态 `<DSH_HOME>/setup.json`，**字段级** `{ onboarding, got: { grade, schedule, rhythm, preference } }`，可中断续问；完成判据是「能给出下一步」，不是「问够四样」。
 - **A/B（HRL）**：教师轨迹一次写全（按 memory 里的偏好）；学生轨迹是原文；逐小步 `student / teacher / merged`，`merged` 必须存学生自己重写的 `mergedText`；每 3 步 flush，pairing 结束必 flush。
 - **收尾规矩**：每轮引导收尾必须问学生一句「这题你自己做出来了吗」；做出来 → `status: review` + `guideOutcome: solved`，没做出来 → 保持 `guide` + `stuck`（写在 `guide.md`）。
 - **固定档复习**：`REVIEW_LADDER = [1,3,7,14,30,60,120]`；进 `review` 自动排第一次，`reviewPassed: true` 升一档、`false` 回第一档，爬到最后一档自动 `mastered`。读端是 `bank_list` 的 due 过滤 + `bank_stats` 的到期数。
@@ -138,12 +140,13 @@
 - **字标 `en∫ure`（2026-10-29 李定）**：ensure 的 s 换成 LaTeX 积分号 ∫（`\int`）。稿在 `docs/design/brand/`——`NOTES.md` 是三版对比与实测度量，`preview.html` 离线可看。
 - **应用图标与托盘已换 geometric（2026-10-30 李定：geometric、不带 ILE、只落地 Windows）**，仿 JetBrains 风格：圆角方块 + 斜向品牌渐变 + 白 ∫ + 底部白条，托盘是 50×50 纯 ∫。生成器 `docs/design/brand/build-icon.mjs`（读 `generate-tray-icons.mjs` 的硬要求：tray-icon.svg 里必须有字面 `fill="#4D6BFE"`、禁 `<style>`，所以把描边 ∫ 采样转成**填充轮廓**）。产物：`build/app-icon.png`、`build/icons/*.png`、`build/app-icon.ico`、`build/tray-icon.svg` + 6 个托盘 PNG。
 - **换图标的完整动作**：跑 `build-icon.mjs` → `build/app-icon.resources.json` 里更新 `outputs.app-icon.png` 与 `outputs.app-icon.ico` 两个 sha256（`assetIcons.pretty.app-icon.png` 同理）→ `corepack yarn icons:check`。`sourceSha256` 只 digest `app-icon.icon/`，别动。
-- **macOS 三件（`app-icon.icon/`、`app-icon-mac.png`、`app-icon.icns`）仍是上游 Icon Composer 原件**，必须在 macOS 用 `ictool` 重导；**在 Windows 上改那个目录会让 `icons:check` 直接红**。
+- **macOS 只剩两件是原件**：`app-icon.icon/` 与 `app-icon.icns` 还是上游 Icon Composer 的鲸鱼，必须在 macOS 用 `ictool` 重导；**在 Windows 上改 `app-icon.icon/` 会让 `icons:check` 直接红**。
+- `app-icon-mac.png` **不是原件**：由 `dsh-plugin-desktop/scripts/generate-mac-app-icon.mjs` 从 `app-icon.png` 派生（824 居中 + 每边 100 透明内边距、RGBA16、**ICC 必须与源逐字节相同**，脚本自己会校验）。换源图后要重跑它，并把 `outputs.app-icon-mac.png` 的 sha256 一起更新——漏掉这条 `tests/package.spec.ts` 的「centered macOS icon」会红（2026-10-30 就踩了）。
 
 ## 验证现状（2026-10-29 复跑，全绿）
 
 - 全量 `corepack yarn check` `EXIT=0`：138 个测试文件 / 1781 用例，1753 通过 / 28 跳过（21 个原有 skip + 7 个 Linux 打包门在 Windows 上整组 skip），149 s。它 = `check:layout` + community-fabric + 桌面包，**不含插件包单测**。比 10-28 少 13 个用例，是桌面壳收窄到单渠道时删掉的多渠道用例。
-- `corepack yarn check:plugins` `EXIT=0`：setup 7 / bankmanager 45 / memory 189 / textbook 37 / schedule 40 全过，guide / work / hrl / teaching-commons 只 typecheck + build。
+- `corepack yarn check:plugins` `EXIT=0`（2026-10-30 复跑）：coreset 11 / setup 11 / bankmanager 45 / memory 189 / textbook 37 / schedule 40 共 333 全过；teaching-commons 与 guide / work / hrl 只 typecheck（它们没有单测，`lib/` 要手动 `yarn workspace <包> build` 才刷新）。
 - `check:layout`：icons 源与全平台资源一致 / vendored runtime 343 packages @687f282e86 / verify-layout 与上游 687f282e86 一致 / bilingual **44 记录 88 文档**；`verify:licenses` 584 production packages；`corepack yarn install --immutable` `exit 0`。
 - `node scripts/verify-patch-references.mjs`：29 个补丁、28 有效、1 无施主（`dsh-experimental-computer-use-cua-driver-native`，见坑·profile 与打包 6）。pi-ai 那份 2026-10-28 已重新对准 1.2.0 并真在 lock 里生效。
 - 打包链路只做过离线 install 模拟（profile 模板拷进四级子目录能装出 9 个包、`require.resolve('dsh-plugin-textbook/data')` 在 schedule 的视角下指到 `lib/data.js`）；`dist:win` 自 2026-10-25 起没重打（图标已换，下次打包会带进去）。
@@ -152,11 +155,12 @@
 
 - **教材锚定最后一步**：真机让模型实读一次教材。要先删 `.ensure-ile/home/profiles/desktop` 再启动（`seedProfile()` 不覆盖）并手动 `pnpm install --offline`。
 - **重打 `dist:win`**：`dsh-plugin-textbook` 与 `dsh-plugin-schedule` 进包的 vendor 链路只做了模拟，没跑真实打包。
-- **macOS 图标重导**：`docs/design/brand/mark/geometric-app.svg` 已定稿，但 `app-icon.icon/`、`app-icon-mac.png`、`app-icon.icns` 还是鲸鱼；要一台 macOS + Icon Composer 按 `NOTES.md` 的落地表重导。
+- **macOS 图标重导**：`docs/design/brand/mark/geometric-app.svg` 已定稿，但 `app-icon.icon/` 与 `app-icon.icns` 还是鲸鱼（`app-icon-mac.png` 已跟随新源）；要一台 macOS + Icon Composer 按 `NOTES.md` 的落地表重导。
 - **图标真机验收**：`icons:check` 与 `check:layout` 都绿了，但没人真看过任务栏 / 托盘 / 开始菜单里的小尺寸效果（16px 的 ∫ 只有 2px 笔画）。
-- **会话内上下文切换**：方案见 `docs/research/2026-10-30-会话内上下文切换.md`，技术路已验证可行（pre-step 换历史 + system prompt 原地归一 + 自建卡），等李拍板要不要落成 `dsh-plugin-context`。
-- **四个预设都没装压缩引擎**：`compaction-basic` / `command-compact` 被 web-app 在 host 平面设了 `disabled: true`（`deepseek-harness/packages/bundle/web-app/cordis.patch.yml:539-543`），真正跑实例的是预设内部的隔离组（`presets/standard.patch.yml:66-82`），而我们四个预设各只有一个插件 → **没有 `/compact`、没有自动压缩，长会话撞上下文窗口会硬失败**。补法：在每个预设的 patch 里加一个 `cordis:group isolate compaction`。
-- **单会话内改上下文**：只研究没动手。旧结论（`docs/research/2026-10-29-单会话上下文重写.md`：不建议改历史）已作废，新方案在 `docs/research/2026-10-30-会话内上下文切换.md`：不改 harness，靠 `agent/pre-step` + `replace` + `startsRequestSeries` 就能在一个会话内换题、换模式。
+- **真机验收会话内切换**：`context_switch` 的折叠靠 `agent/pre-step` 在 turn 边界动手，折叠后那一步会**连着进两条 user 消息**（交接通知 + 学生这句）——上游 plan-mode 的 narration 是这个形状，但我们的 provider 组合没实测过；不接受就把通知并进学生那条（pre-step 里学生消息已在手上）。
+- **两个预设都没有压缩引擎**：host 平面的 `compaction-basic` / `command-compact` 被 web-app 设了 `disabled: true`（`deepseek-harness/packages/bundle/web-app/cordis.patch.yml:539-543`），真正跑实例的是预设内部的隔离组（`presets/standard.patch.yml:66-82`），而 `work` / `chat` 里只有一个核 → **没有 `/compact`、没有自动压缩，长会话撞上下文窗口会硬失败**。补法二选一：预设里加 `cordis:group isolate compaction`，或把 billion-context 接进 profile。
+- **billion-context 没接**：0.1.208 装在 `~/.dsh/profiles/desktop`，**改请求不改历史**（全 dist 里 `CompactionEngine` / `compactRegion` / `surfaceOp` 各 0 次），bundle patch 只给 `preset-standard/ptc/minimal/cordis` 加 `inject`，我们这两个预设不在名单里（host 平面 hook 理论生效，需真机验）。接进来要连 `mysql2` + `zod` 一起 vendor 才能离线装。
+- **旧会话不可恢复**：四个静态预设 `guide` / `work` / `hrl` / `setup` 的声明都撤了（现在 `work` 是新的做题预设，`guide`/`work`/`hrl` 只是会话内能切的人格）。`meta.agentPreset` 指旧 id 的会话 resume 会被直接拒绝；要兼容得写一次旧 meta 迁移，暂不做。
 - **`scripts/verify-patch-references.mjs` 要不要接进 `check:layout`**：现在是孤儿脚本。接进去的好处是补丁失配当天就红；代价是它会把「vendor 里留着一个没人装的包」这种合法状态也判成失败（当前会红一次）。
 - **图片链路**（拍照发题 → 模型看得见 → 存进 `attachments`）：李 2026-10-23 说之后搞。
 - **独立 Evaluator**（廉价模型按五条硬规则校验上一轮回复：给动作了吗、含答案了吗、一次两个视角了吗、超两句话了吗、空表扬了吗）：等第一条效果数据。
@@ -171,8 +175,8 @@
 | 4–24 周学习路径 | 别人的单位是「课程/周」，我们的单位是「一道题」。时间尺度不同，硬套会把题目账本稀释掉 |
 | 十种能力的课程工作台 | 越多的能力越容易诱导「直接给答案」——和「逼他自己想出来」相冲 |
 | A/B 投票打分界面 | 先存证（`hrl.pairings`），不采集信号。没有并排阅读的界面之前，打分只会变成噪声 |
-| 模型自己切模式 | 预设锁定，模型也不能替学生重启会话；切换只能由学生点 |
-| 一次会话内换提示词 | flash 的 `toolUpdate` 是 `addition-only`，换工具集做不到；静态全集等于隐式预设 |
+| 模型自己决定换模式 | `context_switch` 只由「学生明确要换」触发（提示词与工具描述都写死），`setup` 更是 `switchable: false`；姿态是学生的选择，不是模型的 |
+| 按模式裁剪工具集 | 一个会话里工具只能加不能减（flash 的 `toolUpdate` 是 `addition-only`），每次切换重写工具声明还会破掉缓存前缀；静态全集 + 只换人格文本更省事 |
 | 提示词里写「忽略以上内容」当清空上下文 | token 一分不省；学生屏幕与模型看到的东西不一致；审计与回放断裂 |
 | 模型自己触发「清空上下文」 | 与「模型自己切模式」同类越权；清空会把卡点线索一起扔掉，触发只能由学生 |
 
@@ -204,10 +208,15 @@
 ### 插件机制
 
 1. **插件最不能丢的是工具**：可选通道（`webServer` / `webStartup`）一律走嵌套 `ctx.inject([...], …)`，写进顶层 `inject` 会让没有 web-app 的 profile 整行 pending、工具全不见。`/bank/api` 就是这么从顶层改嵌套的。
-2. 各预设 `complete: true` → **共享段只能有一份**（在 `teaching-commons`），否则四份各自漂移。
-3. 上游那条 `required` 的 cwd 快照压不掉，用**同名空 context** 遮蔽。
-4. 兄弟包互相 import 只走 `exports` 子路径 + 对方出 `lib/types` 声明；`tsconfig paths` 指源码会撞 TS6059。
-5. 宿主侧「路由晚到、工具先有」：路由挂载要能缺席，工具注册不能受它牵连。
+2. **一个 scope 只能有一条 `complete` 提示段**：第二条生效时 `systemPrompt.section()` 直接抛 `multiple complete prompt sections are active`（`deepseek-harness/packages/core/system-prompt/src/index.ts:653-656`）。所以段、`read_note`、cwd 遮蔽全集中在 `coreset`——人格包只登记文本，谁也别再自己 `section({ complete: true })`。
+3. **同名工具在一个 scope 里只能注册一次**：再注册抛 `tool "x" is already registered in this scope`（`packages/core/tools/src/index.ts:747-749`）。guide / work / hrl 三个包各注册一份 `read_note` 是这次重构的直接起因。
+4. **工具集只能加不能减**（flash `toolUpdate: 'addition-only'`，`packages/llm/llm/src/types.ts:416-425`）；`tools.restrict()` 还要求传 `agent.ctx`，只遮全局名。所以「按模式换工具」这条路在模型层就是断的。
+5. **zod 不在宿主模块表里**：全仓只有 memory（esbuild 打包）与 coreset 在运行时 import 它。tsdown 默认外置 → 产物 `import { z } from "zod"` 在 profile 里解析不到；要么 `noExternal: ['zod']` 内联（coreset 做法，lib/index.js 涨到 125.6 kB/gzip 27.4 kB），要么自己 esbuild 打进去，别把它写成 peerDep 就以为没事。
+6. `agentPresets.register()` 返回 disposer 且**必须 await**（generator 里 `yield await …`）；registry **没有 hidden 字段**，`list()` 每次现读 definitions——「不注册」就是消失，条件注册（setup）只能在 apply 时决定，重启才生效。
+7. 预设里的插件名按包名从 profile 解析：包必须在 profile 的 `dependencies` 里，**哪怕它不在 `bundles` 里**（guide / work / hrl 现在就只靠 dependencies 被预设点名）。
+8. 上游那条 `required` 的 cwd 快照压不掉，用**同名空 context** 遮蔽（现在只在 coreset 一处）。
+9. 兄弟包互相 import 只走 `exports` 子路径 + 对方出 `lib/types` 声明；`tsconfig paths` 指源码会撞 TS6059。
+10. 宿主侧「路由晚到、工具先有」：路由挂载要能缺席，工具注册不能受它牵连。
 
 ### 上游与文档
 

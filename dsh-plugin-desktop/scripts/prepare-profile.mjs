@@ -32,6 +32,7 @@ const LOCAL_PACKAGES = [
   'dsh-plugin-memory',
   'dsh-plugin-textbook',
   'dsh-plugin-schedule',
+  'dsh-plugin-coreset',
 ]
 
 if (!existsSync(source)) {

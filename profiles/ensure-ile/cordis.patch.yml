@@ -24,11 +24,13 @@
     notifyOnScheduleCompletion: false
     notifyOnScheduleFailure: false
 
-# New sessions start in the guide preset instead of the standard one, so a
-# learner never has to pick a mode before asking a question.
+# New sessions start in the 做题 preset (its first mode is 引导模式) instead of
+# the standard one, so a learner never has to pick a mode before asking a
+# question. The 开学 preset is registered only while onboarding is unfinished,
+# and 聊天 is the other pick.
 - id: agent-preset-registry
   config:
-    default: guide
+    default: work
 
 # ensure-ILE owns every file it writes, the session working directory included.
 # The Web bundle creates the first-use Workspace under the OS Documents folder;

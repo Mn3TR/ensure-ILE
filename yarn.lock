@@ -10880,6 +10880,62 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"dsh-plugin-coreset@link:../dsh-plugin-coreset::locator=dsh-plugin-guide%40workspace%3Adsh-plugin-guide":
+  version: 0.0.0-use.local
+  resolution: "dsh-plugin-coreset@link:../dsh-plugin-coreset::locator=dsh-plugin-guide%40workspace%3Adsh-plugin-guide"
+  languageName: node
+  linkType: soft
+
+"dsh-plugin-coreset@link:../dsh-plugin-coreset::locator=dsh-plugin-hrl%40workspace%3Adsh-plugin-hrl":
+  version: 0.0.0-use.local
+  resolution: "dsh-plugin-coreset@link:../dsh-plugin-coreset::locator=dsh-plugin-hrl%40workspace%3Adsh-plugin-hrl"
+  languageName: node
+  linkType: soft
+
+"dsh-plugin-coreset@link:../dsh-plugin-coreset::locator=dsh-plugin-setup%40workspace%3Adsh-plugin-setup":
+  version: 0.0.0-use.local
+  resolution: "dsh-plugin-coreset@link:../dsh-plugin-coreset::locator=dsh-plugin-setup%40workspace%3Adsh-plugin-setup"
+  languageName: node
+  linkType: soft
+
+"dsh-plugin-coreset@link:../dsh-plugin-coreset::locator=dsh-plugin-work%40workspace%3Adsh-plugin-work":
+  version: 0.0.0-use.local
+  resolution: "dsh-plugin-coreset@link:../dsh-plugin-coreset::locator=dsh-plugin-work%40workspace%3Adsh-plugin-work"
+  languageName: node
+  linkType: soft
+
+"dsh-plugin-coreset@workspace:dsh-plugin-coreset":
+  version: 0.0.0-use.local
+  resolution: "dsh-plugin-coreset@workspace:dsh-plugin-coreset"
+  dependencies:
+    "@deepseek-ai/cordis": "npm:4.0.5"
+    "@deepseek-ai/dsh-agent": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-agent-preset-registry": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-llm": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-session": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-session-projection": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-system-prompt": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-tools": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/schemastery": "npm:^3.18.5"
+    "@types/node": "npm:^22.20.0"
+    dsh-plugin-teaching-commons: "link:../dsh-plugin-teaching-commons"
+    tsdown: "npm:0.22.2"
+    typescript: "npm:6.0.3"
+    vitest: "npm:4.1.8"
+    zod: "npm:^4.4.3"
+  peerDependencies:
+    "@deepseek-ai/cordis": 4.0.5
+    "@deepseek-ai/dsh-agent": ^0.2.1-rc.2
+    "@deepseek-ai/dsh-agent-preset-registry": ^0.2.1-rc.2
+    "@deepseek-ai/dsh-llm": ^0.2.1-rc.2
+    "@deepseek-ai/dsh-session": ^0.2.1-rc.2
+    "@deepseek-ai/dsh-session-projection": ^0.2.1-rc.2
+    "@deepseek-ai/dsh-system-prompt": ^0.2.1-rc.2
+    "@deepseek-ai/dsh-tools": ^0.2.1-rc.2
+    "@deepseek-ai/schemastery": ^3.18.5
+  languageName: unknown
+  linkType: soft
+
 "dsh-plugin-desktop@workspace:dsh-plugin-desktop":
   version: 0.0.0-use.local
   resolution: "dsh-plugin-desktop@workspace:dsh-plugin-desktop"
@@ -11118,17 +11174,14 @@ __metadata:
   resolution: "dsh-plugin-guide@workspace:dsh-plugin-guide"
   dependencies:
     "@deepseek-ai/cordis": "npm:4.0.5"
-    "@deepseek-ai/dsh-system-prompt": "npm:^0.2.1-rc.2"
-    "@deepseek-ai/dsh-tools": "npm:^0.2.1-rc.2"
     "@deepseek-ai/schemastery": "npm:^3.18.5"
     "@types/node": "npm:^22.20.0"
+    dsh-plugin-coreset: "link:../dsh-plugin-coreset"
     dsh-plugin-teaching-commons: "link:../dsh-plugin-teaching-commons"
     tsdown: "npm:0.22.2"
     typescript: "npm:6.0.3"
   peerDependencies:
     "@deepseek-ai/cordis": 4.0.5
-    "@deepseek-ai/dsh-system-prompt": ^0.2.1-rc.2
-    "@deepseek-ai/dsh-tools": ^0.2.1-rc.2
     "@deepseek-ai/schemastery": ^3.18.5
   languageName: unknown
   linkType: soft
@@ -11138,18 +11191,14 @@ __metadata:
   resolution: "dsh-plugin-hrl@workspace:dsh-plugin-hrl"
   dependencies:
     "@deepseek-ai/cordis": "npm:4.0.5"
-    "@deepseek-ai/dsh-system-prompt": "npm:^0.2.1-rc.2"
-    "@deepseek-ai/dsh-tools": "npm:^0.2.1-rc.2"
     "@deepseek-ai/schemastery": "npm:^3.18.5"
     "@types/node": "npm:^22.20.0"
+    dsh-plugin-coreset: "link:../dsh-plugin-coreset"
     dsh-plugin-teaching-commons: "link:../dsh-plugin-teaching-commons"
     tsdown: "npm:0.22.2"
     typescript: "npm:6.0.3"
-    vitest: "npm:^4.1.8"
   peerDependencies:
     "@deepseek-ai/cordis": 4.0.5
-    "@deepseek-ai/dsh-system-prompt": ^0.2.1-rc.2
-    "@deepseek-ai/dsh-tools": ^0.2.1-rc.2
     "@deepseek-ai/schemastery": ^3.18.5
   languageName: unknown
   linkType: soft
@@ -11226,20 +11275,27 @@ __metadata:
   resolution: "dsh-plugin-setup@workspace:dsh-plugin-setup"
   dependencies:
     "@deepseek-ai/cordis": "npm:4.0.5"
-    "@deepseek-ai/dsh-system-prompt": "npm:^0.2.1-rc.2"
+    "@deepseek-ai/dsh-agent-preset-registry": "npm:^0.2.1-rc.2"
     "@deepseek-ai/dsh-tools": "npm:^0.2.1-rc.2"
     "@deepseek-ai/schemastery": "npm:^3.18.5"
     "@types/node": "npm:^22.20.0"
+    dsh-plugin-coreset: "link:../dsh-plugin-coreset"
     dsh-plugin-teaching-commons: "link:../dsh-plugin-teaching-commons"
     tsdown: "npm:0.22.2"
     typescript: "npm:6.0.3"
     vitest: "npm:^4.1.8"
   peerDependencies:
     "@deepseek-ai/cordis": 4.0.5
-    "@deepseek-ai/dsh-system-prompt": ^0.2.1-rc.2
+    "@deepseek-ai/dsh-agent-preset-registry": ^0.2.1-rc.2
     "@deepseek-ai/dsh-tools": ^0.2.1-rc.2
     "@deepseek-ai/schemastery": ^3.18.5
   languageName: unknown
+  linkType: soft
+
+"dsh-plugin-teaching-commons@link:../dsh-plugin-teaching-commons::locator=dsh-plugin-coreset%40workspace%3Adsh-plugin-coreset":
+  version: 0.0.0-use.local
+  resolution: "dsh-plugin-teaching-commons@link:../dsh-plugin-teaching-commons::locator=dsh-plugin-coreset%40workspace%3Adsh-plugin-coreset"
+  languageName: node
   linkType: soft
 
 "dsh-plugin-teaching-commons@link:../dsh-plugin-teaching-commons::locator=dsh-plugin-guide%40workspace%3Adsh-plugin-guide":
@@ -11315,18 +11371,14 @@ __metadata:
   resolution: "dsh-plugin-work@workspace:dsh-plugin-work"
   dependencies:
     "@deepseek-ai/cordis": "npm:4.0.5"
-    "@deepseek-ai/dsh-system-prompt": "npm:^0.2.1-rc.2"
-    "@deepseek-ai/dsh-tools": "npm:^0.2.1-rc.2"
     "@deepseek-ai/schemastery": "npm:^3.18.5"
     "@types/node": "npm:^22.20.0"
+    dsh-plugin-coreset: "link:../dsh-plugin-coreset"
     dsh-plugin-teaching-commons: "link:../dsh-plugin-teaching-commons"
     tsdown: "npm:0.22.2"
     typescript: "npm:6.0.3"
-    vitest: "npm:^4.1.8"
   peerDependencies:
     "@deepseek-ai/cordis": 4.0.5
-    "@deepseek-ai/dsh-system-prompt": ^0.2.1-rc.2
-    "@deepseek-ai/dsh-tools": ^0.2.1-rc.2
     "@deepseek-ai/schemastery": ^3.18.5
   languageName: unknown
   linkType: soft

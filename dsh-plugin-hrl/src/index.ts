@@ -1,9 +1,11 @@
 /**
- * Answer optimization for ensure-ILE.
+ * Answer-optimization persona for ensure-ILE: teacher trajectory plus step-by-step A/B.
  *
- * One row: replace the system prompt with the shared fragments plus the HRL
- * document, and expose `read_note` so "站得住" is judged by the subject's own
- * criteria rather than a general impression.
+ * No section, no tool and no cwd shadow of its own any more: the core
+ * (`dsh-plugin-coreset`) owns the one `complete` section, `read_note` and the
+ * shadow, because a preset that mounts three personas may only have one of each.
+ * This row contributes nothing but its mode text.
+ *
  * @module dsh-plugin-hrl
  */
 
@@ -11,20 +13,19 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { defineTool } from '@deepseek-ai/dsh-tools'
-import { composePrompt, readNote } from 'dsh-plugin-teaching-commons'
-// Type-only: resolves the required ctx.systemPrompt service declaration.
-import type {} from '@deepseek-ai/dsh-system-prompt'
+import { composePrompt } from 'dsh-plugin-teaching-commons'
+// Type-only: resolves the required ctx.ileModes service declaration.
+import type {} from 'dsh-plugin-coreset'
 
 /** Cordis plugin name. */
 export const name = 'plugin-hrl'
 
-/** Services used by this row. */
-export const inject = ['systemPrompt', 'tools']
+/** The core's mode registry is the only service this row needs. */
+export const inject = ['ileModes']
 
-/** Runtime schema for the HRL row. */
+/** Runtime schema for the row. */
 export const Config = z.object({
-  /** Absolute path to the HRL document; empty means the packaged copy. */
+  /** Absolute path to the persona document; empty means the packaged copy. */
   promptFile: z.string().default(''),
 })
 
@@ -33,48 +34,27 @@ export interface Config {
   promptFile?: string
 }
 
-/** The system-prompt section answer optimization occupies. */
-export const HRL_SECTION = 'hrl'
+/** Mode id `context_switch` accepts. */
+export const HRL_MODE = 'hrl'
 
+const MODE_NAME = '答案优化'
 const DEFAULT_PROMPT_FILE = fileURLToPath(new URL('../prompts/hrl.md', import.meta.url))
 
 /**
- * Mount answer optimization and its note reader on this scope.
- * @param ctx - an agent scope context; the preset mounts this row per session.
- * @param config - where the HRL document lives.
+ * Register this mode's persona text with the core.
+ * @param ctx - an agent scope context; a preset mounts this row per session.
+ * @param config - where the persona document lives.
  */
 export function apply(ctx: Context, config: Config): void {
   const file = config.promptFile !== undefined && config.promptFile.length > 0
     ? config.promptFile
     : DEFAULT_PROMPT_FILE
+  // Safety, voice and bank usage are shared by every study mode; the persona
+  // document is this mode's own part.
   const text = composePrompt(['common', 'bank'], readFileSync(file, 'utf8'))
 
-  ctx.effect(() => ctx.systemPrompt.section({
-    name: HRL_SECTION,
-    order: 0,
-    text,
-    complete: true,
-  }), 'hrl.section()')
-
-  ctx.systemPrompt.suppressRuntimeContext()
-  ctx.effect(() => ctx.systemPrompt.context({
-    name: 'working-directory:current',
-    order: ctx.systemPrompt.getContextOrder('WORKING_DIRECTORY'),
-    required: true,
-    interpolate: false,
-    text: '',
-  }), 'hrl.hideCwdContext()')
-
-  ctx.effect(() => ctx.tools.register(defineTool({
-    name: 'read_note',
-    description: '读取一个科目的评价标准。写教师轨迹、判断他的答案站不站得住之前，按科目调用一次。',
-    parameters: {
-      note: { type: 'string', required: true, description: '科目备注名：math（理科）或 arts（文科）' },
-    },
-    output: {
-      schema: { type: 'string' },
-      render: (_args, value) => [{ type: 'text', text: value }],
-    },
-    execute: async (args) => readNote(args.note),
-  })), 'hrl.readNote()')
+  ctx.effect(
+    () => ctx.ileModes.registerMode({ id: HRL_MODE, name: MODE_NAME, text, switchable: true }),
+    'hrl.mode()',
+  )
 }

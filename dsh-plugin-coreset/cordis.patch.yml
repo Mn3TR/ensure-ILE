@@ -1,0 +1,6 @@
+# ensure-ILE core bundle patch: the two presets every learner picks from.
+# The 开学 preset registers itself from dsh-plugin-setup, so it can disappear
+# once onboarding is done; these two never change.
+- insert:
+    - id: coreset-presets
+      name: dsh-plugin-coreset/presets

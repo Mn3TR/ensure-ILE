@@ -1,10 +1,13 @@
 /**
  * First-run conversation for ensure-ILE.
  *
- * One preset (`setup`), one job: ask a learner's grade, timetable, rhythm and
- * solving preference, then say what happens next. Progress is field-level in
- * `<DSH_HOME>/setup.json`, so an interrupted onboarding resumes where it
- * stopped instead of starting over.
+ * One persona (`setup`, reachable only as its own preset) and the two tools
+ * that record progress field-by-field in `<DSH_HOME>/setup.json`, so an
+ * interrupted onboarding resumes where it stopped instead of starting over.
+ *
+ * The persona text is contributed to the core's mode registry; the section, the
+ * cwd shadow and `read_note` belong to `dsh-plugin-coreset`.
+ *
  * @module dsh-plugin-setup
  */
 
@@ -15,8 +18,8 @@ import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { composePrompt } from 'dsh-plugin-teaching-commons'
 import { defaultStateFile, readState, updateState } from './state.ts'
-// Type-only: resolves the required ctx.systemPrompt service declaration.
-import type {} from '@deepseek-ai/dsh-system-prompt'
+// Type-only: resolves the required ctx.ileModes service declaration.
+import type {} from 'dsh-plugin-coreset'
 
 export type { OnboardingState, SetupFacts, SetupPatch, SetupState } from './state.ts'
 export { defaultStateFile, ONBOARDING_STATES, readState, updateState } from './state.ts'
@@ -25,7 +28,7 @@ export { defaultStateFile, ONBOARDING_STATES, readState, updateState } from './s
 export const name = 'plugin-setup'
 
 /** Services used by this row. */
-export const inject = ['systemPrompt', 'tools']
+export const inject = ['ileModes', 'tools']
 
 /** Runtime schema for the setup row. */
 export const Config = z.object({
@@ -41,15 +44,16 @@ export interface Config {
   stateFile?: string
 }
 
-/** The system-prompt section the setup conversation occupies. */
-export const SETUP_SECTION = 'setup'
+/** Mode id the 开学 preset starts in. */
+export const SETUP_MODE = 'setup'
 
+const MODE_NAME = '开学'
 const DEFAULT_PROMPT_FILE = fileURLToPath(new URL('../prompts/setup.md', import.meta.url))
 const FACT_KEYS = ['grade', 'schedule', 'rhythm', 'preference'] as const
 
 /**
- * Mount the setup conversation and its two tools on this scope.
- * @param ctx - an agent scope context; the preset mounts this row per session.
+ * Register the 开学 persona and its two tools on this scope.
+ * @param ctx - an agent scope context; the setup preset mounts this row per session.
  * @param config - where the document and the progress file live.
  */
 export function apply(ctx: Context, config: Config): void {
@@ -60,24 +64,15 @@ export function apply(ctx: Context, config: Config): void {
     ? config.stateFile
     : defaultStateFile()
 
-  ctx.effect(() => ctx.systemPrompt.section({
-    name: SETUP_SECTION,
-    order: 0,
+  // Not switchable: its tools are mounted only inside the 开学 preset, so
+  // switching into it from 做题 would leave the persona asking for tools that
+  // are not there.
+  ctx.effect(() => ctx.ileModes.registerMode({
+    id: SETUP_MODE,
+    name: MODE_NAME,
     text: composePrompt(['common'], readFileSync(promptFile, 'utf8')),
-    complete: true,
-  }), 'setup.section()')
-
-  // Onboarding is a conversation with one teenager, not a shell session: date and
-  // cwd are noise, and the harness adds a required cwd snapshot that must be
-  // shadowed rather than suppressed.
-  ctx.systemPrompt.suppressRuntimeContext()
-  ctx.effect(() => ctx.systemPrompt.context({
-    name: 'working-directory:current',
-    order: ctx.systemPrompt.getContextOrder('WORKING_DIRECTORY'),
-    required: true,
-    interpolate: false,
-    text: '',
-  }), 'setup.hideCwdContext()')
+    switchable: false,
+  }), 'setup.mode()')
 
   ctx.effect(() => ctx.tools.register(defineTool({
     name: 'setup_read',

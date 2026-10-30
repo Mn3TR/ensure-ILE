@@ -7,9 +7,7 @@
         "@deepseek-ai/dsh-base",
         "@deepseek-ai/dsh-web-app",
         "dsh-plugin-setup",
-        "dsh-plugin-guide",
-        "dsh-plugin-work",
-        "dsh-plugin-hrl",
+        "dsh-plugin-coreset",
         "dsh-plugin-bankmanager",
         "dsh-plugin-memory",
         "dsh-plugin-textbook",
@@ -18,6 +16,7 @@
     }
   },
   "dependencies": {
+    "dsh-plugin-coreset": "file:../../../../dsh-plugin-coreset",
     "dsh-plugin-guide": "file:../../../../dsh-plugin-guide",
     "dsh-plugin-bankmanager": "file:../../../../dsh-plugin-bankmanager",
     "dsh-plugin-memory": "file:../../../../dsh-plugin-memory",

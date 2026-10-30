@@ -1,35 +1,36 @@
 /**
- * Work mode for ensure-ILE.
+ * Work mode persona for ensure-ILE: the learner solves alone, hands in, we judge result and reasoning.
  *
- * One row, two jobs: replace the system prompt with the shared teaching
- * fragments plus the work document, and expose `read_note` so the model can
- * judge against the per-subject criteria. The learner never sees the notes —
- * they are judging material, not teaching material.
+ * No section, no tool and no cwd shadow of its own any more: the core
+ * (`dsh-plugin-coreset`) owns the one `complete` section, `read_note` and the
+ * shadow, because a preset that mounts three personas may only have one of each.
+ * This row contributes nothing but its mode text.
+ *
  * @module dsh-plugin-work
  */
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 /** Cordis plugin name. */
 export declare const name = "plugin-work";
-/** Services used by this row. */
+/** The core's mode registry is the only service this row needs. */
 export declare const inject: string[];
-/** Runtime schema for the work row. */
+/** Runtime schema for the row. */
 export declare const Config: z<Schemastery.ObjectS<NoInfer<{
-    /** Absolute path to the work document; empty means the packaged copy. */
+    /** Absolute path to the persona document; empty means the packaged copy. */
     promptFile: z<string, string, "defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
-    /** Absolute path to the work document; empty means the packaged copy. */
+    /** Absolute path to the persona document; empty means the packaged copy. */
     promptFile: z<string, string, "defined">;
 }>>, "plain">;
 /** Resolved configuration shape. */
 export interface Config {
     promptFile?: string;
 }
-/** The system-prompt section work mode occupies. */
-export declare const WORK_SECTION = "work";
+/** Mode id `context_switch` accepts. */
+export declare const WORK_MODE = "work";
 /**
- * Mount work mode and its note reader on this scope.
- * @param ctx - an agent scope context; the preset mounts this row per session.
- * @param config - where the work document lives.
+ * Register this mode's persona text with the core.
+ * @param ctx - an agent scope context; a preset mounts this row per session.
+ * @param config - where the persona document lives.
  */
 export declare function apply(ctx: Context, config: Config): void;

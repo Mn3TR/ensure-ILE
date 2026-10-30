@@ -15,14 +15,8 @@
   },
   "files": [
     "lib",
-    "prompts",
-    "cordis.patch.yml"
+    "prompts"
   ],
-  "dsh": {
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    }
-  },
   "scripts": {
     "build": "tsc -p tsconfig.json && tsdown",
     "typecheck": "tsc --noEmit"
@@ -32,18 +26,14 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.5",
-    "@deepseek-ai/dsh-system-prompt": "^0.2.1-rc.2",
-    "@deepseek-ai/dsh-tools": "^0.2.1-rc.2",
     "@deepseek-ai/schemastery": "^3.18.5"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.5",
-    "@deepseek-ai/dsh-system-prompt": "^0.2.1-rc.2",
-    "@deepseek-ai/dsh-tools": "^0.2.1-rc.2",
     "@deepseek-ai/schemastery": "^3.18.5",
     "@types/node": "^22.20.0",
+    "dsh-plugin-coreset": "link:../dsh-plugin-coreset",
     "tsdown": "0.22.2",
-    "typescript": "6.0.3",
-    "vitest": "^4.1.8"
+    "typescript": "6.0.3"
   }
 }

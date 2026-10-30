@@ -1,13 +1,7 @@
-# ensure-ILE setup bundle patch: one insert over the profile root.
-# The preset definition lives with the plugin that implements it, so the desktop
-# shell does not know this mode exists either.
+# ensure-ILE setup bundle patch: the 开学 preset registers itself.
+# The preset row lives in dsh-plugin-setup/presets, which registers only while
+# <DSH_HOME>/setup.json says onboarding is unfinished — the registry has no
+# hidden flag, so "do not register" is how 开学 leaves the picker.
 - insert:
-    - id: setup-preset
-      name: '@deepseek-ai/dsh-agent-preset'
-      config:
-        id: setup
-        name: 开学
-        description: 第一次见面：问清年级、课表、作息和解题偏好，然后告诉学生下一步
-        order: 30
-        plugins:
-          - name: dsh-plugin-setup
+    - id: setup-presets
+      name: dsh-plugin-setup/presets

@@ -24,6 +24,7 @@ dsh-plugin-desktop/lib/
 
 # Temporary logs and local gate output.
 *.log
+.tmp-*
 
 # Test and build intermediates.
 coverage/

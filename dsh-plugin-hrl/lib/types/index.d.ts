@@ -1,34 +1,36 @@
 /**
- * Answer optimization for ensure-ILE.
+ * Answer-optimization persona for ensure-ILE: teacher trajectory plus step-by-step A/B.
  *
- * One row: replace the system prompt with the shared fragments plus the HRL
- * document, and expose `read_note` so "站得住" is judged by the subject's own
- * criteria rather than a general impression.
+ * No section, no tool and no cwd shadow of its own any more: the core
+ * (`dsh-plugin-coreset`) owns the one `complete` section, `read_note` and the
+ * shadow, because a preset that mounts three personas may only have one of each.
+ * This row contributes nothing but its mode text.
+ *
  * @module dsh-plugin-hrl
  */
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 /** Cordis plugin name. */
 export declare const name = "plugin-hrl";
-/** Services used by this row. */
+/** The core's mode registry is the only service this row needs. */
 export declare const inject: string[];
-/** Runtime schema for the HRL row. */
+/** Runtime schema for the row. */
 export declare const Config: z<Schemastery.ObjectS<NoInfer<{
-    /** Absolute path to the HRL document; empty means the packaged copy. */
+    /** Absolute path to the persona document; empty means the packaged copy. */
     promptFile: z<string, string, "defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
-    /** Absolute path to the HRL document; empty means the packaged copy. */
+    /** Absolute path to the persona document; empty means the packaged copy. */
     promptFile: z<string, string, "defined">;
 }>>, "plain">;
 /** Resolved configuration shape. */
 export interface Config {
     promptFile?: string;
 }
-/** The system-prompt section answer optimization occupies. */
-export declare const HRL_SECTION = "hrl";
+/** Mode id `context_switch` accepts. */
+export declare const HRL_MODE = "hrl";
 /**
- * Mount answer optimization and its note reader on this scope.
- * @param ctx - an agent scope context; the preset mounts this row per session.
- * @param config - where the HRL document lives.
+ * Register this mode's persona text with the core.
+ * @param ctx - an agent scope context; a preset mounts this row per session.
+ * @param config - where the persona document lives.
  */
 export declare function apply(ctx: Context, config: Config): void;

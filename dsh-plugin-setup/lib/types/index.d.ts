@@ -1,10 +1,13 @@
 /**
  * First-run conversation for ensure-ILE.
  *
- * One preset (`setup`), one job: ask a learner's grade, timetable, rhythm and
- * solving preference, then say what happens next. Progress is field-level in
- * `<DSH_HOME>/setup.json`, so an interrupted onboarding resumes where it
- * stopped instead of starting over.
+ * One persona (`setup`, reachable only as its own preset) and the two tools
+ * that record progress field-by-field in `<DSH_HOME>/setup.json`, so an
+ * interrupted onboarding resumes where it stopped instead of starting over.
+ *
+ * The persona text is contributed to the core's mode registry; the section, the
+ * cwd shadow and `read_note` belong to `dsh-plugin-coreset`.
+ *
  * @module dsh-plugin-setup
  */
 import type { Context } from '@deepseek-ai/cordis';
@@ -32,11 +35,11 @@ export interface Config {
     promptFile?: string;
     stateFile?: string;
 }
-/** The system-prompt section the setup conversation occupies. */
-export declare const SETUP_SECTION = "setup";
+/** Mode id the 开学 preset starts in. */
+export declare const SETUP_MODE = "setup";
 /**
- * Mount the setup conversation and its two tools on this scope.
- * @param ctx - an agent scope context; the preset mounts this row per session.
+ * Register the 开学 persona and its two tools on this scope.
+ * @param ctx - an agent scope context; the setup preset mounts this row per session.
  * @param config - where the document and the progress file live.
  */
 export declare function apply(ctx: Context, config: Config): void;

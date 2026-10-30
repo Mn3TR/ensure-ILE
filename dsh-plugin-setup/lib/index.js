@@ -1,111 +1,26 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { i as updateState, n as defaultStateFile, r as readState, t as ONBOARDING_STATES } from "./state-AWeyxRsN.js";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import z from "@deepseek-ai/schemastery";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 import { composePrompt } from "dsh-plugin-teaching-commons";
-import { dirname, join } from "node:path";
-//#region src/state.ts
-/**
-* Progress record for the first-run conversation.
-*
-* Kept apart from the plugin row so it carries no Cordis or tool dependency:
-* the store is testable on its own and the row is only wiring.
-* @module dsh-plugin-setup/state
-*/
-/** Whether the onboarding conversation has finished. */
-const ONBOARDING_STATES = ["pending", "done"];
-const FACT_KEYS$1 = [
-	"grade",
-	"schedule",
-	"rhythm",
-	"preference"
-];
-/**
-* Resolve the default progress file under the Harness home.
-* @returns the absolute path.
-*/
-function defaultStateFile() {
-	const home = process.env.DSH_HOME?.trim();
-	return home !== void 0 && home.length > 0 ? join(home, "setup.json") : join(process.cwd(), "setup.json");
-}
-/**
-* Read the progress record, or an empty pending one.
-* @param file - absolute path.
-* @returns the record; a corrupt file starts over rather than blocking onboarding.
-*/
-function readState(file) {
-	if (!existsSync(file)) return {
-		schema: 1,
-		onboarding: "pending",
-		got: {}
-	};
-	let raw;
-	try {
-		raw = JSON.parse(readFileSync(file, "utf8"));
-	} catch {
-		return {
-			schema: 1,
-			onboarding: "pending",
-			got: {}
-		};
-	}
-	const value = typeof raw === "object" && raw !== null ? raw : {};
-	const got = {};
-	const source = typeof value.got === "object" && value.got !== null ? value.got : {};
-	for (const key of FACT_KEYS$1) {
-		const entry = source[key];
-		if (typeof entry === "string" && entry.length > 0) got[key] = entry;
-	}
-	return {
-		schema: 1,
-		onboarding: value.onboarding === "done" ? "done" : "pending",
-		got,
-		...typeof value.next === "string" ? { next: value.next } : {},
-		...typeof value.updatedAt === "string" ? { updatedAt: value.updatedAt } : {}
-	};
-}
-/**
-* Apply one patch and persist it atomically.
-* @param file - absolute path.
-* @param patch - the fields to write.
-* @param now - clock injection for tests.
-* @returns the merged record.
-*/
-function updateState(file, patch, now = /* @__PURE__ */ new Date()) {
-	const current = readState(file);
-	const got = { ...current.got };
-	for (const key of FACT_KEYS$1) {
-		const value = patch[key];
-		if (value !== void 0) got[key] = value;
-	}
-	const next = {
-		schema: 1,
-		onboarding: patch.onboarding === "done" ? "done" : patch.onboarding === "pending" ? "pending" : current.onboarding,
-		got,
-		...patch.next !== void 0 ? { next: patch.next } : current.next !== void 0 ? { next: current.next } : {},
-		updatedAt: now.toISOString()
-	};
-	mkdirSync(dirname(file), { recursive: true });
-	const temporary = file + ".tmp";
-	writeFileSync(temporary, JSON.stringify(next, null, 2) + "\n");
-	renameSync(temporary, file);
-	return next;
-}
-//#endregion
 //#region src/index.ts
 /**
 * First-run conversation for ensure-ILE.
 *
-* One preset (`setup`), one job: ask a learner's grade, timetable, rhythm and
-* solving preference, then say what happens next. Progress is field-level in
-* `<DSH_HOME>/setup.json`, so an interrupted onboarding resumes where it
-* stopped instead of starting over.
+* One persona (`setup`, reachable only as its own preset) and the two tools
+* that record progress field-by-field in `<DSH_HOME>/setup.json`, so an
+* interrupted onboarding resumes where it stopped instead of starting over.
+*
+* The persona text is contributed to the core's mode registry; the section, the
+* cwd shadow and `read_note` belong to `dsh-plugin-coreset`.
+*
 * @module dsh-plugin-setup
 */
 /** Cordis plugin name. */
 const name = "plugin-setup";
 /** Services used by this row. */
-const inject = ["systemPrompt", "tools"];
+const inject = ["ileModes", "tools"];
 /** Runtime schema for the setup row. */
 const Config = z.object({
 	/** Absolute path to the setup document; empty means the packaged copy. */
@@ -113,8 +28,9 @@ const Config = z.object({
 	/** Absolute path to the progress file; empty means `<DSH_HOME>/setup.json`. */
 	stateFile: z.string().default("")
 });
-/** The system-prompt section the setup conversation occupies. */
-const SETUP_SECTION = "setup";
+/** Mode id the 开学 preset starts in. */
+const SETUP_MODE = "setup";
+const MODE_NAME = "开学";
 const DEFAULT_PROMPT_FILE = fileURLToPath(new URL("../prompts/setup.md", import.meta.url));
 const FACT_KEYS = [
 	"grade",
@@ -123,27 +39,19 @@ const FACT_KEYS = [
 	"preference"
 ];
 /**
-* Mount the setup conversation and its two tools on this scope.
-* @param ctx - an agent scope context; the preset mounts this row per session.
+* Register the 开学 persona and its two tools on this scope.
+* @param ctx - an agent scope context; the setup preset mounts this row per session.
 * @param config - where the document and the progress file live.
 */
 function apply(ctx, config) {
 	const promptFile = config.promptFile !== void 0 && config.promptFile.length > 0 ? config.promptFile : DEFAULT_PROMPT_FILE;
 	const stateFile = config.stateFile !== void 0 && config.stateFile.length > 0 ? config.stateFile : defaultStateFile();
-	ctx.effect(() => ctx.systemPrompt.section({
-		name: SETUP_SECTION,
-		order: 0,
+	ctx.effect(() => ctx.ileModes.registerMode({
+		id: SETUP_MODE,
+		name: MODE_NAME,
 		text: composePrompt(["common"], readFileSync(promptFile, "utf8")),
-		complete: true
-	}), "setup.section()");
-	ctx.systemPrompt.suppressRuntimeContext();
-	ctx.effect(() => ctx.systemPrompt.context({
-		name: "working-directory:current",
-		order: ctx.systemPrompt.getContextOrder("WORKING_DIRECTORY"),
-		required: true,
-		interpolate: false,
-		text: ""
-	}), "setup.hideCwdContext()");
+		switchable: false
+	}), "setup.mode()");
 	ctx.effect(() => ctx.tools.register(defineTool({
 		name: "setup_read",
 		description: "读开学进度：已经问了哪些、还差哪些。开新会话时先读，填过的不重问。",
@@ -212,6 +120,6 @@ function apply(ctx, config) {
 	})), "setup.update()");
 }
 //#endregion
-export { Config, ONBOARDING_STATES, SETUP_SECTION, apply, defaultStateFile, inject, name, readState, updateState };
+export { Config, ONBOARDING_STATES, SETUP_MODE, apply, defaultStateFile, inject, name, readState, updateState };
 
 //# sourceMappingURL=index.js.map
