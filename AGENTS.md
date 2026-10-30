@@ -149,12 +149,12 @@
 - `corepack yarn check:plugins` `EXIT=0`（2026-10-30 复跑）：coreset 11 / setup 11 / bankmanager 45 / memory 189 / textbook 37 / schedule 40 共 333 全过；teaching-commons 与 guide / work / hrl 只 typecheck（它们没有单测，`lib/` 要手动 `yarn workspace <包> build` 才刷新）。
 - `check:layout`：icons 源与全平台资源一致 / vendored runtime 343 packages @687f282e86 / verify-layout 与上游 687f282e86 一致 / bilingual **44 记录 88 文档**；`verify:licenses` 584 production packages；`corepack yarn install --immutable` `exit 0`。
 - `node scripts/verify-patch-references.mjs`：29 个补丁、28 有效、1 无施主（`dsh-experimental-computer-use-cua-driver-native`，见坑·profile 与打包 6）。pi-ai 那份 2026-10-28 已重新对准 1.2.0 并真在 lock 里生效。
-- 打包链路只做过离线 install 模拟（profile 模板拷进四级子目录能装出 9 个包、`require.resolve('dsh-plugin-textbook/data')` 在 schedule 的视角下指到 `lib/data.js`）；`dist:win` 自 2026-10-25 起没重打（图标已换，下次打包会带进去）。
+- `dist:win` 2026-10-30 23:46 重打通过：`dist/ensure-ILE-2.0.18-x64-Setup.exe` **277.6 MB**（`win-unpacked` 1.2G），afterPack 的 installer 校验过，包内 `resources/app/profiles/ensure-ile/vendor` **10 个本地包**齐全（含 coreset）；把这份 profile 拷进四级子目录离线 `pnpm install` 能装出 10 个包，coreset 解析到 `lib/index.js`、内部 `link:../dsh-plugin-teaching-commons` 在 vendor 里自洽（所以只改 profile 的 dependencies 就够，不用改 vendored 包自己的依赖）、产物里没有裸 `zod` import。
 
 ## 还没做
 
 - **教材锚定最后一步**：真机让模型实读一次教材。要先删 `.ensure-ile/home/profiles/desktop` 再启动（`seedProfile()` 不覆盖）并手动 `pnpm install --offline`。
-- **重打 `dist:win`**：`dsh-plugin-textbook` 与 `dsh-plugin-schedule` 进包的 vendor 链路只做了模拟，没跑真实打包。
+- **新包真机装一遍**：`dist:win` 已带 coreset 打出来（277.6 MB），但还没在一台干净机器 / 临时目录里跑完「静默安装 → 首启装 profile → 预设选单只出现 work / chat（入学期间多一个 setup）」。装的时候记得 `seedProfile()` 不覆盖，本机残留的 `.ensure-ile/home/profiles/desktop` 会盖住新模板。
 - **macOS 图标重导**：`docs/design/brand/mark/geometric-app.svg` 已定稿，但 `app-icon.icon/` 与 `app-icon.icns` 还是鲸鱼（`app-icon-mac.png` 已跟随新源）；要一台 macOS + Icon Composer 按 `NOTES.md` 的落地表重导。
 - **图标真机验收**：`icons:check` 与 `check:layout` 都绿了，但没人真看过任务栏 / 托盘 / 开始菜单里的小尺寸效果（16px 的 ∫ 只有 2px 笔画）。
 - **真机验收会话内切换**：`context_switch` 的折叠靠 `agent/pre-step` 在 turn 边界动手，折叠后那一步会**连着进两条 user 消息**（交接通知 + 学生这句）——上游 plan-mode 的 narration 是这个形状，但我们的 provider 组合没实测过；不接受就把通知并进学生那条（pre-step 里学生消息已在手上）。
