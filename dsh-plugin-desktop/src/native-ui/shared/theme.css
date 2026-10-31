@@ -4,19 +4,19 @@
 @import "@fontsource-variable/inter/wght.css";
 
 /*
- * ensure-ILE 的视觉层：演算纸。
+ * ensure-ILE 的视觉层。
  *
- * 三种笔迹分工，身份不靠气泡和头像：
- *   宋体   = 印刷体（题干、教材原文、教师版）
- *   楷体   = 手写（学生说过的话、他自己重写的那一句）
- *   黑体   = 界面本身
+ * 2026-10-31 起弃用「演算纸」（三笔迹 + 纸面），原生窗口改用与
+ * dsh-claude-style 一致的底色与强调色：中性纸面换成中性画布，
+ * 主色是蓝绿 #4E9C90（深色）/ #2F7F76（浅色），与 Web 客户端的
+ * customAccent 同源。
  *
  * 颜色只编码状态，不编码身份：
- *   墨蓝 primary   = 主操作与「我」的语气
- *   朱批 destructive = 判错、卡住（不做装饰）
- *   印章青 seal    = 通过、已确认、mastered
+ *   蓝绿 primary      = 主操作
+ *   朱批 destructive  = 判错、卡住（不做装饰）
+ *   印章青 seal       = 通过、已确认、mastered
  *
- * 圆角按层级递增：纸面直角、按钮 8px、弹层 12px。
+ * 圆角按层级递增：画布直角、按钮 8px、弹层 12px。
  */
 
 /* 子集化属于修改，OFL 的保留字体名条款不允许继续叫「霞鹜」/「Source」，
@@ -59,49 +59,49 @@
 }
 
 :root {
-  --background: #FBFBF9;
+  --background: #FFFFFF;
   --foreground: #17191B;
   --card: #FFFFFF;
   --card-foreground: #17191B;
   --popover: #FFFFFF;
   --popover-foreground: #17191B;
-  --primary: #24436B;
-  --primary-foreground: #FBFBF9;
-  --secondary: #EFF0EB;
+  --primary: #2F7F76;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F0F2F0;
   --secondary-foreground: #17191B;
-  --muted: #F1F2EE;
-  --muted-foreground: #6F7571;
-  --accent: #EAEFF5;
-  --accent-foreground: #24436B;
+  --muted: #F2F4F2;
+  --muted-foreground: #6B7370;
+  --accent: #E8F1EF;
+  --accent-foreground: #2F7F76;
   --destructive: #B4392C;
   --seal: #2E6659;
-  --border: #DDDFDA;
-  --input: #D5D7D2;
-  --ring: #24436B;
+  --border: #E3E5E2;
+  --input: #D8DAD7;
+  --ring: #2F7F76;
   --radius: 0.5rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #15171A;
-    --foreground: #E8E6E1;
-    --card: #1B1E22;
-    --card-foreground: #E8E6E1;
-    --popover: #1B1E22;
-    --popover-foreground: #E8E6E1;
-    --primary: #86ABD6;
-    --primary-foreground: #10161F;
-    --secondary: #23272C;
-    --secondary-foreground: #E8E6E1;
-    --muted: #22262B;
-    --muted-foreground: #A9ACA7;
-    --accent: #1E2836;
-    --accent-foreground: #86ABD6;
+    --background: #191919;
+    --foreground: #ECEAE5;
+    --card: #1F1F1F;
+    --card-foreground: #ECEAE5;
+    --popover: #1F1F1F;
+    --popover-foreground: #ECEAE5;
+    --primary: #4E9C90;
+    --primary-foreground: #0F1413;
+    --secondary: #242424;
+    --secondary-foreground: #ECEAE5;
+    --muted: #232323;
+    --muted-foreground: #A6AAA6;
+    --accent: #1E2B29;
+    --accent-foreground: #7FC3B8;
     --destructive: #D9695E;
     --seal: #6DAE9C;
-    --border: #2A2E33;
-    --input: #33383D;
-    --ring: #86ABD6;
+    --border: #2C2C2C;
+    --input: #353535;
+    --ring: #4E9C90;
   }
 }
 

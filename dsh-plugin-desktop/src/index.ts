@@ -434,7 +434,7 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
         authenticationUrl: ctx.connection.authenticatedUrl(new URL(url).origin),
         rendererAccessHeader: browserAccess.rendererHeader,
         productName: DESKTOP_PRODUCT_NAME,
-        windowTitle: 'DeepSeek Harness Desktop',
+        windowTitle: 'ensure-ILE',
         iconPath,
         trayIcons,
         readLocalePreference: () => {

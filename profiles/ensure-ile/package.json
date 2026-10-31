@@ -6,6 +6,7 @@
       "bundles": [
         "@deepseek-ai/dsh-base",
         "@deepseek-ai/dsh-web-app",
+        "dsh-claude-style",
         "dsh-plugin-setup",
         "dsh-plugin-coreset",
         "dsh-plugin-bankmanager",
@@ -16,6 +17,7 @@
     }
   },
   "dependencies": {
+    "dsh-claude-style": "file:../../../../vendor/dsh-claude-style",
     "dsh-plugin-coreset": "file:../../../../dsh-plugin-coreset",
     "dsh-plugin-guide": "file:../../../../dsh-plugin-guide",
     "dsh-plugin-bankmanager": "file:../../../../dsh-plugin-bankmanager",

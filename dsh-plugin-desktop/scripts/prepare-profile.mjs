@@ -33,6 +33,8 @@ const LOCAL_PACKAGES = [
   'dsh-plugin-textbook',
   'dsh-plugin-schedule',
   'dsh-plugin-coreset',
+  // Vendored third-party source kept under vendor/, not a workspace of ours.
+  'dsh-claude-style',
 ]
 
 if (!existsSync(source)) {
@@ -45,7 +47,10 @@ console.log('prepare-profile: copied profiles/ensure-ile')
 
 const vendor = join(target, 'vendor')
 for (const name of LOCAL_PACKAGES) {
-  const from = join(repoRoot, name)
+  // A vendored package lives under vendor/<name>; everything else is a root workspace.
+  const from = existsSync(join(repoRoot, name, 'package.json'))
+    ? join(repoRoot, name)
+    : join(repoRoot, 'vendor', name)
   const manifestPath = join(from, 'package.json')
   if (!existsSync(manifestPath)) {
     console.error('prepare-profile: missing local package ' + from)

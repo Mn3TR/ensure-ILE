@@ -19,6 +19,8 @@ import { createElement } from 'react'
 import { SetupWizardApp, type EmbeddedSetupWizard } from '../native-ui/setup-wizard/App.tsx'
 import './onboarding.css'
 import { applyAdvancedShell } from './advanced-shell.ts'
+import { installBrandStyles } from './brand-styles.ts'
+import { installWorkspaceStyles } from './workspace-styles.ts'
 import { startRendererBootReporter } from './boot-health.ts'
 import { applyDesktopSettings } from './desktop-settings.ts'
 import { installDesktopDirectoryPickerBridge } from './directory-picker.ts'
@@ -48,6 +50,7 @@ export type {
 export { DesktopSettingsSection } from './DesktopSettingsSection.tsx'
 export { PluginControls, registerPluginControls }
 export { installPluginControlsStyles }
+export { installBrandStyles, installWorkspaceStyles }
 export { DesktopTerminalSettingsAction } from './DesktopTerminalSettingsAction.tsx'
 export type {
   DesktopTerminalSettingsActionInjected,
@@ -151,6 +154,17 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(
     () => installSidebarFooterStyles(),
     'dsh-plugin-desktop: sidebar footer stacking styles',
+  )
+  // The skin's sidebar shows a square mark beside a wordmark that already
+  // contains it; shelve the mark. Global on purpose — see brand-styles.ts.
+  ctx.effect(
+    () => installBrandStyles(),
+    'dsh-plugin-desktop: brand shelving styles',
+  )
+  // One workspace means nothing to pick; see workspace-styles.ts.
+  ctx.effect(
+    () => installWorkspaceStyles(),
+    'dsh-plugin-desktop: single-workspace styles',
   )
   ctx.effect(
     () => startRendererBootReporter(ctx.loader),

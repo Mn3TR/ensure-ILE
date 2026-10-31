@@ -40,3 +40,35 @@
   config:
     documentsDirectory: !!js dshHomePath('..')
 
+
+# The interface layer itself is dsh-claude-style; this row retunes it rather than
+# replacing it. Our brand name stands where "Claude" did, the accent is the
+# learning build's blue-green instead of the theme's clay, the home screen is the
+# plain greeting-and-composer layout (the studio one opens on a usage dashboard a
+# student has no use for), and the composer mascot is off: a student's screen
+# should not carry a joke they did not choose.
+- id: ui-skin-claude-style
+  name: dsh-claude-style
+  config:
+    sodium: on
+    brandName: en∫ure
+    brandInk: accent
+    brandAccent: '#4E9C90'
+    paletteColors: custom
+    customAccent: '#4E9C90'
+    homeLayout: classic
+    mascot: off
+    permissionsControl: false
+# A learner never switches permission modes, so the composer's chip row is gone
+# rather than retuned, and with it the two sidebar entries that lead to surfaces
+# this build does not ship (插件 / 自动化任务). `permissionsControl: false` drops
+# dsh-claude-style's own chips; disabling the upstream row drops the one it would
+# otherwise fall back to. The mode itself stays whatever the host resolves.
+- id: ui-plugin-manager
+  disabled: true
+
+- id: ui-schedule
+  disabled: true
+
+- id: ui-permission
+  disabled: true

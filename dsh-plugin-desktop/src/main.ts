@@ -1995,6 +1995,28 @@ function seedProfile(dataRoot: string, projectRoot: string): string {
 }
 
 /**
+ * Seed our geometric brand lockup beside the seeded profile. `dsh-claude-style`
+ * reads `<DSH_HOME>/dsh-claude-style/brand/{mark,wordmark}.svg` and falls back to
+ * Claude's own mark when a file is absent, so a fresh data root would quietly
+ * bring a competitor's logo back into the sidebar and the welcome hero. Existing
+ * files win: replacing them through the skin's settings must survive restarts.
+ */
+function seedBrandAssets(home: string, projectRoot: string): void {
+  const template = app.isPackaged
+    ? join(app.getAppPath(), 'profiles', 'ensure-ile')
+    : join(projectRoot, 'profiles', 'ensure-ile')
+  const source = join(template, 'brand')
+  if (!existsSync(source)) return
+  const target = join(home, 'dsh-claude-style', 'brand')
+  mkdirSync(target, { recursive: true })
+  for (const file of ['mark.svg', 'wordmark.svg']) {
+    const from = join(source, file)
+    const to = join(target, file)
+    if (existsSync(from) && !existsSync(to)) copyFileSync(from, to)
+  }
+}
+
+/**
  * Install the seeded profile's packages once. Everything ensure-ILE links is a
  * local `file:` package with no registry dependency, so the bundled pnpm can do
  * this offline; an existing node_modules means an earlier run already did.
@@ -2082,6 +2104,11 @@ async function run(): Promise<void> {
   // build uses; keeping ours distinct means an inherited DSH_HOME can never smuggle
   // this launch back into the installed copy's data.
   process.env.ENSURE_ILE_HOME ??= join(dataRoot, 'home')
+  // Seed into this instance's own data root, never `process.env.DSH_HOME`: an
+  // inherited value points at whatever instance launched us (an agent shell had
+  // one aimed at the real `~/.dsh`), and writing there would put our lockup
+  // into somebody else's installation.
+  seedBrandAssets(join(dataRoot, 'home'), resolveProjectRoot())
   process.env.DSH_AGENTS_HOME = join(dataRoot, 'agents')
   // ensure-ILE: an installed copy and this build would otherwise share one userData
   // and fight over the single-instance lock requested in start().
