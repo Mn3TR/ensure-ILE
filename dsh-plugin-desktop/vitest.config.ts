@@ -4,6 +4,10 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.spec.ts'],
+    // `tests/ui` drives the real Electron app through Playwright (`yarn test:ui`).
+    // It needs a built `lib/` and takes about a minute and a half, so it stays out
+    // of the unit suite rather than doubling every `check`.
+    exclude: ['**/node_modules/**', '**/dist/**', 'tests/ui/**'],
     globalSetup: process.platform === 'win32' ? ['../scripts/prepare-test-electron.mjs'] : [],
     // Keep patched packages in Vitest's module graph so mocks reach their
     // fs/promises and undici imports instead of using the live filesystem/network.
