@@ -1,0 +1,94 @@
+name: Release (Windows)
+
+# ensure-ILE ships one platform. This workflow turns a tag into the setup
+# program students install; nothing else is built here. `dist:win` runs its own
+# installer verification, so a green run means the artifact was launched once.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DSH_TELEMETRY_DISABLED: '1'
+  # Packaging checks run as their own step so the packer does not repeat them.
+  DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.23.2
+      - run: corepack enable
+      - name: Resolve Yarn cache folder
+        id: yarn-cache
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$env:GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: ${{ steps.yarn-cache.outputs.dir }}
+          key: yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock', '.yarnrc.yml') }}
+      - name: Cache Electron and runtime downloads
+        uses: actions/cache@v6
+        with:
+          path: |
+            dsh-plugin-desktop/.desktop-build/downloads
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+          key: packaging-downloads-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock', 'deepseek-harness/scripts/primary-runtime/lock.json') }}
+      - run: yarn install --immutable
+      # A tag that disagrees with package.json would publish an installer whose
+      # version, filename, and release page all disagree with each other.
+      - name: Check tag matches the packaged version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $declared = (Get-Content dsh-plugin-desktop/package.json -Raw | ConvertFrom-Json).version
+          $expected = "v$declared"
+          if ('${{ github.ref_name }}' -ne $expected) {
+            throw "tag ${{ github.ref_name }} does not match packaged version $declared"
+          }
+          Write-Host "tag ${{ github.ref_name }} matches packaged version $declared"
+      - run: yarn workspace dsh-plugin-desktop check:win-package:platform
+      - name: Build Windows installer
+        run: yarn workspace dsh-plugin-desktop dist:win
+      - name: Hash installer
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem dsh-plugin-desktop/dist/ensure-ILE-*-x64-Setup.exe | Select-Object -First 1
+          if (-not $installer) { throw 'installer was not produced' }
+          $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLower()
+          "$hash  $($installer.Name)" | Set-Content "$($installer.FullName).sha256" -Encoding ascii
+          Write-Host "installer: $($installer.Name) sha256: $hash size: $($installer.Length)"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ensure-ILE-windows-installer
+          path: |
+            dsh-plugin-desktop/dist/ensure-ILE-*-x64-Setup.exe
+            dsh-plugin-desktop/dist/ensure-ILE-*-x64-Setup.exe.sha256
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dsh-plugin-desktop/dist/ensure-ILE-*-x64-Setup.exe
+            dsh-plugin-desktop/dist/ensure-ILE-*-x64-Setup.exe.sha256
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          # 0.1.0-alpha1 and friends are preview builds: mark them so GitHub
+          # does not advertise them as the latest release.
+          prerelease: ${{ contains(github.ref_name, '-') }}

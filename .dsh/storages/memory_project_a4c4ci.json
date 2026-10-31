@@ -204,6 +204,26 @@
         ],
         "createdAt": 1793119009624,
         "updatedAt": 1793119009624
+      },
+      "89336235-1345-4272-bc66-197371a7c3a2": {
+        "namespace": "project",
+        "status": "approved",
+        "injected": false,
+        "source": "agent",
+        "content": "ensure-ILE 2026-10-31 的发布就绪评估（李问「达到发布程度了吗」，结论：没到，但他认为无伤大雅、只记录不做）：三件硬缺口——① 打包产物 `dist/ensure-ILE-2.0.18-x64-Setup.exe` 从未在干净数据根上跑过（打包版走 app.getAppPath 取模板 / 内置 pnpm 离线装 profile / seedBrandAssets，只在开发路径验过）；② 预设里没有压缩引擎，长会话撞上下文会硬失败；③ 权限默认 workspace-write 且没有审批对话框。软的：native 四窗（恢复页/选配置/桌面对话框/画廊）换蓝绿 token 后未逐屏核过。教材随包发（dsh-plugin-textbook/data 1.8MB 七本），题库新装为空。都写进 AGENTS.md「还没做」。",
+        "keywords": [
+          "发布",
+          "release readiness",
+          "ensure-ile",
+          "clean install",
+          "全新安装",
+          "压缩 compaction",
+          "权限审批",
+          "native 窗口",
+          "发布门槛"
+        ],
+        "createdAt": 1793456151135,
+        "updatedAt": 1793456151135
       }
     }
   }

@@ -38,7 +38,7 @@
 
 `git remote -v` 里 `origin` 是 `https://github.com/Mn3TR/ensure-ILE.git`，`upstream` 是 `https://github.com/anywhere-labs/dsh-desktop.git`——所以「上游桌面发新版」**不是 checkout，是移植**。事实：
 
-- `dsh-plugin-desktop/package.json` 的 `name` 是 `dsh-plugin-desktop`、版本 `2.0.18`；本地 tag 有 `v2.0.18` / `v2.0.18-beta.1` / `v2.0.19-next`。
+- `dsh-plugin-desktop/package.json` 的 `name` 是 `dsh-plugin-desktop`、版本 `0.1.0-alpha1`（2026-10-31 起转 α 线，与上游 2.0.18 的版本号脱钩）；本地 tag 有 `v2.0.18` / `v2.0.18-beta.1` / `v2.0.19-next` / `v0.1.0-alpha1`。
 - 我们和上游**共享历史**（fork 根 `b67e81ac97` 是 `upstream/master` 的祖先），不是压成一份拷贝。分叉点是 `6a63b9730b`（2026-10-18，`fix(desktop): support AA Schemastery 3.18.5 builds (#1417)`）。
 - 当前相对 `upstream/master`（`092e2ecef7`，2026-10-24）：**落后 33 个提交、领先 60 个提交**。`dsh-plugin-desktop/` 这棵树有 732 个提交的历史。
 - `THIRD_PARTY_NOTICES.md` 是按安装产物生成的第三方清单（`@deepseek-ai/*` 全是 `0.2.1-rc.2`），跟上游 repo 的 license 无关，不构成同步依据。
