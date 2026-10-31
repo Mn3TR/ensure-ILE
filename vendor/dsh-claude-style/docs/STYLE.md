@@ -1079,4 +1079,3 @@ plays its reaction.
   whole: `packages/client/src/shared/page-scale.ts` gives each one a space one pixel to one
   pixel with the window (D81), and a rule that caps a card against the window reads
   `--dsh-claude-page-height` / `--dsh-claude-page-width` rather than `vh` / `vw`.
-

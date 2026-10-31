@@ -1,3 +1,6 @@
 * text=auto eol=lf
 patches/*.patch text eol=lf whitespace=-space-before-tab,-blank-at-eol
 .yarn/patches/*.patch text eol=lf whitespace=-space-before-tab,-blank-at-eol
+# Generated plugin bundles inline zod's own source verbatim; its whitespace is
+# third-party, so do not police trailing blanks inside lib/ artifacts.
+dsh-plugin-*/lib/* whitespace=-blank-at-eol,-blank-at-eof

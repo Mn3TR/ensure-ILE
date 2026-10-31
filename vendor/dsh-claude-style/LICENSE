@@ -54,5 +54,3 @@ after that character (by `scripts/draw-crab.py`, which carries the drawings).
 These files, and their copies inlined into `lib/client.js`, are **not** covered
 by the MIT license above. This plugin is an unofficial fan work, not affiliated
 with or endorsed by Anthropic.
-
-

@@ -250,4 +250,3 @@ describe('public Desktop version check', () => {
     expect(request).not.toHaveBeenCalled()
   })
 })
-
