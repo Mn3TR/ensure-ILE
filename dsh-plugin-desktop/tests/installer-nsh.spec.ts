@@ -51,6 +51,21 @@ describe('Windows NSIS running-app handoff', () => {
   })
 })
 
+describe('Windows learner data across overwrite installs', () => {
+  it('parks the data root on the installer volume instead of %TEMP%', () => {
+    const script = readFileSync(join(process.cwd(), 'build', 'installer.nsh'), 'utf8')
+
+    // NSIS Rename moves a directory only within one drive, so a %TEMP% park
+    // silently loses $INSTDIR\\.ensure-ile on every machine whose %TEMP% is on C:.
+    expect(script).toContain('GetFullPathName $R0 "$INSTDIR\\..\\ensure-ILE-data"')
+    expect(script).not.toMatch(/Rename "\$INSTDIR\\\.ensure-ile" "\$TEMP/)
+    // CopyFiles is not recursive, and the data root has subdirectories.
+    expect(script).toContain('robocopy')
+    // The marker stays in %TEMP%: a zero-byte flag, not a directory move.
+    expect(script).toContain('$TEMP\\ensure-ILE-upgrade.flag')
+  })
+})
+
 describe('Windows assisted installer messages', () => {
   it('sets a clearer message for the slow install stage', () => {
     const messages = parse(readFileSync(join(process.cwd(), 'build', 'assistedMessages.yml'), 'utf8')) as {

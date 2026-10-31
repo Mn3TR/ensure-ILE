@@ -73,14 +73,29 @@ Var pid
 ; ensure-ILE keeps learner data ($INSTDIR\.ensure-ile: problem bank, memory,
 ; student profile) inside the application directory. Every overwrite install
 ; first runs the previously installed uninstaller, which removes $INSTDIR
-; recursively. Park the data in $TEMP while the marker file exists and restore it
-; from customInstall. A plain uninstall carries no marker, so it still clears
-; everything, exactly as before.
+; recursively. Park the data beside $INSTDIR while the marker file exists and
+; restore it from customInstall. A plain uninstall carries no marker, so it still
+; clears everything, exactly as before.
+;
+; The parking spot must stay on one volume: NSIS Rename moves a directory only
+; within the same drive, and a refused move just sets the error flag. Parking in
+; $TEMP, as this once did, silently lost the data whenever the app was installed
+; on D: while Windows kept %TEMP% on C: - the uninstaller then recurses over
+; $INSTDIR with the data still inside it. The parent of $INSTDIR is on the same
+; volume by construction, so that is where it parks now; $TEMP holds the marker.
 !macro customUnInstall
   ${if} ${FileExists} "$TEMP\ensure-ILE-upgrade.flag"
   ${andIf} ${FileExists} "$INSTDIR\.ensure-ile\*.*"
-    RMDir /r "$TEMP\ensure-ILE-data"
-    Rename "$INSTDIR\.ensure-ile" "$TEMP\ensure-ILE-data"
+    GetFullPathName $R0 "$INSTDIR\..\ensure-ILE-data"
+    RMDir /r "$R0"
+    Rename "$INSTDIR\.ensure-ile" "$R0"
+    ${if} ${FileExists} "$INSTDIR\.ensure-ile\*.*"
+      ; Still there (open handle, read-only parent): move it the slow way so
+      ; the recursion below cannot take the data with it. CopyFiles is not
+      ; recursive, and the data root has subdirectories.
+      nsExec::Exec 'robocopy "$INSTDIR\.ensure-ile" "$R0" /E /MOVE /R:1 /W:1 /NFL /NDL /NJH /NJS'
+      Pop $R1
+    ${endIf}
   ${endIf}
 !macroend
 
@@ -121,13 +136,26 @@ Var pid
 ; the updated application and close the installer as soon as extraction finishes
 ; without stopping on the Finish wizard page.
 !macro customInstall
-  ; Put back the learner data the previous uninstaller parked for us.
+  ; Put back the learner data the previous uninstaller parked for us. The
+  ; current uninstaller parks it beside $INSTDIR (same volume); releases up to
+  ; 2.0.18 parked in $TEMP, so that location is still honoured.
   Delete "$TEMP\ensure-ILE-upgrade.flag"
-  ${if} ${FileExists} "$TEMP\ensure-ILE-data\*.*"
+  GetFullPathName $R0 "$INSTDIR\..\ensure-ILE-data"
+  ${if} ${FileExists} "$R0\*.*"
+    RMDir /r "$INSTDIR\.ensure-ile"
+    Rename "$R0" "$INSTDIR\.ensure-ile"
+    ${if} ${FileExists} "$R0\*.*"
+      nsExec::Exec 'robocopy "$R0" "$INSTDIR\.ensure-ile" /E /MOVE /R:1 /W:1 /NFL /NDL /NJH /NJS'
+      Pop $R1
+    ${endIf}
+  ${elseIf} ${FileExists} "$TEMP\ensure-ILE-data\*.*"
     RMDir /r "$INSTDIR\.ensure-ile"
     Rename "$TEMP\ensure-ILE-data" "$INSTDIR\.ensure-ile"
+    ${if} ${FileExists} "$TEMP\ensure-ILE-data\*.*"
+      nsExec::Exec 'robocopy "$TEMP\ensure-ILE-data" "$INSTDIR\.ensure-ile" /E /MOVE /R:1 /W:1 /NFL /NDL /NJH /NJS'
+      Pop $R1
+    ${endIf}
   ${endIf}
-
   ${if} ${isUpdated}
   ${andIf} ${isForceRun}
   ${andIfNot} ${Silent}
