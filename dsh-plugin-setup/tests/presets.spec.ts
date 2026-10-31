@@ -18,11 +18,25 @@ afterEach(async () => {
 describe('SETUP_PRESET', () => {
   it('starts in the setup mode and mounts the core with the setup row', () => {
     expect(SETUP_PRESET.id).toBe('setup')
-    expect(SETUP_PRESET.name).toBe('开学')
-    expect(SETUP_PRESET.plugins).toEqual([
-      { name: 'dsh-plugin-coreset', config: { mode: 'setup' } },
-      { name: 'dsh-plugin-setup' },
-    ])
+    expect(SETUP_PRESET.name).toBe('Setup')
+    expect(SETUP_PRESET.plugins).toEqual([{
+      id: 'ile',
+      name: 'cordis:group',
+      group: true,
+      isolate: { ileModes: true },
+      config: [
+        { id: 'coreset', name: 'dsh-plugin-coreset', config: { mode: 'setup' } },
+        { id: 'setup', name: 'dsh-plugin-setup' },
+      ],
+    }])
+  })
+
+  /* Same reason as the two coreset presets: the core publishes `ileModes`, so a
+     second core outside a realm collides and the registry rejects the preset. */
+  it('keeps the core in an ileModes realm of its own', () => {
+    const [group] = SETUP_PRESET.plugins as { group?: boolean; isolate?: Record<string, boolean> }[]
+    expect(group.group).toBe(true)
+    expect(group.isolate).toEqual({ ileModes: true })
   })
 })
 

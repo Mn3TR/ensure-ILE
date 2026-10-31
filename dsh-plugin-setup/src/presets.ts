@@ -17,13 +17,23 @@ import { defaultStateFile, readState } from './state.ts'
 /** The one preset this package owns. */
 export const SETUP_PRESET: PresetDefinition = {
   id: 'setup',
-  name: '开学',
+  name: 'Setup',
   description: '第一次见面：问清年级、课表、作息和解题偏好，然后告诉学生下一步',
   order: 30,
-  plugins: [
-    { name: 'dsh-plugin-coreset', config: { mode: 'setup' } },
-    { name: 'dsh-plugin-setup' },
-  ],
+  // The core publishes `ileModes`, so it needs a realm of its own: two cores in
+  // the same realm collide, and a service published into the root realm makes
+  // the registry reject the preset ("Preset services require isolate realms").
+  // The persona sits inside the group to resolve the core it was mounted with.
+  plugins: [{
+    id: 'ile',
+    name: 'cordis:group',
+    group: true,
+    isolate: { ileModes: true },
+    config: [
+      { id: 'coreset', name: 'dsh-plugin-coreset', config: { mode: 'setup' } },
+      { id: 'setup', name: 'dsh-plugin-setup' },
+    ],
+  }],
 }
 
 /** Configuration of the conditional registration. */

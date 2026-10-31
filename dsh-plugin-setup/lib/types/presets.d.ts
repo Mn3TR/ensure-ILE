@@ -19,6 +19,15 @@ export interface PresetsConfig {
     stateFile?: string;
 }
 /**
+ * Whether 开学 still belongs in the picker.
+ *
+ * The registry has no hidden flag, so this decides between registering the
+ * preset and never registering it — a finished learner sees it gone rather than
+ * greyed out.
+ * @param stateFile - absolute path to the progress file.
+ */
+export declare function shouldRegisterSetup(stateFile: string): boolean;
+/**
  * Registers {@link SETUP_PRESET} when onboarding has not been finished.
  * Registration is awaited in {@link Service.init} because the registry returns
  * the disposer this row must hold.

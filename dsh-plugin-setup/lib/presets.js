@@ -14,14 +14,35 @@ import { Service } from "@deepseek-ai/cordis";
 /** The one preset this package owns. */
 const SETUP_PRESET = {
 	id: "setup",
-	name: "开学",
+	name: "Setup",
 	description: "第一次见面：问清年级、课表、作息和解题偏好，然后告诉学生下一步",
 	order: 30,
 	plugins: [{
-		name: "dsh-plugin-coreset",
-		config: { mode: "setup" }
-	}, { name: "dsh-plugin-setup" }]
+		id: "ile",
+		name: "cordis:group",
+		group: true,
+		isolate: { ileModes: true },
+		config: [{
+			id: "coreset",
+			name: "dsh-plugin-coreset",
+			config: { mode: "setup" }
+		}, {
+			id: "setup",
+			name: "dsh-plugin-setup"
+		}]
+	}]
 };
+/**
+* Whether 开学 still belongs in the picker.
+*
+* The registry has no hidden flag, so this decides between registering the
+* preset and never registering it — a finished learner sees it gone rather than
+* greyed out.
+* @param stateFile - absolute path to the progress file.
+*/
+function shouldRegisterSetup(stateFile) {
+	return readState(stateFile).onboarding !== "done";
+}
 /**
 * Registers {@link SETUP_PRESET} when onboarding has not been finished.
 * Registration is awaited in {@link Service.init} because the registry returns
@@ -37,7 +58,7 @@ var SetupPresets = class {
 		this.config = config;
 	}
 	async *[Service.init]() {
-		if (readState(this.config.stateFile !== void 0 && this.config.stateFile.length > 0 ? this.config.stateFile : defaultStateFile()).onboarding === "done") {
+		if (!shouldRegisterSetup(this.config.stateFile !== void 0 && this.config.stateFile.length > 0 ? this.config.stateFile : defaultStateFile())) {
 			yield () => {};
 			return;
 		}
@@ -45,6 +66,6 @@ var SetupPresets = class {
 	}
 };
 //#endregion
-export { SETUP_PRESET, SetupPresets as default };
+export { SETUP_PRESET, SetupPresets as default, shouldRegisterSetup };
 
 //# sourceMappingURL=presets.js.map

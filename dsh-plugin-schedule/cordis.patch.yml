@@ -4,5 +4,9 @@
 # due today. No systemPrompt section is registered — every mode replaces the
 # whole prompt — so the rules live in the tool descriptions.
 - insert:
-    - id: schedule
+    # `ile-schedule`, not `schedule`: web-app already ships a row with id
+    # `schedule` (bundle/web-app/cordis.patch.yml), and the desktop shell's
+    # `assertUniqueEntryIds` refuses to compose a profile with a duplicate id —
+    # the app falls back to the recovery page before any plugin runs.
+    - id: ile-schedule
       name: dsh-plugin-schedule
