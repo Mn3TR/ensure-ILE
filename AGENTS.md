@@ -82,7 +82,7 @@
 
 ## 模式与交接（2026-10-25 定稿，事实都有代码出处）
 
-- **预设管组队，模式管姿态（2026-10-30 落成）**。预设两个加一个：`work`（起步 `guide`，挂 guide + work + hrl）、`chat`、`setup`（办完条件不注册）。换**预设** = 开新会话：`agentPresets.select` 只认空会话（`boundary.lastTurn > 0` 即锁，`deepseek-harness/packages/preset/agent-preset-registry/src/index.ts:351`），UI 只给空会话挂选择器（`client/ui-agent-preset/src/client/seat-store.ts:214`），resume 按 `meta.agentPreset` 还原，缺预设直接拒。
+- **预设管组队，模式管姿态（2026-10-30 落成）**。预设两个加一个：`work`（起步 `guide`）、`chat`（起步 `chat`）、`setup`（办完条件不注册）。前两个**都挂** coreset + guide + work + hrl + `ile-time-context`，**只差起步模式**——模式清单是「这个预设里挂了哪些人格」的产物（`ileModes` 在 isolate 域里，一预设一份），少挂一个包就等于少一个可切模式；2026-11-01 真机踩过：chat 预设只挂核时 `context_switch({to:'work'})` 必报「没有「work」这个模式」，而 `prompts/chat.md` 恰恰让它一切到做题就切。换**预设** = 开新会话：`agentPresets.select` 只认空会话（`boundary.lastTurn > 0` 即锁，`deepseek-harness/packages/preset/agent-preset-registry/src/index.ts:351`），UI 只给空会话挂选择器（`client/ui-agent-preset/src/client/seat-store.ts:214`），resume 按 `meta.agentPreset` 还原，缺预设直接拒。
 - **会话内换人格，不换工具集**：`context_switch({ to, summary })` 只置待办意图（不改历史、不动工具表），**学生下次开口第一个 pre-step** 才落——把 `nodes[1] … nodes.at(-1)` 折成一条交接 `user/message`（`surfaceOp: replace`，node 0 不碰，runtime 随后原地归一 system），同时 append log-only `ile/mode` 事件（重启靠它恢复）。`step !== 1` 一律放过，否则折掉进行中的 tool call、留下无 result 孤儿。
 - **工具集只能加不能减**（flash `toolUpdate: 'addition-only'`），同预设里任何模式看到的工具都是并集；换模式只换 `complete` 段文本。**模型不自己切模式**：提示词与工具描述写死「学生没提不要切」，`setup` 更是 `switchable: false`。
 - **跨会话只靠 bank + memory，零注入**。新会话靠提示词让模型开场 `bank_list` 找 pending `handoff`，不用 `agent.inject()`（要额外 host 插件、时机含糊、永久占 user 位）。代价：模型可能忘记读。
