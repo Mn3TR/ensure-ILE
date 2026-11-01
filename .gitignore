@@ -34,6 +34,11 @@ test-results/
 
 .env.yarn
 .ensure-ile/
+# Project memory (`.dsh/storages/memory_project_*.json`) is per-machine session
+# state, not shared knowledge: every session rewrites it, and committing it keeps
+# the working tree permanently dirty. Durable project conventions go in
+# AGENTS.md / README / .agents/notes instead (2026-10-31 decision).
+.dsh/
 .dsh-ops/
 .dsh-ops-update-*.lock
 .codegraph/

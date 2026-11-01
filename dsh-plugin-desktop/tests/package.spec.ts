@@ -53,7 +53,7 @@ const manifest = JSON.parse(readFileSync(new URL('package.json', packageRoot), '
       target?: unknown
       x64ArchFiles?: unknown
     }
-    win?: { asar?: unknown; compression?: unknown; extraResources?: unknown; icon?: unknown; asarUnpack?: unknown; target?: unknown; artifactName?: unknown }
+    win?: { asar?: unknown; compression?: unknown; extraResources?: unknown; files?: unknown; icon?: unknown; asarUnpack?: unknown; target?: unknown; artifactName?: unknown }
     nsis?: Record<string, unknown>
     portable?: Record<string, unknown>
     linux?: {
@@ -856,6 +856,27 @@ describe('published package surface', () => {
       arch: ['x64'],
     }])
     expect(manifest.build?.win?.artifactName).toBe('ensure-ILE-${version}-${arch}-Portable.${ext}')
+    // An x64 installer must not carry the arm64 build of a native payload: the
+    // bundled binaries are dead weight there (libreoffice-kit alone is 174 MB)
+    // and they are copied and compressed into every artifact.
+    expect(manifest.build?.win?.files).toEqual([
+      '!node_modules/@deepseek-ai/libreoffice-kit-win32-arm64{,/**}',
+      '!node_modules/@deepseek-ai/libreoffice-kit-win32-x64{,/**}',
+      '!node_modules/@img/sharp-win32-arm64{,/**}',
+      '!node_modules/@vscode/ripgrep-win32-arm64{,/**}',
+      '!node_modules/@koromix/koffi-win32-arm64{,/**}',
+      '!node_modules/node-addon-require-builtin-win32-arm64-msvc{,/**}',
+      '!node_modules/node-pty/prebuilds/win32-arm64{,/**}',
+      '!node_modules/@deepseek-ai/dsh-acp{,/**}',
+      '!node_modules/@deepseek-ai/dsh-experimental-inspector{,/**}',
+      '!node_modules/@agentclientprotocol/sdk{,/**}',
+      '!node_modules/@mixmark-io/domino{,/**}',
+      '!node_modules/@modelcontextprotocol/client{,/**}',
+      '!node_modules/@modelcontextprotocol/core{,/**}',
+      '!node_modules/sherpa-onnx-node{,/**}',
+      '!node_modules/sherpa-onnx-win-x64{,/**}',
+      '!node_modules/turndown{,/**}',
+    ])
     expect(manifest.build?.nsis).toEqual({
       include: 'installer.nsh',
       installerIcon: 'build/app-icon.ico',
@@ -869,7 +890,7 @@ describe('published package surface', () => {
       differentialPackage: false,
       shortcutName: 'ensure-ILE',
       uninstallerIcon: 'build/app-icon.ico',
-      useZip: false,
+      useZip: true,
       artifactName: 'ensure-ILE-${version}-${arch}-Setup.${ext}',
     })
     expect(manifest.build?.linux?.icon).toBe('build/icons')

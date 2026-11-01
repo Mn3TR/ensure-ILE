@@ -150,7 +150,7 @@
 - `test:ui` 4 spec / 18 用例全绿，约 2 min。
 - `check:layout`：icons 源与全平台资源一致 / vendored runtime 343 packages @687f282e86 / verify-layout 与上游 687f282e86 一致 / bilingual 44 记录 88 文档；`verify:licenses` 584 production packages；`install --immutable` exit 0。
 - `node scripts/verify-patch-references.mjs`：29 补丁、28 有效、1 无施主（`dsh-experimental-computer-use-cua-driver-native`，坑·profile 与打包 6）。pi-ai 那份 2026-10-28 已对准 1.2.0 并在 lock 里生效。
-- `dist:win` 2026-10-31 重打 `0.1.0-alpha1`：产物 `dsh-plugin-desktop/dist/ensure-ILE-0.1.0-alpha1-x64-Setup.exe`（**279 160 911 B ≈ 266 MiB**，`win-unpacked` 1.2 G）；包内 `resources/app/profiles/ensure-ile/vendor` 10 个本地包齐全，离线 `pnpm install` 能装出 10 个包，coreset 解析到 `lib/index.js`，产物无裸 `zod` import。
+- `dist:win` 2026-11-01 重打 `0.1.0-alpha1`（裁包 + `nsis.useZip: true` 之后）：构建 **6.4 min**（原 12 min），产物 `dsh-plugin-desktop/dist/ensure-ILE-0.1.0-alpha1-x64-Setup.exe` **201 683 683 B ≈ 192 MiB**（原 266 MiB），`win-unpacked` 940 M（原 1.2 G），`node_modules` 697 M → 426 M；包内 `resources/app/profiles/ensure-ile/vendor` 10 个本地包齐全，离线 `pnpm install` 能装出 10 个包，coreset 解析到 `lib/index.js`，产物无裸 `zod` import。
 
 ## 自动化 UI 测试（2026-10-31 落地，李要求）
 
@@ -206,7 +206,13 @@
 5. **覆盖安装会删数据根**：`build/installer.nsh` 用 `$TEMP\ensure-ILE-upgrade.flag` 标记安装，旧卸载器把整个 `.ensure-ile` 停到 `$INSTDIR\..\ensure-ILE-data`，`customInstall` 再搬回（旧版本停在 `$TEMP`，安装端仍认那个位置）。**停车点必须与 `$INSTDIR` 同卷**：NSIS `Rename` 只能同盘搬目录，跨盘失败只置错误标志，卸载器随后递归删 `$INSTDIR`——`$TEMP` 在 C:、应用装 D: 的机器上就是静默丢数据。`Rename` 失败用 `robocopy /E /MOVE` 兜底（`CopyFiles` 不递归）。手动卸载仍全删。回归在 `dsh-plugin-desktop/tests/installer-nsh.spec.ts`。
 6. 补丁与 vendor 运行时是死的：`patches/` 只留被 `resolutions` 用 `patch:` 引到的（2026-10-28 删 155 个旧补丁 / 414 KB），`vendor/dsh-runtime/` 只留 `upstream.json` 那版（同日删 8 个旧树 / 160 MB）。**`scripts/sync-vendored-runtime.mjs` 的 `--write` / `--check` 只看当前版本目录**，旧版本堆积结构上看不见——清完必须跑 `corepack yarn install --immutable` 证明没断。**被 resolutions 引用 ≠ 生效**：判据是 `yarn.lock` 里有没有 `@patch:` 条目（坑·上游与文档 4）；`node scripts/verify-patch-references.mjs` 打印 29 份各自有效性；`dsh-experimental-computer-use-cua-driver-native` 「无施主」是**合法状态**（整个 computer-use 分支不在依赖图里，补丁等它回来），别当垃圾删。
 7. `materializeSeededProfile()` 在 `node_modules` 缺失时用内置 pnpm 跑 `install --offline --no-frozen-lockfile`——清掉 `.ensure-ile` 后首启自己装，也可在 `.ensure-ile/home/profiles/desktop` 手跑。
-8. **bundle 的 row id 不能和上游撞**（2026-10-30 首启硬失败）：web-app 已有 `id: schedule`，`dsh-plugin-schedule/cordis.patch.yml` 当年也 insert 同名行 → `prepareDesktopProfile` 的 `assertUniqueEntryIds`（`src/profile.ts:1194-1207`，在 `profile.ts:1488` 调用）抛 `duplicate loader entry id "schedule" in the composed profile`，应用进恢复页、任何插件没跑起来。现在叫 `ile-schedule`；**新 insert 行一律加 `ile-` 前缀**，别复用上游短名（`schedule` / `memory` / `textbook`）。回归是 `tests/ensure-ile-profile.spec.ts`：种模板进临时 home、依赖 junction 到仓库包、真跑 `prepareDesktopProfile` 断言 id 无重复。恢复页取消勾选只写 `desktopDeselectedBundles` 这个 UI 账本，合成 profile 只看 `dsh.profile.bundles`——那是绕过不是修好。
+8. **别把用不到的运行时装进 Windows 包**（2026-11-01 李定）：体积全压在 `resources/app/node_modules`（697 M → 426 M 靠这一串负向规则，判据是「有没有行挂它」而不是「看着没用」）：
+   - **非本架构**：`libreoffice-kit-win32-arm64`(174 M) / `sharp-win32-arm64`(17 M) / `ripgrep-win32-arm64` / `koffi-win32-arm64` / `node-addon-require-builtin-win32-arm64-msvc` / `node-pty/prebuilds/win32-arm64`；
+   - **一个行都挂不到**：`@deepseek-ai/dsh-experimental-inspector`(22 M)、`sherpa-onnx-{node,win-x64}`(23 M，语音链没行)、`@modelcontextprotocol/{client,core}`(22 M，只有未挂的 `dsh-acp` import 它们)、`@agentclientprotocol/sdk` + `dsh-acp`、`@mixmark-io/domino` + `turndown`（只有被关掉的 `tool-web` 用）；
+   - **`@deepseek-ai/libreoffice-kit-win32-x64`(182 M)**：只服务右栏 Office 预览（`.docx/.xlsx/.pptx` 经 `office-to-pdf` 转 PDF）。李 2026-11-01 决定删，学生做题用不到；代价是打开 Office 文档报 `Required LibreOfficeKit native package is missing`，PDF / 文本 / 代码 / 图片照旧，启动不变（本来就按需 require）。
+   - 删法只用 `build.win.files` 负向规则，**不动 dependencies**：inspector / voice / mcp-client 是壳的直接依赖，但同时被 `@deepseek-ai/dsh` 聚合包依赖，光改依赖图一个包都省不掉；而 afterPack 门禁 `verify-packaged-runtime.ts` 钉死的 pnpm / ripgrep 的 rg.exe / node-pty conpty 四件 / web-frontend / `dsh/lib/*.js` 一个都不能排。
+9. **压缩档位与包体是两件事**：`nsis.useZip: true`（2026-11-01）把 7z LZMA 换成 zip，构建 12 → 9 min，但同样内容安装包从 266 MiB 涨到 445 MiB；先裁包再选压缩才有意义。`build.win.compression` 另有 `store` / `normal` / `maximum` 三档，CI 的 smoke 构建用 `DSH_WINDOWS_PACKAGE_COMPRESSION` 覆盖（`scripts/package-win.ts`）。
+10. **bundle 的 row id 不能和上游撞**（2026-10-30 首启硬失败）：web-app 已有 `id: schedule`，`dsh-plugin-schedule/cordis.patch.yml` 当年也 insert 同名行 → `prepareDesktopProfile` 的 `assertUniqueEntryIds`（`src/profile.ts:1194-1207`，在 `profile.ts:1488` 调用）抛 `duplicate loader entry id "schedule" in the composed profile`，应用进恢复页、任何插件没跑起来。现在叫 `ile-schedule`；**新 insert 行一律加 `ile-` 前缀**，别复用上游短名（`schedule` / `memory` / `textbook`）。回归是 `tests/ensure-ile-profile.spec.ts`：种模板进临时 home、依赖 junction 到仓库包、真跑 `prepareDesktopProfile` 断言 id 无重复。恢复页取消勾选只写 `desktopDeselectedBundles` 这个 UI 账本，合成 profile 只看 `dsh.profile.bundles`——那是绕过不是修好。
 
 ### 工具链
 
@@ -245,7 +251,7 @@
 
 1. `deepseek-harness/` 禁止修改；子模块 pin 更新单独提交，别和桌面行为改动混一起。
 2. 命名规矩：`README.md` 中文 / `README.en.md` 英文 / `README.zh.md` 只是兼容跳转；`PRIVACY.md`（中文）/ `PRIVACY.en.md`（英文）同规矩，哈希记在 `*.i18n.yaml`。
-3. `.dsh/storages/memory_project_*.json`（项目记忆）**进 git**，随仓库分享；代价是每个会话都把它改脏，工作树几乎永远不干净。这是取舍不是 bug，别顺手 ignore。
+3. **项目记忆 `.dsh/storages/memory_project_*.json` 不进 git**（2026-10-31 李定，反转 10-28 的旧决定）：它是本机会话运行时写脏的账本，提交进来工作树永远不干净，还会把本机路径 / 会话细节一起分享出去。`.gitignore` 的 `.dsh/` 别删；要分享的项目知识写进 `AGENTS.md` / 包 `README.md` / `.agents/notes/`。
 4. **`resolutions` 的 patch 选择器是 `标识@描述符` 精确匹配**：写 `@earendil-works/pi-ai@npm:^1.0.2` 而依赖方声明 `npm:^1.1.0`，Yarn 就**静默忽略**（lock 里连 `patch:` 标记都没有，安装零告警）——pi-ai 的流式工具参数补丁因此从锁到 1.2.0 起一直没生效，2026-10-28 才被 grep 到。改依赖版本时 grep 一遍 `patches/` 选择器；`node scripts/verify-patch-references.mjs` 干这个（打印每份补丁有没有施主，非 0 表示有失效）。现对应 `@earendil-works/pi-ai@npm:^1.1.0` → `patches/pi-ai@1.2.0.patch`（删掉每次 delta 的 `block.arguments = parseStreamingJson(...)`，terminating 的 `toolcall_end` / `content_block_stop` 解析保留；副作用是流式过程中 `partial` 快照拿不到半成品 arguments）。
 5. **桌面壳同步不是 checkout 而是 rebase**：`upstream` remote = `anywhere-labs/dsh-desktop`，共享历史（分叉 `6a63b9730b`）。换新版 `git fetch upstream` 再 rebase / cherry-pick，冲突热点 `src/index.ts`、`cordis.patch.yml`、`build/installer.nsh`、`scripts/prepare-profile.mjs`；四层流程与失败信号表在 `docs/upstream-sync.md`。
 6. `scripts/bilingual-docs.mjs:87` 用 `git ls-files '*.i18n.yaml'` 枚举——**没 `git add` 的 i18n 文件对双语门完全不可见**，`docs:record` 与 `check:bilingual-docs` 会绿着放行。新增成对文档先 `git add` 再跑门。

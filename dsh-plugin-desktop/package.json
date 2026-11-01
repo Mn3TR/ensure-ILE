@@ -445,6 +445,24 @@
     "win": {
       "asar": false,
       "compression": "normal",
+      "files": [
+        "!node_modules/@deepseek-ai/libreoffice-kit-win32-arm64{,/**}",
+        "!node_modules/@deepseek-ai/libreoffice-kit-win32-x64{,/**}",
+        "!node_modules/@img/sharp-win32-arm64{,/**}",
+        "!node_modules/@vscode/ripgrep-win32-arm64{,/**}",
+        "!node_modules/@koromix/koffi-win32-arm64{,/**}",
+        "!node_modules/node-addon-require-builtin-win32-arm64-msvc{,/**}",
+        "!node_modules/node-pty/prebuilds/win32-arm64{,/**}",
+        "!node_modules/@deepseek-ai/dsh-acp{,/**}",
+        "!node_modules/@deepseek-ai/dsh-experimental-inspector{,/**}",
+        "!node_modules/@agentclientprotocol/sdk{,/**}",
+        "!node_modules/@mixmark-io/domino{,/**}",
+        "!node_modules/@modelcontextprotocol/client{,/**}",
+        "!node_modules/@modelcontextprotocol/core{,/**}",
+        "!node_modules/sherpa-onnx-node{,/**}",
+        "!node_modules/sherpa-onnx-win-x64{,/**}",
+        "!node_modules/turndown{,/**}"
+      ],
       "extraResources": [
         {
           "from": ".desktop-build/runtime",
@@ -475,7 +493,7 @@
       "differentialPackage": false,
       "shortcutName": "ensure-ILE",
       "uninstallerIcon": "build/app-icon.ico",
-      "useZip": false,
+      "useZip": true,
       "artifactName": "ensure-ILE-${version}-${arch}-Setup.${ext}"
     },
     "linux": {
