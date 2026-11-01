@@ -1,8 +1,12 @@
+<div align="center">
+
 # ensure-ILE
 
-基于[Deepseek Harness Desktop](https://github.com/anywhere-labs/dsh-desktop)的学习辅助软件  
-  
+基于[Deepseek Harness Desktop](https://github.com/anywhere-labs/dsh-desktop)的学习辅助软件
+
 ![软件图标](./assets/LOGO.png)
+
+</div>
 
 学生发题，模型只引导：
 
@@ -45,11 +49,9 @@ corepack yarn check:plugins                          # 九个插件包
 corepack yarn workspace dsh-plugin-desktop test:ui   # 端到端 UI
 ```
 
-bilingual 哈希过期用`yarn docs:record`重算
-
 ## Plan
 
-当前版本：0.1.0-alpha1
+当前版本：0.1.0-alpha2
 
 - [ ] 开始人工介入本项目，缩减vibe比例
 - [ ] 压缩引擎（长会话撞窗口会硬失败）、权限审批交互、native 四窗换 token 后没逐屏核、交接卡片、图片链路、独立 Evaluator

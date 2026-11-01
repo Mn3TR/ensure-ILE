@@ -1,5 +1,0 @@
-# Bilingual-pair consistency record: the git blob hash of each side as of the last
-# confirmed-consistent state. Both languages carry equal authority. Update both files
-# and re-record their hashes with git hash-object after editing either side.
-upstream-sync.md: d0768cc6439b8f9e11745ecf0a0b3aa51cbd5233
-upstream-sync.en.md: d696b5a88891befc4b7a1af91c71e8a4d1f0698a

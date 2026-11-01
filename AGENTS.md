@@ -28,7 +28,7 @@
 | `patches/` | 上游 npm 包补丁 29 份，被根 `resolutions` 引用（1 份暂无施主） | 改上游行为 / 升 pin 重打 |
 | `vendor/` | `dsh-runtime/<version>/` 上游运行时 tarball 树（只留 `upstream.json` 那版）+ `dsh-claude-style/` 皮肤源码 | 换 pin / 改皮肤 |
 | `upstream.json` | 上游 pin 唯一记录：`commit` / `sourceVersion` / `runtimePackageVersion` / `runtimeSource` | 换 pin |
-| `scripts/` | 根级门禁（bilingual、layout、icons、vendored runtime、run-parallel） | 改门禁 |
+| `scripts/` | 根级门禁（layout、icons、vendored runtime、run-parallel） | 改门禁 |
 | `docs/` | 产品文档；`research/` `design/` `screenshots/` `evidence/` | 写面向人的文档 |
 | `docs/upstream-sync.md` | 四层身份、29 补丁清单、四类同步流程、失败信号表——同步前必读 | 换 pin |
 | `.agents/notes/` | 日期化决策记录（`implemented/` `proposed/`） | 追溯取舍 |
@@ -148,7 +148,7 @@
 - 全量 `corepack yarn check` `EXIT=0`（2026-10-29 复跑）：138 测试文件 / 1781 用例，1753 通过 / 28 跳过（21 原有 skip + 7 Linux 打包门在 Windows 整组 skip），149 s。= `check:layout` + community-fabric + 桌面包，**不含插件包单测**。
 - `corepack yarn check:plugins` `EXIT=0`（2026-10-30）：coreset 11 / setup 11 / bankmanager 45 / memory 189 / textbook 37 / schedule 40 = 333 全过；teaching-commons 与 guide / work / hrl 只 typecheck（无单测，`lib/` 要手跑 `yarn workspace <包> build`）。
 - `test:ui` 4 spec / 18 用例全绿，约 2 min。
-- `check:layout`：icons 源与全平台资源一致 / vendored runtime 343 packages @687f282e86 / verify-layout 与上游 687f282e86 一致 / bilingual 44 记录 88 文档；`verify:licenses` 584 production packages；`install --immutable` exit 0。
+- `check:layout`：icons 源与全平台资源一致 / vendored runtime 343 packages @687f282e86 / verify-layout 与上游 687f282e86 一致；`verify:licenses` 584 production packages；`install --immutable` exit 0。（2026-11-01 双语门已拆，见坑·工具链 5）
 - `node scripts/verify-patch-references.mjs`：29 补丁、28 有效、1 无施主（`dsh-experimental-computer-use-cua-driver-native`，坑·profile 与打包 6）。pi-ai 那份 2026-10-28 已对准 1.2.0 并在 lock 里生效。
 - `dist:win` 2026-11-01 重打 `0.1.0-alpha1`（裁包之后，`compression: normal`）：构建 **550 s（9.2 min）**，产物 `dsh-plugin-desktop/dist/ensure-ILE-0.1.0-alpha1-x64-Setup.exe` **172 132 861 B ≈ 164 MiB**，`win-unpacked` 682 M，`resources/app` 208 M（其中 `node_modules` 188 M）；包内 `profiles/ensure-ile/vendor` 10 个本地包齐全，离线 `pnpm install` 能装出 10 个包，coreset 解析到 `lib/index.js`，产物无裸 `zod` import。**同日真机装通**（`D:\Apps\ensure-ILE`，716 M，品牌图与数据根就位，日志 `startup.run.completed` / `rendererStatus: healthy`）。开发迭代用 `dist:win:store`（215 s / 655 MiB），发布只用 `dist:win`。
 
@@ -221,7 +221,7 @@
 2. `dsh-plugin-desktop/dist/` 会堆到 1.5G（Setup 262MB + `win-unpacked` 1.2G）；腾地方先删 `win-unpacked`（可重建）。
 3. **根 `node_modules` 没有 `.bin`**：包内别写 `../node_modules/.bin/vitest`，一律 `corepack yarn workspace <pkg> typecheck|test|build`。`build:client` 需要包里有 `vite`（bankmanager devDependencies 8.2.1，同桌面包版本）。
 4. **根 `corepack yarn check` 不跑插件包单测**（根 `test` 只有 `yarn workspace dsh-plugin-desktop test`）——改插件必须自己跑。`corepack yarn check:plugins` 是补的那道（9 包 typecheck + setup/bankmanager/memory/textbook/schedule 单测，串行约 100 s），**故意不接进 `check`**：接进去全量门从 346 s 涨到约 445 s，且 memory 189 用例在并行负载下会撞 5 s 超时（独占跑 23.5 s 全过）——那种红是调度抖动不是缺陷。
-5. bilingual 哈希过期不用手改：`yarn docs:record` 重算全部记录、只改过期行；`verify-bilingual-docs` 失败时也会提示。
+5. **双语门 2026-11-01 拆了**（李定：删 `README.en.md` / `PRIVACY.*` / `CONTRIBUTING.*` / `CODE_OF_CONDUCT.*` 那批上游模板的同时）：`scripts/bilingual-docs.mjs` / `verify-bilingual-docs.mjs` / `record-bilingual-docs.mjs` / 同名 test 与 44 份 `*.i18n.yaml` 全删，`check:layout` 只剩 inspector-compat、icons、vendored runtime、verify-layout 四路；`docs:record` / `check:bilingual-docs` / `test:bilingual-docs` 三个脚本一并没了——别再 `yarn docs:record`。改完成对文档以前要重算哈希，现在不用管。
 6. 26 个 Windows 基线单测的教训（已修，别改回去）：POSIX 字面量 `file:///tmp/...` 在 Windows 上 `fileURLToPath` 直接抛 `File URL path must be absolute`，而 `filePath()` 吞异常返回 `undefined` → Profile 边界识别全失效，fixture 要用 `pathToFileURL(join(tmpdir(), ...))`；PATH 用例不能拿 `D:` 喂按 `:` 切分的 PATH；`windowsNodeShim` 要用 `for %%I in ("%~dp0..") do set "X=%%~fI"` 规范化，否则留下未规范化的 `bin\..`。
 7. `scripts/verify-cli-runtime.mjs` 期望 `runAsNode: []` 是**断言写错了**：Windows 私有 node shim 是批处理，子进程丢掉 `ELECTRON_RUN_AS_NODE` 就会起 GUI 而不是 Node，保留是有意设计。
 8. CI 2026-10-25 剪到 Windows：只留 `changes`、`check`、`desktop-windows`、`upstream-command-windows`；macOS/Linux 打包整段删（学生只装 Windows）。2026-10-31 加 `release-windows.yml`：推 `v*` tag 才出 Release，tag 与 `package.json` 版本不一致直接失败。
@@ -251,9 +251,9 @@
 ### 上游与文档
 
 1. `deepseek-harness/` 禁止修改；子模块 pin 更新单独提交，别和桌面行为改动混一起。
-2. 命名规矩：`README.md` 中文 / `README.en.md` 英文（根目录的 `README.zh.md` 兼容页 2026-11-01 已删，别再加回来）；`PRIVACY.md`（中文）/ `PRIVACY.en.md`（英文）同规矩，哈希记在 `*.i18n.yaml`。
+2. 命名规矩：**文档单语中文**（2026-11-01 起）。`README.en.md` / `PRIVACY.*` / `CONTRIBUTING.*` / `CODE_OF_CONDUCT.*` 连同 `*.i18n.yaml` 一并删了，根目录只留 `README.md` / `AGENTS.md` / `CLAUDE.md` / `LICENSE`；`README.zh.md` 兼容页更早（同日）已删。别再新增英文对照页——没有门禁会提醒你它们对不上了。
 3. **项目记忆 `.dsh/storages/memory_project_*.json` 不进 git**（2026-10-31 李定，反转 10-28 的旧决定）：它是本机会话运行时写脏的账本，提交进来工作树永远不干净，还会把本机路径 / 会话细节一起分享出去。`.gitignore` 的 `.dsh/` 别删；要分享的项目知识写进 `AGENTS.md` / 包 `README.md` / `.agents/notes/`。
 4. **`resolutions` 的 patch 选择器是 `标识@描述符` 精确匹配**：写 `@earendil-works/pi-ai@npm:^1.0.2` 而依赖方声明 `npm:^1.1.0`，Yarn 就**静默忽略**（lock 里连 `patch:` 标记都没有，安装零告警）——pi-ai 的流式工具参数补丁因此从锁到 1.2.0 起一直没生效，2026-10-28 才被 grep 到。改依赖版本时 grep 一遍 `patches/` 选择器；`node scripts/verify-patch-references.mjs` 干这个（打印每份补丁有没有施主，非 0 表示有失效）。现对应 `@earendil-works/pi-ai@npm:^1.1.0` → `patches/pi-ai@1.2.0.patch`（删掉每次 delta 的 `block.arguments = parseStreamingJson(...)`，terminating 的 `toolcall_end` / `content_block_stop` 解析保留；副作用是流式过程中 `partial` 快照拿不到半成品 arguments）。
 5. **桌面壳同步不是 checkout 而是 rebase**：`upstream` remote = `anywhere-labs/dsh-desktop`，共享历史（分叉 `6a63b9730b`）。换新版 `git fetch upstream` 再 rebase / cherry-pick，冲突热点 `src/index.ts`、`cordis.patch.yml`、`build/installer.nsh`、`scripts/prepare-profile.mjs`；四层流程与失败信号表在 `docs/upstream-sync.md`。
-6. `scripts/bilingual-docs.mjs:87` 用 `git ls-files '*.i18n.yaml'` 枚举——**没 `git add` 的 i18n 文件对双语门完全不可见**，`docs:record` 与 `check:bilingual-docs` 会绿着放行。新增成对文档先 `git add` 再跑门。
+6. 双语门为什么拆：它是上游模板带过来的（`git ls-files '*.i18n.yaml'` 枚举 + blob 哈希对账），可我们只有中文一种读者，维护成本全落在「改了中文忘了重算哈希 → 门红」上。李 2026-11-01 决定删，理由同「账号 / 多租户」——不服务唯一的学生。
 7. 「以代码为第一信源」的反面教材：文档写过「插件市场由内置 dshmarket bundle 提供」「Channels 是独立 roadmap」，代码里都不存在，2026-10-28 全文清掉——别再写回去。**但别把官方 custom-market 一起删**：`src/desktop-market.ts`、`src/desktop-settings-route.ts`、`src/desktop-settings-contract.ts`、`src/safe-mode.ts`、`src/profile-preferences.ts`、`src/factory-reset.ts` 互相引用，HTTP 路由在 `src/index.ts:233/237` 注册，客户端 `src/client/api.ts:368` → `DesktopSettingsSection.tsx:473/684` 都通；`src/client/market-toggle.ts` 只被 `plugin-controls.tsx` 引用、由 `src/client/index.ts:141` 静态注册进 vite 单入口（`vite.client.config.ts:37`），产物里真实可达。死的只是**第三方 dshmarket 残渣**，已清（`vitest.config.ts` 的 inline、桌面 `package.json` 的 `dsh.optionalBundles`、`release-mac.ts:104` 对已删脚本 `prepare-dsh-market.mjs` 的死调用）。
