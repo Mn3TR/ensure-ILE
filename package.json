@@ -766,6 +766,7 @@
     "dist:mac": "yarn workspace dsh-plugin-desktop dist:mac",
     "dist:mac-smoke": "yarn workspace dsh-plugin-desktop dist:mac-smoke",
     "dist:win": "yarn workspace dsh-plugin-desktop dist:win",
+    "dist:win:store": "yarn workspace dsh-plugin-desktop dist:win:store",
     "dist:linux": "yarn workspace dsh-plugin-desktop dist:linux",
     "dist:win-portable": "yarn workspace dsh-plugin-desktop dist:win-portable",
     "upstream:version": "cd deepseek-harness && corepack pnpm --version",

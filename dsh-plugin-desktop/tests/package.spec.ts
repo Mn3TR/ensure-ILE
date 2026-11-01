@@ -893,7 +893,9 @@ describe('published package surface', () => {
       differentialPackage: false,
       shortcutName: 'ensure-ILE',
       uninstallerIcon: 'build/app-icon.ico',
-      useZip: true,
+      // 2026-11-01 撤掉 useZip: nsisunz::Unzip 在真机解 13823 个文件时报
+      // "Failed to decompress files"，装不上；回到 Nsis7z::Extract（构建慢 5 min，
+      // 但 2.0.18 一直是这条路）。别为了构建速度改回去，先验真机安装。
       artifactName: 'ensure-ILE-${version}-${arch}-Setup.${ext}',
     })
     expect(manifest.build?.linux?.icon).toBe('build/icons')

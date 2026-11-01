@@ -141,6 +141,7 @@
     "dist:mac": "node scripts/release-mac.ts",
     "dist:mac-smoke": "node scripts/package-mac.ts",
     "dist:win": "node scripts/package-win.ts",
+    "dist:win:store": "node scripts/package-win-store.mjs",
     "dist:win-portable": "node scripts/package-win-portable.ts",
     "dist:linux": "node scripts/package-linux.ts",
     "prepack": "yarn run check",
@@ -495,7 +496,6 @@
       "differentialPackage": false,
       "shortcutName": "ensure-ILE",
       "uninstallerIcon": "build/app-icon.ico",
-      "useZip": true,
       "artifactName": "ensure-ILE-${version}-${arch}-Setup.${ext}"
     },
     "linux": {
