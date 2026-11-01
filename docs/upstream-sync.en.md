@@ -38,7 +38,7 @@ Root `package.json:23-720` holds **697 `resolutions` entries**: **52 of them are
 
 `git remote -v` reports `origin` = `https://github.com/Mn3TR/ensure-ILE.git` and `upstream` = `https://github.com/anywhere-labs/dsh-desktop.git` — so "upstream desktop shipped a release" means **porting, not checking out**. The facts:
 
-- `dsh-plugin-desktop/package.json` names the package `dsh-plugin-desktop`, version `0.1.0-alpha1` (α line since 2026-10-31, decoupled from upstream 2.0.18); local tags are `v2.0.18`, `v2.0.18-beta.1`, `v2.0.19-next`, `v0.1.0-alpha1`.
+- `dsh-plugin-desktop/package.json` names the package `dsh-plugin-desktop`, version `0.1.0-alpha2` (α line since 2026-10-31, decoupled from upstream 2.0.18); local tags are `v2.0.18`, `v2.0.18-beta.1`, `v2.0.19-next`, `v0.1.0-alpha1`.
 - We **share history** with upstream (the fork root `b67e81ac97` is an ancestor of `upstream/master`); this is not a squashed copy. The divergence point is `6a63b9730b` (2026-10-18, `fix(desktop): support AA Schemastery 3.18.5 builds (#1417)`).
 - Against `upstream/master` (`092e2ecef7`, 2026-10-24) we are **33 commits behind and 60 ahead**. The `dsh-plugin-desktop/` tree alone has 732 commits of history.
 - `THIRD_PARTY_NOTICES.md` is a generated inventory of the installed artifacts (`@deepseek-ai/*` all at `0.2.1-rc.2`); it says nothing about upstream licensing and is not a sync input.
