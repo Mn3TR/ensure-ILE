@@ -845,21 +845,6 @@ describe('published package surface', () => {
       'profiles/**',
       '!node_modules/node-pty/build/**',
       '!node_modules/fs-ext/build/**',
-    ])
-    expect(manifest.build?.mac?.icon).toBe('build/app-icon.icon')
-    expect(manifest.build?.dmg?.icon).toBe('build/app-icon.icns')
-    expect(manifest.build?.mac?.mergeASARs).toBe(false)
-    expect(manifest.build?.mac?.signIgnore).toEqual(['\\.(?:pak|dat|wasm)$', '/Contents/Resources/runtime/(?:arm64|x64)/primary-runtime(?:/|$)'])
-    expect(manifest.build?.win?.icon).toBe('build/app-icon.ico')
-    expect(manifest.build?.win?.target).toEqual([{
-      target: 'nsis',
-      arch: ['x64'],
-    }])
-    expect(manifest.build?.win?.artifactName).toBe('ensure-ILE-${version}-${arch}-Portable.${ext}')
-    // An x64 installer must not carry the arm64 build of a native payload: the
-    // bundled binaries are dead weight there (libreoffice-kit alone is 174 MB)
-    // and they are copied and compressed into every artifact.
-    expect(manifest.build?.win?.files).toEqual([
       '!node_modules/@deepseek-ai/libreoffice-kit-win32-arm64{,/**}',
       '!node_modules/@deepseek-ai/libreoffice-kit-win32-x64{,/**}',
       '!node_modules/@img/sharp-win32-arm64{,/**}',
@@ -876,7 +861,25 @@ describe('published package surface', () => {
       '!node_modules/sherpa-onnx-node{,/**}',
       '!node_modules/sherpa-onnx-win-x64{,/**}',
       '!node_modules/turndown{,/**}',
+      '!node_modules/**/*.map',
+      '!node_modules/**/*.d.ts',
+      '!node_modules/**/*.d.mts',
+      '!node_modules/**/*.d.cts',
     ])
+    expect(manifest.build?.mac?.icon).toBe('build/app-icon.icon')
+    expect(manifest.build?.dmg?.icon).toBe('build/app-icon.icns')
+    expect(manifest.build?.mac?.mergeASARs).toBe(false)
+    expect(manifest.build?.mac?.signIgnore).toEqual(['\\.(?:pak|dat|wasm)$', '/Contents/Resources/runtime/(?:arm64|x64)/primary-runtime(?:/|$)'])
+    expect(manifest.build?.win?.icon).toBe('build/app-icon.ico')
+    expect(manifest.build?.win?.target).toEqual([{
+      target: 'nsis',
+      arch: ['x64'],
+    }])
+    expect(manifest.build?.win?.artifactName).toBe('ensure-ILE-${version}-${arch}-Portable.${ext}')
+    // Every exclusion lives in `build.files`: a platform-specific `win.files`
+    // list REPLACES the common one (measured 2026-11-01: the artifact shipped
+    // src/ tests/ docs/ and .desktop-build, +190 MB). Keep it undefined.
+    expect(manifest.build?.win?.files).toBeUndefined()
     expect(manifest.build?.nsis).toEqual({
       include: 'installer.nsh',
       installerIcon: 'build/app-icon.ico',
