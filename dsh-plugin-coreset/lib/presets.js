@@ -1,10 +1,11 @@
 import { Service } from "@deepseek-ai/cordis";
 //#region src/presets.ts
 /**
-* The two presets a learner picks from. Both mount the core; they differ in
-* which personas are installed inside them, which is exactly what makes an
-* in-session switch possible — every persona of a preset is already loaded, so
-* switching only swaps the mode the core reads.
+* The two presets a learner picks from. Both mount the core and all four
+* personas, so both can switch modes in-session; they differ only in which mode
+* the session starts in. That is what makes an in-session switch possible —
+* every persona of a preset is already loaded, so switching only swaps the mode
+* the core reads.
 *
 * The 开学 preset is not here: dsh-plugin-setup registers it itself, and only
 * while onboarding is unfinished.
@@ -37,6 +38,30 @@ function ileRealm(rows) {
 		config: rows
 	}];
 }
+/**
+* The model's clock, mounted in every preset.
+*
+* A learner session has no shell: the tool surface is deliberately narrow, and
+* handing the model `bash` just to read the wall clock would give an unreviewed
+* command runner to a workspace-write session (we mount no approval UI), and
+* `toolUpdate: 'addition-only'` would make that permanent for every mode in
+* the preset. The upstream plugin instead appends one sourced user message per
+* qualifying step (timestamp + browser zone + elapsed), append-only after the
+* reusable prefix, so the KV cache stays valid (dsh-time-context README.zh.md).
+* 60 s: a tutoring exchange usually spans minutes, so each fresh opening gets a
+* reading without one appearing between two quick follow-ups.
+*
+* The id needs the `ile-` prefix: upstream rows keep their own short ids, and a
+* collision aborts the whole composed profile (assertUniqueEntryIds).
+*/
+const TIME_CONTEXT_ROW = {
+	id: "ile-time-context",
+	name: "@deepseek-ai/dsh-time-context",
+	config: {
+		timeZone: "Asia/Shanghai",
+		refreshIntervalMs: 6e4
+	}
+};
 /** 做题: the three study personas behind one switch. */
 const WORK_PRESET = {
 	id: "work",
@@ -60,20 +85,47 @@ const WORK_PRESET = {
 		{
 			id: "hrl",
 			name: "dsh-plugin-hrl"
-		}
+		},
+		TIME_CONTEXT_ROW
 	])
 };
-/** 聊天: no study persona at all; the way in and the way out of a session. */
+/**
+* 聊天: the way in and the way out of a session — it just starts in 聊天.
+*
+* The three study personas are mounted here too, and that is deliberate: the
+* chat persona tells the model to hand over through
+* `context_switch({ to: 'work' })` the moment the learner wants to work on a
+* problem (prompts/chat.md). `modes` is per preset, so leaving the personas out
+* made that call fail every time with "没有「work」这个模式" — measured
+* 2026-11-01 on a real session. Personas only register text (no tools), so
+* mounting them costs a prompt line and nothing else; the two presets now
+* differ in the mode they start in, not in what they can switch to.
+*/
 const CHAT_PRESET = {
 	id: "chat",
 	name: "Chat",
 	description: "先随便说说话，想做题了再切 Work",
 	order: 60,
-	plugins: ileRealm([{
-		id: "coreset",
-		name: "dsh-plugin-coreset",
-		config: { mode: "chat" }
-	}])
+	plugins: ileRealm([
+		{
+			id: "coreset",
+			name: "dsh-plugin-coreset",
+			config: { mode: "chat" }
+		},
+		{
+			id: "guide",
+			name: "dsh-plugin-guide"
+		},
+		{
+			id: "work",
+			name: "dsh-plugin-work"
+		},
+		{
+			id: "hrl",
+			name: "dsh-plugin-hrl"
+		},
+		TIME_CONTEXT_ROW
+	])
 };
 /**
 * Registers both presets at the profile root. Registration is awaited in

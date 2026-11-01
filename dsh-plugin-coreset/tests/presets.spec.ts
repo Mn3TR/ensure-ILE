@@ -27,14 +27,21 @@ describe('presets', () => {
       'dsh-plugin-guide',
       'dsh-plugin-work',
       'dsh-plugin-hrl',
+      '@deepseek-ai/dsh-time-context',
     ])
     expect(rows(top(WORK_PRESET))[0].config).toEqual({ mode: 'guide' })
   })
 
-  it('starts 聊天 with the core alone', () => {
+  it('starts 聊天 and can still switch into the study modes', () => {
     expect(CHAT_PRESET.id).toBe('chat')
     expect(CHAT_PRESET.name).toBe('Chat')
-    expect(names(CHAT_PRESET)).toEqual(['dsh-plugin-coreset'])
+    expect(names(CHAT_PRESET)).toEqual([
+      'dsh-plugin-coreset',
+      'dsh-plugin-guide',
+      'dsh-plugin-work',
+      'dsh-plugin-hrl',
+      '@deepseek-ai/dsh-time-context',
+    ])
     expect(rows(top(CHAT_PRESET))[0].config).toEqual({ mode: 'chat' })
   })
 
