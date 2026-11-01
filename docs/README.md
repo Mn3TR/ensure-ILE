@@ -71,7 +71,6 @@
 
 - [`README.md`](../README.md)：中文产品入口。
 - [`README.en.md`](../README.en.md)：英文产品入口，与中文 README 保持同一产品范围。
-- [`README.zh.md`](../README.zh.md)：旧中文路径的兼容页，只有几行跳转，不维护独立内容。
 
 `README.i18n.yaml` 只记录这两个正式入口的双语 hash，不是用户指南。隐私政策遵循同一套命名约定：[`PRIVACY.md`](../PRIVACY.md) 是中文正文，[`PRIVACY.en.md`](../PRIVACY.en.md) 是英文正文，`PRIVACY.i18n.yaml` 记录这两份的 hash。
 

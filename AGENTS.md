@@ -250,7 +250,7 @@
 ### 上游与文档
 
 1. `deepseek-harness/` 禁止修改；子模块 pin 更新单独提交，别和桌面行为改动混一起。
-2. 命名规矩：`README.md` 中文 / `README.en.md` 英文 / `README.zh.md` 只是兼容跳转；`PRIVACY.md`（中文）/ `PRIVACY.en.md`（英文）同规矩，哈希记在 `*.i18n.yaml`。
+2. 命名规矩：`README.md` 中文 / `README.en.md` 英文（根目录的 `README.zh.md` 兼容页 2026-11-01 已删，别再加回来）；`PRIVACY.md`（中文）/ `PRIVACY.en.md`（英文）同规矩，哈希记在 `*.i18n.yaml`。
 3. **项目记忆 `.dsh/storages/memory_project_*.json` 不进 git**（2026-10-31 李定，反转 10-28 的旧决定）：它是本机会话运行时写脏的账本，提交进来工作树永远不干净，还会把本机路径 / 会话细节一起分享出去。`.gitignore` 的 `.dsh/` 别删；要分享的项目知识写进 `AGENTS.md` / 包 `README.md` / `.agents/notes/`。
 4. **`resolutions` 的 patch 选择器是 `标识@描述符` 精确匹配**：写 `@earendil-works/pi-ai@npm:^1.0.2` 而依赖方声明 `npm:^1.1.0`，Yarn 就**静默忽略**（lock 里连 `patch:` 标记都没有，安装零告警）——pi-ai 的流式工具参数补丁因此从锁到 1.2.0 起一直没生效，2026-10-28 才被 grep 到。改依赖版本时 grep 一遍 `patches/` 选择器；`node scripts/verify-patch-references.mjs` 干这个（打印每份补丁有没有施主，非 0 表示有失效）。现对应 `@earendil-works/pi-ai@npm:^1.1.0` → `patches/pi-ai@1.2.0.patch`（删掉每次 delta 的 `block.arguments = parseStreamingJson(...)`，terminating 的 `toolcall_end` / `content_block_stop` 解析保留；副作用是流式过程中 `partial` 快照拿不到半成品 arguments）。
 5. **桌面壳同步不是 checkout 而是 rebase**：`upstream` remote = `anywhere-labs/dsh-desktop`，共享历史（分叉 `6a63b9730b`）。换新版 `git fetch upstream` 再 rebase / cherry-pick，冲突热点 `src/index.ts`、`cordis.patch.yml`、`build/installer.nsh`、`scripts/prepare-profile.mjs`；四层流程与失败信号表在 `docs/upstream-sync.md`。

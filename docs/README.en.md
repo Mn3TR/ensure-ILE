@@ -71,7 +71,6 @@ The outer repository has two formal product READMEs plus one legacy compatibilit
 
 - [`README.md`](../README.md): the Chinese product entry point.
 - [`README.en.md`](../README.en.md): the English product entry point with the same product scope.
-- [`README.zh.md`](../README.zh.md): a legacy Chinese-path compatibility page with a few redirect lines and no independent content.
 
 `README.i18n.yaml` records the bilingual blob hashes for those two formal entry points; it is not a user guide. The privacy policy follows the same naming convention: [`PRIVACY.md`](../PRIVACY.md) is the Chinese text, [`PRIVACY.en.md`](../PRIVACY.en.md) is the English text, and `PRIVACY.i18n.yaml` records their hashes.
 
