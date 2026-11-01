@@ -70,12 +70,17 @@ Var pid
   dsh_installer_app_stopped:
 !macroend
 
-; ensure-ILE keeps learner data ($INSTDIR\.ensure-ile: problem bank, memory,
-; student profile) inside the application directory. Every overwrite install
-; first runs the previously installed uninstaller, which removes $INSTDIR
-; recursively. Park the data beside $INSTDIR while the marker file exists and
-; restore it from customInstall. A plain uninstall carries no marker, so it still
-; clears everything, exactly as before.
+; Releases up to 0.1.0-alpha2 kept learner data ($INSTDIR\.ensure-ile: problem
+; bank, memory, student profile) inside the application directory. Every
+; overwrite install first runs the previously installed uninstaller, which
+; removes $INSTDIR recursively, so those releases park the data beside $INSTDIR
+; while the marker file exists and restore it from customInstall. A plain
+; uninstall carries no marker, so it still clears everything, exactly as before.
+;
+; 0.1.0-alpha3 moved the data root to %LOCALAPPDATA%\ensure-ILE-data, which no
+; uninstaller can reach. The parking below stays for one release: it is what
+; carries an alpha2 installation's data across this very upgrade, before the new
+; build copies it out of $INSTDIR on its first launch.
 ;
 ; The parking spot must stay on one volume: NSIS Rename moves a directory only
 ; within the same drive, and a refused move just sets the error flag. Parking in

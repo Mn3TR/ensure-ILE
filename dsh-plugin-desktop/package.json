@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-desktop",
-  "version": "0.1.0-alpha2",
+  "version": "0.1.0-alpha3",
   "description": "ensure-ILE: an Electron shell composed as a DeepSeek Harness Cordis plugin",
   "desktopName": "dsh-desktop.desktop",
   "license": "MIT",

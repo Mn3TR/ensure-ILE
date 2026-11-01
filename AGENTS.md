@@ -12,7 +12,7 @@
 
 | 路径 | 是什么 | 何时读 |
 | --- | --- | --- |
-| `dsh-plugin-desktop/` | 上游桌面壳 fork（现 `0.1.0-alpha2`）+ 我们的改动（数据根、OOBE 裁剪、预设、皮肤、打包） | 改外壳 / 窗口 / 设置 / 打包 |
+| `dsh-plugin-desktop/` | 上游桌面壳 fork（现 `0.1.0-alpha3`）+ 我们的改动（数据根、OOBE 裁剪、预设、皮肤、打包） | 改外壳 / 窗口 / 设置 / 打包 |
 | `dsh-plugin-teaching-commons/` | 各模式共用教学文字：安全边界、说话方式、题库规则 + `skills/` 学科备注 + `readNote` | 改「怎么说话」 |
 | `dsh-plugin-coreset/` | **会话的核**：唯一 `complete` 提示段、`ctx.ileModes`、`read_note`、`context_switch` + 历史折叠；预设 `work` / `chat` 也在这 | 改共享行为 / 加模式 / 改预设 |
 | `dsh-plugin-setup/` | 开学**人格** + `setup_read` / `setup_update` + 条件注册 `setup` 预设 | 改开学问话 |
@@ -42,9 +42,9 @@
 - 全量门 `corepack yarn check`（**不含插件包单测**）。端到端 UI `corepack yarn workspace dsh-plugin-desktop test:ui`（Playwright 驱动真 Electron，约 2 min）。插件包整批 `corepack yarn check:plugins`（坑·工具链 4）。桌面壳 `corepack yarn workspace dsh-plugin-desktop typecheck|test`。单包 `corepack yarn workspace <pkg> typecheck|test|build`。
 - 数据隔离：`run()` 把 `DSH_HOME` / `ENSURE_ILE_HOME` / `DSH_AGENTS_HOME` / `userData` 全放 `.ensure-ile/`。
 - **`seedProfile()` 只在文件不存在时复制**：改完 `profiles/ensure-ile/` 要删 `.ensure-ile/home/profiles/desktop` 再启动，然后手跑 `pnpm install --offline`（校验用 `COREPACK_ENABLE_PROJECT_SPEC=0 corepack pnpm install --offline --no-frozen-lockfile`；直接 `corepack pnpm` 会被根 `packageManager` 挡）。
-- 会话工作区也在数据根：`workspace-controller` 的 `documentsDirectory` patch 成 `!!js dshHomePath('..')`，落 `.ensure-ile/deepseek-harness/default-workspace`（上游叶子目录名写死，短不了）。
-- 打包：`corepack yarn dist:win` → `dsh-plugin-desktop/dist/`；**打包后数据根 = `dirname(ensure-ILE.exe)\.ensure-ile`**。
-- 版本：`dsh-plugin-desktop/package.json` 的 `version` 是唯一来源，当前 `0.1.0-alpha2`（α 线，与上游 2.0.18 脱钩）。**每笔加功能 / 修 bug 的提交都递增这个号**（李 2026-11-01 定），顺带同步 `dsh-plugin-desktop/tests/package.spec.ts:812` 的断言——不同步单测直接红。
+- 会话工作区也在数据根：`workspace-controller` 的 `documentsDirectory` patch 成 `!!js dshHomePath('..')`，落 `<数据根>/deepseek-harness/default-workspace`（上游叶子目录名写死，短不了）。
+- 打包：`corepack yarn dist:win` → `dsh-plugin-desktop/dist/`；**打包后数据根 = `%LOCALAPPDATA%\ensure-ILE-data`**（2026-11-01 起；开发跑仍是仓库根的 `.ensure-ile`，`ENSURE_ILE_DATA_ROOT` 优先级最高）。
+- 版本：`dsh-plugin-desktop/package.json` 的 `version` 是唯一来源，当前 `0.1.0-alpha3`（α 线，与上游 2.0.18 脱钩）。**每笔加功能 / 修 bug 的提交都递增这个号**（李 2026-11-01 定），顺带同步 `dsh-plugin-desktop/tests/package.spec.ts:812` 的断言——不同步单测直接红。
 
 ## 上游是谁、我们在哪一层改它（2026-10-29）
 
@@ -58,7 +58,7 @@
 
 ## 数据落在哪
 
-`<DSH_HOME>` = 数据根的 `home`（打包后 `<安装目录>\.ensure-ile\home`）。
+`<DSH_HOME>` = 数据根的 `home`（打包后 `%LOCALAPPDATA%\ensure-ILE-data\home`，开发跑是仓库根 `.ensure-ile\home`）。
 
 | 数据 | 路径 | 写 | 读 |
 | --- | --- | --- | --- |
@@ -203,7 +203,7 @@
 2. 模板路径是**仓库根**的 `profiles/ensure-ile/`，不是 `dsh-plugin-desktop/profiles/`（后者是 `scripts/prepare-profile.mjs` 在 `build` 开头镜像出来的，gitignore）。
 3. **不能用 `build.extraResources`**（上游 `tests/package.spec.ts` 禁止顶层 extraResources）；用 `build.files` 加 `profiles/**`，`seedProfile()` 打包时读 `app.getAppPath()/profiles/ensure-ile`、开发时读仓库根。
 4. 九个本地包（含 teaching-commons——它在 `dependencies` 但不在 `bundles`）必须 **vendor 进 `profiles/ensure-ile/vendor/`**，并把包内 `package.json` 依赖改写成 `file:./vendor/*`——原 `file:../../../../` 指到安装目录外，首启 install 必失败。仓库模板不动，开发仍链源码。
-5. **覆盖安装会删数据根**：`build/installer.nsh` 用 `$TEMP\ensure-ILE-upgrade.flag` 标记安装，旧卸载器把整个 `.ensure-ile` 停到 `$INSTDIR\..\ensure-ILE-data`，`customInstall` 再搬回（旧版本停在 `$TEMP`，安装端仍认那个位置）。**停车点必须与 `$INSTDIR` 同卷**：NSIS `Rename` 只能同盘搬目录，跨盘失败只置错误标志，卸载器随后递归删 `$INSTDIR`——`$TEMP` 在 C:、应用装 D: 的机器上就是静默丢数据。`Rename` 失败用 `robocopy /E /MOVE` 兜底（`CopyFiles` 不递归）。手动卸载仍全删。回归在 `dsh-plugin-desktop/tests/installer-nsh.spec.ts`。
+5. **数据根已搬出安装目录（2026-11-01 事故后）**：alpha2 及以前数据根在 `$INSTDIR\.ensure-ile`，靠「旧卸载器先停到 `$INSTDIR\..\ensure-ILE-data`、`customInstall` 再搬回」兜住。alpha1→alpha2 那次覆盖安装**把这个兜底漏了**：`D:\Apps\ensure-ILE-data`、`$TEMP\ensure-ILE-data`、`$PLUGINSDIR\old-install` 三处都不存在，卸载器的 `RMDir /r $INSTDIR` 把李当天的开学四问、题目账本、会话与记忆一起删了（NSIS 不进回收站）。所以从 **alpha3** 起打包版数据根 = `%LOCALAPPDATA%\ensure-ILE-data`（`dsh-plugin-desktop/src/data-root.ts`，`resolveDataRoot()`），安装/卸载结构上碰不到；首次启动把旧的 `$INSTDIR\.ensure-ile` 拷过去再改名为 `.ensure-ile-migrated`（`migrateLegacyDataRoot()`，先落到 `<target>.migrating` 再整体改名，避免半份数据被当成「已迁移」）。`installer.nsh` 里那套 marker + 停车逻辑留着过渡一版——它正是把 alpha2 的数据带过这次升级的东西，别急着删。**教训**：`tests/installer-nsh.spec.ts` 只校验脚本文本，从没真跑过两次安装，所以这条路径一直是瞎的；测试改成 `tests/data-root.spec.ts` 断言「打包根不在安装目录里」+ 迁移四种结局。真机恢复步骤见 `.tmp-recover-data.ps1`（winfr，要管理员）。
 6. 补丁与 vendor 运行时是死的：`patches/` 只留被 `resolutions` 用 `patch:` 引到的（2026-10-28 删 155 个旧补丁 / 414 KB），`vendor/dsh-runtime/` 只留 `upstream.json` 那版（同日删 8 个旧树 / 160 MB）。**`scripts/sync-vendored-runtime.mjs` 的 `--write` / `--check` 只看当前版本目录**，旧版本堆积结构上看不见——清完必须跑 `corepack yarn install --immutable` 证明没断。**被 resolutions 引用 ≠ 生效**：判据是 `yarn.lock` 里有没有 `@patch:` 条目（坑·上游与文档 4）；`node scripts/verify-patch-references.mjs` 打印 29 份各自有效性；`dsh-experimental-computer-use-cua-driver-native` 「无施主」是**合法状态**（整个 computer-use 分支不在依赖图里，补丁等它回来），别当垃圾删。
 7. `materializeSeededProfile()` 在 `node_modules` 缺失时用内置 pnpm 跑 `install --offline --no-frozen-lockfile`——清掉 `.ensure-ile` 后首启自己装，也可在 `.ensure-ile/home/profiles/desktop` 手跑。
 8. **别把用不到的运行时装进 Windows 包**（2026-11-01 李定）：体积全压在 `resources/app/node_modules`（697 M → 426 M 靠这一串负向规则，判据是「有没有行挂它」而不是「看着没用」）：

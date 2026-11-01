@@ -35,6 +35,7 @@ import {
   isDesktopInstallerQuitRequest,
 } from './desktop-installer-quit.ts'
 import { createDesktopBrowserAccess } from './desktop-browser-access.ts'
+import { legacyDataRoot, migrateLegacyDataRoot, resolveDataRoot as resolveEnsureIleDataRoot } from './data-root.ts'
 import {
   installDesktopDshRuntime,
   installDesktopPnpmRuntime,
@@ -1943,9 +1944,10 @@ async function start(): Promise<void> {
 /**
  * ensure-ILE owns every file it writes: the harness home, the shared agents root and
  * Electron's userData all default under one data root — the checkout in
- * development, the executable's directory in a packaged build. `ENSURE_ILE_DATA_ROOT`
- * overrides it; `DSH_HOME`, `DSH_AGENTS_HOME` and `DSH_DESKTOP_USER_DATA` still
- * win individually when a caller sets them deliberately.
+ * development, `%LOCALAPPDATA%\ensure-ILE-data` in a packaged build (see
+ * `data-root.ts` for why it is no longer the executable's directory).
+ * `ENSURE_ILE_DATA_ROOT` overrides it; `DSH_HOME`, `DSH_AGENTS_HOME` and
+ * `DSH_DESKTOP_USER_DATA` still win individually when a caller sets them deliberately.
  */
 /** The workspace root in development, the executable's directory when packaged. */
 function resolveProjectRoot(): string {
@@ -2044,10 +2046,26 @@ function materializeSeededProfile(profileDir: string): void {
   }
 }
 
+/**
+ * Resolve this launch's data root, moving a pre-alpha3 install-directory root out
+ * of the installation the first time a packaged build starts.
+ *
+ * The migration runs before anything reads the root, so profile seeding, the
+ * brand assets and the Harness home all land in the new location.
+ */
 function resolveDataRoot(): string {
-  const configured = process.env.ENSURE_ILE_DATA_ROOT
-  if (configured !== undefined && configured.trim().length > 0) return resolve(configured)
-  return join(resolveProjectRoot(), '.ensure-ile')
+  const projectRoot = resolveProjectRoot()
+  const root = resolveEnsureIleDataRoot({ packaged: app.isPackaged, projectRoot })
+  if (!app.isPackaged) return root
+  const migration = migrateLegacyDataRoot(legacyDataRoot(projectRoot), root)
+  if (migration === 'moved') {
+    console.log(`${BIN_NAME}: learner data moved from ${legacyDataRoot(projectRoot)} to ${root}`)
+  } else if (migration === 'failed') {
+    // Loud on purpose: the old root is still readable, and a learner whose data
+    // "disappeared" needs a trail pointing at it.
+    console.error(`${BIN_NAME}: could not move ${legacyDataRoot(projectRoot)} to ${root}; using the new root`)
+  }
+  return root
 }
 
 /** True for a ensure-ILE launch: run() tags its own data root before start(). */
