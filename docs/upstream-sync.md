@@ -229,11 +229,9 @@ grep -c 'cua-driver-native' yarn.lock           # 手验法：0 就是没施主
 | 2 | `corepack yarn typecheck` | 桌面壳类型全绿 |
 | 3 | `corepack yarn check` | = `check:layout` + community-fabric + 桌面包；**不跑插件包单测** |
 | 4 | `corepack yarn check:plugins` | 9 包 typecheck + setup/bankmanager/memory/textbook/schedule 单测 |
-| 5 | `corepack yarn docs:record` | 重算双语 hash，只改过期行 |
-| 6 | `corepack yarn check:bilingual-docs` | 双语记录与文件实际 hash 一致 |
-| 7 | `corepack yarn icons:check` | 图标源与全平台资源一致 |
-| 8 | `corepack yarn dist:win` | 真实打包；产物在 `dsh-plugin-desktop/dist/`，装完数据根 = `dirname(ensure-ILE.exe)\\.ensure-ile` |
-| 9 | AGENTS.md 记账 | 版本号、验证现状、新踩的坑 |
+| 5 | `corepack yarn icons:check` | 图标源与全平台资源一致 |
+| 6 | `corepack yarn dist:win` | 真实打包；产物在 `dsh-plugin-desktop/dist/`，装完数据根 = `%LOCALAPPDATA%\ensure-ILE-data` |
+| 7 | AGENTS.md 记账 | 版本号、验证现状、新踩的坑 |
 
 ## 4. 失败信号表
 
