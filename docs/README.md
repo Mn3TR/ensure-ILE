@@ -1,8 +1,6 @@
 # ensure-ILE 文档
 
-[English documentation](README.en.md)
-
-这里是 ensure-ILE 的产品与开发文档入口。根目录的 [`README.md`](../README.md) 适合第一次了解项目；本目录解释项目为什么存在、如何使用、如何为 Desktop 编写插件，以及这个 fork 自己加了什么。想参与贡献？见[参与贡献](../CONTRIBUTING.md)。
+这里是 ensure-ILE 的产品与开发文档入口。根目录的 [`README.md`](../README.md) 适合第一次了解项目；本目录解释项目为什么存在、如何使用、如何为 Desktop 编写插件，以及这个 fork 自己加了什么。
 
 ## 按目标阅读
 
@@ -14,25 +12,23 @@
 | --- | --- |
 | [用户指南](user-guide.md) | 安装、profile、模式、终端、插件命令和更新 |
 | [常见问题](faq.md) | 支持平台、内置环境、官方边界、数据、插件和更新的直接回答 |
-| [隐私政策](../PRIVACY.md) | 官方更新、下载、本地数据、第三方服务与用户选择 |
 | [为什么做 Desktop](why-desktop.md) | Desktop 与官方 Harness 的边界，以及为什么坚持插件化 |
 
 ### ensure-ILE 自己的部分
 
 上游 DSH Desktop 的文档里没有这几块：四个模式、共享数据根，以及桌面壳之外的九个本地 `dsh-plugin-*` 包。每个包自己的 `README.md` 才是那个组件的说明书——这里只做索引，不复制内容。
 
-**模式即预设。** profile 由 [`profiles/ensure-ile/package.json`](../profiles/ensure-ile/package.json) 决定挂哪些 bundle，[`profiles/ensure-ile/cordis.patch.yml`](../profiles/ensure-ile/cordis.patch.yml) 把默认预设定成 `guide`：
+**预设管组队，模式管姿态。** profile 由 [`profiles/ensure-ile/package.json`](../profiles/ensure-ile/package.json) 决定挂哪些 bundle，[`profiles/ensure-ile/cordis.patch.yml`](../profiles/ensure-ile/cordis.patch.yml) 把默认预设定成 `work`：
 
-| 预设 id | 显示名 | 插件包 |
-| --- | --- | --- |
-| `setup` | 开学 | [dsh-plugin-setup](../dsh-plugin-setup/README.md) |
-| `guide`（默认） | 引导模式 | [dsh-plugin-guide](../dsh-plugin-guide/README.md) |
-| `work` | 独立做题 | [dsh-plugin-work](../dsh-plugin-work/README.md) |
-| `hrl` | 答案优化 | [dsh-plugin-hrl](../dsh-plugin-hrl/README.md) |
+| 预设 id | 显示名 | 起步模式 | 何时能选 |
+| --- | --- | --- | --- |
+| `work`（默认） | 做题 | 引导模式 | 总是 |
+| `chat` | 聊天 | 聊天 | 总是 |
+| `setup` | 开学 | 开学 | 只在开学没问完时注册 |
 
-四个预设都用 `complete: true` 整份替换系统提示，所以共用段（安全边界、说话方式、题库规则、学科备注）只在 [dsh-plugin-teaching-commons](../dsh-plugin-teaching-commons/README.md) 里存一份，各预设挂载时拼接。
+两个学习预设挂的是同一组行：核 [dsh-plugin-coreset](../dsh-plugin-coreset/README.md) + guide / work / hrl 三个人格包 + `ile-time-context`，区别只在起步模式；会话里用 `context_switch` 在 `guide` / `work` / `hrl` / `chat` 之间换。人格包只登记一段文本，整个会话只有核的一条 `complete: true` 段，共用段（安全边界、说话方式、题库规则）只在 [dsh-plugin-teaching-commons](../dsh-plugin-teaching-commons/README.md) 里存一份。
 
-**共享数据。** 开发时数据根是 `.ensure-ile/`，安装版是 `<安装目录>\.ensure-ile\`；`DSH_HOME` 就是数据根里的 `home/`。
+**共享数据。** 开发时数据根是仓库根的 `.ensure-ile/`，安装版是 `%LOCALAPPDATA%\ensure-ILE-data\`（alpha3 起数据根搬出安装目录，安装 / 卸载碰不到它）；`DSH_HOME` 就是数据根里的 `home/`。
 
 | 数据 | 位置 | 谁在读写 |
 | --- | --- | --- |
@@ -67,12 +63,7 @@
 
 ## README 文件怎么分工
 
-目前外层仓库有两份正式的产品 README，另保留一个旧链接兼容入口：
-
-- [`README.md`](../README.md)：中文产品入口。
-- [`README.en.md`](../README.en.md)：英文产品入口，与中文 README 保持同一产品范围。
-
-`README.i18n.yaml` 只记录这两个正式入口的双语 hash，不是用户指南。隐私政策遵循同一套命名约定：[`PRIVACY.md`](../PRIVACY.md) 是中文正文，[`PRIVACY.en.md`](../PRIVACY.en.md) 是英文正文，`PRIVACY.i18n.yaml` 记录这两份的 hash。
+文档单语中文：产品入口只有根目录的 [`README.md`](../README.md)，本目录的每一篇都没有英文对照页。2026-11-01 起双语门禁与 `*.i18n.yaml` 记录一并撤掉（没有第二种读者，维护成本全落在「改了中文忘了重算哈希」上），别再新增 `*.en.md`——没有门禁会提醒它们和中文版对不上。
 
 `dsh-plugin-desktop/README.md` 和 `dsh-plugin-desktop/README.zh.md` 是 npm 包随包发布的包级参考；它们比根 README 更技术化。`dsh-plugin-desktop/docs/` 是稳定 API 合同，不是营销页。`docs/design/` 是演算纸视觉层的设计稿、截图（`screenshots/`）与字体子集，`docs/evidence/` 是装机与升级的实测证据。`.agents/notes/implemented/` 是日期化的维护者决策记录，适合追溯取舍，不替代用户文档。
 

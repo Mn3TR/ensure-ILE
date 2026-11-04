@@ -22,8 +22,7 @@
     "docs/**",
     "LICENSE",
     "README.md",
-    "README.zh.md",
-    "README.i18n.yaml"
+    "README.zh.md"
   ],
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
