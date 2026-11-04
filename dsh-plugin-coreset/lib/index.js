@@ -3636,16 +3636,53 @@ function boundSummary(summary) {
 * memory of the folded conversation and the student's marker that the switch
 * happened.
 */
-function handoffNotice({ from, to, summary }) {
+function handoffNotice({ from, to, summary, imageCount = 0 }) {
 	const body = summary.trim();
+	const kept = imageCount > 0 ? `之前那段对话收成了这段摘要，原来那 ${imageCount} 张图还在下面：` : "之前那段对话不在这条上下文里了，只留下这段摘要：";
 	return [
 		`【交接】从「${from}」换到「${to}」。`,
-		"之前那段对话不在这条上下文里了，只留下这段摘要：",
+		kept,
 		"",
 		body === "" ? "（没留摘要。）" : body,
 		"",
 		"从这里接着走。"
 	].join("\n");
+}
+/**
+* The pictures a folded range keeps.
+*
+* Newest occurrences win, and one attachment takes one slot however often the
+* student pasted it. Offloaded pictures stay out: the route already refused
+* their bytes once, so re-sending them would only spend the same budget again.
+* @param blocks - content of the messages being folded, in model order.
+* @param limit - most pictures to carry.
+*/
+function carriedImages(blocks, limit = 4) {
+	const kept = [];
+	const seen = /* @__PURE__ */ new Set();
+	for (let index = blocks.length - 1; index >= 0 && kept.length < limit; index -= 1) {
+		const block = blocks[index];
+		if (block === void 0 || block.type !== "image" || block.offloaded === true) continue;
+		if (seen.has(block.attachment.attachmentId)) continue;
+		seen.add(block.attachment.attachmentId);
+		kept.unshift(block);
+	}
+	return kept;
+}
+/**
+* The one message a switch leaves behind: the notice text, then the pictures
+* the folded history was about. The bytes stay in the attachment store — the
+* blocks are references, so a switch re-points at the same picture instead of
+* copying it.
+*/
+function handoffContent({ images = [], ...notice }) {
+	return [{
+		type: "text",
+		text: handoffNotice({
+			...notice,
+			imageCount: images.length
+		})
+	}, ...images];
 }
 /**
 * Every surface node except the system head. Node 0 holds the system prompt and
@@ -3724,6 +3761,28 @@ const ileProjectionDefinition = {
 		})
 	}
 };
+/**
+* Pictures the folded messages carried, in model order.
+*
+* The attachment store owns the bytes, so the switch re-references them: the
+* picture the student photographed before the switch still shows the problem
+* after it. Reading history here is the deprecated synchronous reader the
+* upstream note forbids for new callers, but a fold needs the content of the
+* very range it replaces and Session exposes no asynchronous window yet --
+* upstream's own tool-result pruner reads the same way, and this is the one
+* place we do.
+* @param session - session whose surface range is being folded.
+* @param seqs - surface nodes the replacement covers.
+*/
+function foldedImages(session, seqs) {
+	const blocks = [];
+	for (const seq of seqs) {
+		const event = session.eventAt(seq);
+		if (event === void 0 || event.type !== "user/message") continue;
+		blocks.push(...event.data.content);
+	}
+	return carriedImages(blocks);
+}
 /**
 * `ctx.ileModes`: owns the persona section, the shared tools, the mode registry
 * and the fold-with-handoff switch. One instance per preset scope; the
@@ -3913,22 +3972,21 @@ var IleModes = class extends Service {
 		const session = agent.session;
 		const from = this.loggedMode(session);
 		const summary = pending.summary ?? "";
+		const range = replacementRange(session.surface.nodes);
+		const images = range === null ? [] : foldedImages(session, range.sourceEventSeqs);
 		const notice = createUserMessage({
-			content: [{
-				type: "text",
-				text: handoffNotice({
-					from: this.modeName(from),
-					to: this.modeName(pending.mode),
-					summary
-				})
-			}],
+			content: handoffContent({
+				from: this.modeName(from),
+				to: this.modeName(pending.mode),
+				summary,
+				images
+			}),
 			source: {
 				kind: "ile-handoff",
 				form: "notice",
 				summary: boundSummary(summary)
 			}
 		});
-		const range = replacementRange(session.surface.nodes);
 		session.append("ile/mode", pending);
 		if (range === null) session.append("user/message", notice, { surfaceOp: "append" });
 		else session.append("user/message", notice, {

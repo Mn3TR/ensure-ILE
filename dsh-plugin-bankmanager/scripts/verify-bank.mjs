@@ -1,4 +1,4 @@
-/** Mount smoke: the built bank registers its six tools. */
+/** Mount smoke: the built bank registers its seven tools. */
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,7 +8,7 @@ try {
   const { apply, name } = await import('../lib/index.js')
   const tools = []
   apply({ tools: { register: (tool) => tools.push(tool) } }, { directory })
-  const expected = ['bank_add', 'bank_list', 'bank_show', 'bank_update', 'bank_resume', 'bank_stats']
+  const expected = ['bank_add', 'bank_image', 'bank_list', 'bank_show', 'bank_update', 'bank_resume', 'bank_stats']
   const names = tools.map((tool) => tool.name)
   for (const tool of expected) {
     if (!names.includes(tool)) throw new Error('missing tool ' + tool)

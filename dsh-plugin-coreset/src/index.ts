@@ -28,9 +28,10 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
-import type { Session } from '@deepseek-ai/dsh-session'
+import type { ContentBlock, ImageBlock } from '@deepseek-ai/dsh-llm'
+import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
-import { boundSummary, handoffNotice, replacementRange } from './handoff.ts'
+import { boundSummary, carriedImages, handoffContent, replacementRange } from './handoff.ts'
 import { CHAT_MODE, ILE_SECTION } from './types.ts'
 import type { IleModeDefinition, IleModeEvent, IleUnitState } from './types.ts'
 
@@ -81,6 +82,30 @@ declare module '@deepseek-ai/cordis' {
     /** The mode registry every persona plugin contributes to. */
     ileModes: IleModes
   }
+}
+
+/**
+ * Pictures the folded messages carried, in model order.
+ *
+ * The attachment store owns the bytes, so the switch re-references them: the
+ * picture the student photographed before the switch still shows the problem
+ * after it. Reading history here is the deprecated synchronous reader the
+ * upstream note forbids for new callers, but a fold needs the content of the
+ * very range it replaces and Session exposes no asynchronous window yet --
+ * upstream's own tool-result pruner reads the same way, and this is the one
+ * place we do.
+ * @param session - session whose surface range is being folded.
+ * @param seqs - surface nodes the replacement covers.
+ */
+function foldedImages(session: Session, seqs: readonly SessionSeq[]): ImageBlock[] {
+  const blocks: ContentBlock[] = []
+  for (const seq of seqs) {
+    // oxlint-disable-next-line typescript/no-deprecated -- fold input; no async window on Session.
+    const event = session.eventAt(seq)
+    if (event === undefined || event.type !== 'user/message') continue
+    blocks.push(...event.data.content)
+  }
+  return carriedImages(blocks)
 }
 
 /**
@@ -279,17 +304,20 @@ export class IleModes extends Service {
     const session = agent.session
     const from = this.loggedMode(session)
     const summary = pending.summary ?? ''
-    const notice = createUserMessage({
-      content: [{
-        type: 'text',
-        text: handoffNotice({ from: this.modeName(from), to: this.modeName(pending.mode), summary }),
-      }],
-      source: { kind: 'ile-handoff', form: 'notice', summary: boundSummary(summary) },
-    })
     // Everything that can reject is computed before the first append: a failed
     // fold then leaves the session untouched, and the intent stays pending for
     // the next boundary instead of vanishing.
     const range = replacementRange(session.surface.nodes)
+    const images = range === null ? [] : foldedImages(session, range.sourceEventSeqs)
+    const notice = createUserMessage({
+      content: handoffContent({
+        from: this.modeName(from),
+        to: this.modeName(pending.mode),
+        summary,
+        images,
+      }),
+      source: { kind: 'ile-handoff', form: 'notice', summary: boundSummary(summary) },
+    })
     session.append('ile/mode', pending)
     if (range === null) {
       session.append('user/message', notice, { surfaceOp: 'append' })

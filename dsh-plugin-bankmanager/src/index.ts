@@ -15,15 +15,23 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-tools'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { mountBankApi } from './api.ts'
 import {
   BankError,
+  attachProblemImages,
   createProblem,
+  migrateLegacyProblems,
   defaultBankDirectory,
   isReviewDue,
+  indexIsCurrent,
   listProblems,
   pendingHandoffs,
+  readBankIndex,
   readProblem,
+  readProblemImage,
+  rebuildIndex,
   resumeView,
   summarizeProblem,
   summarizeStats,
@@ -32,6 +40,7 @@ import {
   type HrlUpdateInput,
   type PairingChoice,
   type PairingMatch,
+  type ProblemAttachment,
   type ProblemStatus,
   type WorkAttemptInput,
 } from './store.ts'
@@ -73,6 +82,81 @@ function json(value: unknown): string {
   return JSON.stringify(value, null, 2)
 }
 
+/** One image reference carried by a user message. */
+type PromptImage = Extract<ContentBlock, { type: 'image' }>['attachment']
+
+/** The slice of the attachment store this row needs; absent in a profile without it. */
+interface ImageStore {
+  readImage(ref: PromptImage): Promise<{ data: Uint8Array }>
+  saveImage(input: { data: Uint8Array; mediaType: PromptImage['mediaType']; name?: string }): Promise<PromptImage>
+}
+
+/** A picture older than this no longer belongs to the exchange being answered. */
+const IMAGE_WINDOW_MS = 10 * 60_000
+
+/** Pictures one `bank_image` call may return; the message-level image bound is the reason. */
+const MAX_IMAGES_PER_CALL = 4
+
+/** Output schema of one durable image reference. */
+const IMAGE_REF_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    attachmentId: { type: 'string', required: true, description: '存储标识' },
+    mediaType: { type: 'string', required: true, description: '图片类型' },
+    bytes: { type: 'number', required: true, description: '字节数' },
+    width: { type: 'number', required: true, description: '宽' },
+    height: { type: 'number', required: true, description: '高' },
+  },
+} as const
+
+/** Image references carried by one user message's content. */
+function imagesOf(content: readonly ContentBlock[]): PromptImage[] {
+  return content.flatMap(part => (part.type === 'image' ? [part.attachment] : []))
+}
+
+/**
+ * Pictures from the prompt this call is answering.
+ *
+ * Walks back over the user messages of the current exchange — a photo sent on
+ * its own and a "这题怎么做" typed after it are the same question — and stops
+ * once the messages are older than {@link IMAGE_WINDOW_MS}, so the previous
+ * problem's picture never rides along by accident.
+ * @param agent - the agent owning the tool call.
+ * @param now - clock injection for tests.
+ */
+function promptImages(agent: Agent | undefined, now: number = Date.now()): PromptImage[] {
+  if (agent === undefined) return []
+  const session = agent.session
+  const nodes = session.surface.nodes
+  for (let index = nodes.length - 1; index >= 0; index -= 1) {
+    const seq = nodes[index]
+    if (seq === undefined) continue
+    // Synchronous read; the async replacement upstream is not exposed on Session.
+    const event = session.eventAt(seq)
+    if (event === undefined || event.type !== 'user/message') continue
+    if (event.time > now || now - event.time > IMAGE_WINDOW_MS) return []
+    const images = imagesOf(event.data.content)
+    if (images.length > 0) return images
+  }
+  return []
+}
+
+/** Copy the prompt's pictures into the problem folder; a no-op without an attachment store. */
+async function captureImages(ctx: Context, agent: Agent | undefined, directory: string, id: string): Promise<number> {
+  const images = promptImages(agent)
+  if (images.length === 0) return 0
+  const reader = ctx.get('attachments', false) as ImageStore | undefined
+  if (reader === undefined) return 0
+  const copies: { data: Uint8Array; mediaType: PromptImage['mediaType']; width: number; height: number }[] = []
+  for (const image of images) {
+    const stored = await reader.readImage(image)
+    copies.push({ data: stored.data, mediaType: image.mediaType, width: image.width, height: image.height })
+  }
+  const record = await attachProblemImages(directory, id, copies)
+  return record.attachments.length
+}
+
 /**
  * Mount the bank tools on this scope.
  * @param ctx - profile-root context; the row registers host-wide tools.
@@ -82,6 +166,25 @@ export function apply(ctx: Context, config: Config): void {
   const directory = config.directory !== undefined && config.directory.length > 0
     ? config.directory
     : defaultBankDirectory()
+
+  // 老账本（一题一 flat json）搬进一题一文件夹。幂等：没有扁平文件时什么也不做，
+  // 搬不动的留在原处并在日志里点名，绝不让启动失败。
+  try {
+    const migration = migrateLegacyProblems(directory)
+    if (migration.migrated.length > 0) {
+      ctx.logger.info('dsh-plugin-bankmanager: migrated %d legacy problem files into folders', migration.migrated.length)
+    }
+    for (const skipped of migration.skipped) {
+      ctx.logger.warn('dsh-plugin-bankmanager: left %s in place: %s', skipped.file, skipped.reason)
+    }
+  } catch (error) {
+    ctx.logger.warn('dsh-plugin-bankmanager: legacy migration failed: %o', error)
+  }
+
+  // 索引是派生品：挂载时重建一次，挂不上也不影响任何工具（下次列账会再试）。
+  void rebuildIndex(directory).catch((error: unknown) => {
+    ctx.logger.warn('dsh-plugin-bankmanager: could not rebuild bank index: %o', error)
+  })
 
   // 浏览器通道：等服务出现再挂，缺席时（headless profile）这行照常只提供工具。
   const scoped = ctx as unknown as {
@@ -98,6 +201,7 @@ export function apply(ctx: Context, config: Config): void {
       '用在：学生第一次把一道题发给你、或者你判断这次要开始引导一道新题时。',
       'statement 是题干原文，尽量完整（含小问）；subject 是科目，自由写（math、arts、physics、chemistry…）；',
       'tags 可选，放知识点。',
+      '学生这条消息里带的图片会自动存进这道题的文件夹，不用另做一步；图片不在手上了就用 bank_list 先找题。',
       '同一道题只建一次：不确定建过没有，先用 bank_list 看。',
     ].join('\n'),
     parameters: {
@@ -109,16 +213,79 @@ export function apply(ctx: Context, config: Config): void {
       schema: { type: 'string' },
       render: (_args, value) => [{ type: 'text', text: value }],
     },
-    execute: async (args) => {
+    execute: async (args, exec) => {
       try {
         const record = await createProblem(directory, {
           statement: args.statement,
           subject: args.subject,
           ...(args.tags === undefined ? {} : { tags: args.tags }),
         })
-        return '已建题：' + record.id + '\n状态：new，科目：' + record.subject
+        let imageNote = ''
+        try {
+          const captured = await captureImages(ctx, exec.agent, directory, record.id)
+          if (captured > 0) imageNote = '\n图片：' + captured + ' 张已存进题目文件夹'
+        } catch (error) {
+          imageNote = '\n图片没存成：' + explain(error)
+        }
+        return '已建题：' + record.id + '\n状态：new，科目：' + record.subject + imageNote
       } catch (error) {
         return explain(error)
+      }
+    },
+  }))
+
+ctx.tools.register(defineTool({
+    name: 'bank_image',
+    description: [
+      '把题目里存着的图片重新给你看。',
+      '用在：bank_show 显示这道题有附件，而你要看图才能讲；或者学生问的就是图上的东西，但这条消息里没带图。',
+      '一次最多 4 张：默认全给，which 指定第几张（从 1 开始）。',
+    ].join('\n'),
+    parameters: {
+      id: { type: 'string', required: true, description: '题目 id' },
+      which: { type: 'integer', description: '要第几张（从 1 开始），省略就返回全部' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          text: { type: 'string', required: true, description: '这道题有几张图、这次给了哪几张' },
+          images: { type: 'array', required: true, items: IMAGE_REF_SCHEMA },
+        },
+      },
+      render: (_args, value) => [
+        { type: 'text', text: value.text },
+        ...value.images.map(image => ({ type: 'image' as const, attachment: image })),
+      ],
+    },
+    execute: async (args) => {
+      try {
+        const record = readProblem(directory, args.id.trim())
+        if (record.attachments.length === 0) return { text: '这道题没有存图片：' + record.id, images: [] }
+        const store = ctx.get('attachments', false) as ImageStore | undefined
+        if (store === undefined) return { text: '这个 profile 没挂附件服务，图读不出来。', images: [] }
+        const total = record.attachments.length
+        const wanted: ProblemAttachment[] = args.which === undefined
+          ? record.attachments.slice(0, MAX_IMAGES_PER_CALL)
+          : [record.attachments[args.which - 1]].filter((entry): entry is ProblemAttachment => entry !== undefined)
+        if (wanted.length === 0) {
+          return { text: '这道题只有 ' + total + ' 张图，没有第 ' + String(args.which) + ' 张。', images: [] }
+        }
+        const images: PromptImage[] = []
+        for (const entry of wanted) {
+          const data = readProblemImage(directory, record.id, entry)
+          // 回灌进附件存储：题目文件夹是账，这里只负责让 provider 的请求路径拿得到字节。
+          images.push(await store.saveImage({ data, mediaType: entry.mediaType, name: entry.file }))
+        }
+        const left = total - images.length
+        return {
+          text: '题目 ' + record.id + ' 有 ' + total + ' 张图，这次给了 ' + images.length + ' 张'
+            + (left > 0 ? '（还有 ' + left + ' 张，用 which 指定）' : '') + '。',
+          images,
+        }
+      } catch (error) {
+        return { text: explain(error), images: [] }
       }
     },
   }))
@@ -145,6 +312,10 @@ export function apply(ctx: Context, config: Config): void {
     execute: async (args) => {
       try {
         const { records, skipped } = listProblems(directory)
+        const ids = records.map(record => record.id)
+        if (!indexIsCurrent(readBankIndex(directory), ids)) {
+          await rebuildIndex(directory)
+        }
         let rows = records
         if (args.status !== undefined && args.status.length > 0) {
           rows = rows.filter(record => record.status === (args.status as ProblemStatus))

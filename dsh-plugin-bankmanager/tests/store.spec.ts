@@ -1,20 +1,32 @@
-import { mkdtempSync, readFileSync, writeFileSync, rmSync, readdirSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  BANK_INDEX_FILE,
   BankError,
+  IMAGES_DIR,
+  PROBLEM_FILE,
   createProblem,
+  mediaTypeExtension,
   isReviewDue,
   listProblems,
   makeProblemId,
   parseRecord,
+  problemDir,
   problemPath,
   readProblem,
+  readProblemImage,
   reviewDueAt,
   slugSubject,
+  indexPath,
+  indexIsCurrent,
+  migrateLegacyProblems,
   pendingHandoffs,
+  readBankIndex,
+  rebuildIndex,
   resumeView,
+  saveProblemImage,
   summarizeProblem,
   summarizeStats,
   updateProblem,
@@ -55,14 +67,16 @@ describe('ids', () => {
 })
 
 describe('create and read', () => {
-  it('writes one json file with defaults', async () => {
+  it('writes one folder with problem.json and no images yet', async () => {
     const dir = bank()
     const record = await createProblem(dir, { statement: '已知 f(x)=x^2，求 f\'(2)', subject: 'math', tags: ['导数'], now: new Date('2026-10-24T12:00:00Z'), suffix: 'aaaaaa' })
     expect(record.id).toBe('20261024-math-aaaaaa')
     expect(record.status).toBe('new')
+    expect(record.attachments).toEqual([])
     const file = readFileSync(problemPath(dir, record.id), 'utf8')
     expect(JSON.parse(file).statement).toContain('f(x)')
-    expect(readdirSync(dir)).toEqual([record.id + '.json'])
+    expect(readdirSync(dir).sort()).toEqual([BANK_INDEX_FILE, record.id].sort())
+    expect(readdirSync(problemDir(dir, record.id))).toEqual([PROBLEM_FILE])
   })
   it('explains a missing problem', () => {
     const dir = bank()
@@ -78,7 +92,8 @@ describe('listing', () => {
     const dir = bank()
     const first = await createProblem(dir, { statement: 'one', subject: 'math', now: new Date('2026-10-22T00:00:00Z'), suffix: '111111' })
     const second = await createProblem(dir, { statement: 'two', subject: 'arts', now: new Date('2026-10-23T00:00:00Z'), suffix: '222222' })
-    writeFileSync(join(dir, '20261024-math-broken.json'), '{not json')
+    mkdirSync(join(dir, '20261024-math-broken'), { recursive: true })
+    writeFileSync(join(dir, '20261024-math-broken', PROBLEM_FILE), '{not json')
     const listing = listProblems(dir)
     expect(listing.records.map(record => record.id)).toEqual([first.id, second.id])
     expect(listing.skipped).toHaveLength(1)
@@ -314,5 +329,102 @@ describe('review due window', () => {
     expect(due({ ...base, status: 'mastered', review: { count: 9, history: [], nextAt: '2026-01-01T00:00:00.000Z' } })).toBe(false)
     expect(due({ ...base, status: 'parked', review: { count: 1, history: [], nextAt: '2026-01-01T00:00:00.000Z' } })).toBe(false)
     expect(reviewDueAt({ ...base, status: 'review', review: { count: 1, history: [], nextAt: '不是日期' } })).toBeUndefined()
+  })
+})
+
+describe('pictures', () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3])
+  it('copies bytes into images/ and names them by digest', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: '看图', subject: 'math', now: new Date('2026-10-24T00:00:00Z'), suffix: 'cccccc' })
+    const entry = await saveProblemImage(dir, record.id, { data: png, mediaType: 'image/png', width: 2, height: 2 })
+    expect(entry.file).toMatch(/^images\/[a-f0-9]{64}\.png$/u)
+    expect(entry.bytes).toBe(png.byteLength)
+    expect(readdirSync(problemDir(dir, record.id))).toContain(IMAGES_DIR)
+    expect(() => mediaTypeExtension('image/svg+xml')).toThrow(BankError)
+  })
+  it('saves the same bytes once', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: '看图', subject: 'math', now: new Date('2026-10-24T00:00:00Z'), suffix: 'dddddd' })
+    const first = await saveProblemImage(dir, record.id, { data: png, mediaType: 'image/png' })
+    const second = await saveProblemImage(dir, record.id, { data: png, mediaType: 'image/png' })
+    expect(second.file).toBe(first.file)
+    expect(readdirSync(join(problemDir(dir, record.id), IMAGES_DIR))).toEqual([first.sha256 + '.png'])
+  })
+  it('reads the bytes back and refuses a tampered file', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: '看图', subject: 'math', now: new Date('2026-10-24T00:00:00Z'), suffix: 'eeeeee' })
+    const entry = await saveProblemImage(dir, record.id, { data: png, mediaType: 'image/png' })
+    expect([...readProblemImage(dir, record.id, entry)]).toEqual([...png])
+    writeFileSync(join(problemDir(dir, record.id), entry.file), new Uint8Array([1, 2]))
+    expect(() => readProblemImage(dir, record.id, entry)).toThrow(/不符/u)
+  })
+  it('keeps the entries in the record', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: '看图', subject: 'math', now: new Date('2026-10-24T00:00:00Z'), suffix: 'ffffff' })
+    const entry = await saveProblemImage(dir, record.id, { data: png, mediaType: 'image/png' })
+    const updated = await updateProblem(dir, record.id, { patch: { attachments: [entry] } })
+    expect(updated.attachments).toEqual([entry])
+    expect(parseRecord(JSON.parse(readFileSync(problemPath(dir, record.id), 'utf8'))).attachments).toEqual([entry])
+    const bad = JSON.parse(readFileSync(problemPath(dir, record.id), 'utf8'))
+    bad.attachments = [{ file: '../escape.png', sha256: entry.sha256, mediaType: 'image/png', bytes: 1, addedAt: 'x' }]
+    expect(() => parseRecord(bad)).toThrow(/images\//u)
+  })
+})
+
+describe('legacy migration', () => {
+  it('moves a flat record into a folder and keeps a .migrated copy', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: '老题', subject: 'math', now: new Date('2026-10-24T00:00:00Z'), suffix: 'a1a1a1' })
+    const legacy = join(dir, record.id + '.json')
+    writeFileSync(legacy, JSON.stringify(record, null, 2))
+    rmSync(problemDir(dir, record.id), { recursive: true, force: true })
+    const result = migrateLegacyProblems(dir)
+    expect(result.migrated).toEqual([record.id])
+    expect(readProblem(dir, record.id).statement).toBe('老题')
+    expect(readdirSync(dir).sort()).toEqual([BANK_INDEX_FILE, record.id, record.id + '.json.migrated'].sort())
+    expect(migrateLegacyProblems(dir).migrated).toEqual([])
+  })
+  it('leaves a broken record where it is', () => {
+    const dir = bank()
+    writeFileSync(join(dir, '20261024-math-broken.json'), '{not json')
+    const result = migrateLegacyProblems(dir)
+    expect(result.migrated).toEqual([])
+    expect(result.skipped).toHaveLength(1)
+    expect(readdirSync(dir)).toEqual(['20261024-math-broken.json'])
+  })
+})
+
+describe('index', () => {
+  it('names every problem folder in creation order', async () => {
+    const dir = bank()
+    const first = await createProblem(dir, { statement: '一', subject: 'math', now: new Date('2026-10-22T00:00:00Z'), suffix: '111111' })
+    const second = await createProblem(dir, { statement: '二', subject: 'arts', now: new Date('2026-10-23T00:00:00Z'), suffix: '222222' })
+    const index = readBankIndex(dir)
+    expect(index?.problems).toEqual([first.id, second.id])
+    expect(readFileSync(indexPath(dir), 'utf8')).toContain(first.id)
+    expect(indexIsCurrent(index, [first.id, second.id])).toBe(true)
+    expect(indexIsCurrent(index, [first.id])).toBe(false)
+  })
+  it('rebuilds from the folders after a manual change', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: '一', subject: 'math', now: new Date('2026-10-22T00:00:00Z'), suffix: '333333' })
+    rmSync(problemDir(dir, record.id), { recursive: true, force: true })
+    expect(indexIsCurrent(readBankIndex(dir), [])).toBe(false)
+    const rebuilt = await rebuildIndex(dir)
+    expect(rebuilt.problems).toEqual([])
+    expect(indexIsCurrent(readBankIndex(dir), [])).toBe(true)
+  })
+  it('ignores a corrupt index instead of failing', () => {
+    const dir = bank()
+    writeFileSync(join(dir, BANK_INDEX_FILE), '{not json')
+    expect(readBankIndex(dir)).toBeUndefined()
+    expect(indexIsCurrent(undefined, [])).toBe(false)
+  })
+  it('is not mistaken for a legacy record', () => {
+    const dir = bank()
+    writeFileSync(join(dir, BANK_INDEX_FILE), JSON.stringify({ schema: 1, updatedAt: '', problems: [] }))
+    const result = migrateLegacyProblems(dir)
+    expect(result.skipped).toEqual([])
   })
 })

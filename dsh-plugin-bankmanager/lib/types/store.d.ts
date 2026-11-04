@@ -1,15 +1,38 @@
 /**
- * Problem-bank storage: one JSON file per problem under `<DSH_HOME>/bank/problems`.
+ * Problem-bank storage: one directory per problem under `<DSH_HOME>/bank/problems`.
  *
- * A record holds everything that ever happened to one problem — the statement,
- * the guide sessions, attempts, the review schedule and an append-only history.
- * Files are written atomically and read defensively: one broken file is skipped
- * and reported, never a reason to fail a listing.
+ * `<id>/problem.json` holds everything that ever happened to one problem — the
+ * statement, the guide sessions, attempts, the review schedule and an append-only
+ * history; `<id>/images/` holds the pictures that came with it, copied out of the
+ * inbound attachment pipeline so a problem travels as one folder. Files are
+ * written atomically and read defensively: one broken folder is skipped and
+ * reported, never a reason to fail a listing.
  * @module dsh-plugin-bankmanager/store
  */
 /** Statuses a problem can carry. */
 export declare const PROBLEM_STATUSES: readonly ["new", "guide", "hrl", "review", "mastered", "parked"];
 export type ProblemStatus = (typeof PROBLEM_STATUSES)[number];
+/** Record file inside one problem folder. */
+export declare const PROBLEM_FILE = "problem.json";
+/** Derived table of contents beside the problem folders. */
+export declare const BANK_INDEX_FILE = "index.json";
+/** Image folder inside one problem folder. */
+export declare const IMAGES_DIR = "images";
+/** Source formats accepted for problem pictures, matching the inbound pipeline. */
+export declare const PROBLEM_IMAGE_MEDIA_TYPES: readonly ["image/png", "image/jpeg", "image/webp", "image/gif"];
+export type ProblemImageMediaType = (typeof PROBLEM_IMAGE_MEDIA_TYPES)[number];
+/** One picture copied into a problem folder. */
+export interface ProblemAttachment {
+    /** Path relative to the problem folder, `images/<sha256>.<ext>`. */
+    file: string;
+    /** Digest of the stored bytes; the file name without its extension. */
+    sha256: string;
+    mediaType: ProblemImageMediaType;
+    bytes: number;
+    width?: number;
+    height?: number;
+    addedAt: string;
+}
 /** How one guide session ended. */
 export declare const GUIDE_OUTCOMES: readonly ["solved", "stuck", "abandoned"];
 export type GuideOutcome = (typeof GUIDE_OUTCOMES)[number];
@@ -135,7 +158,7 @@ export interface ProblemRecord {
     subject: string;
     tags: string[];
     statement: string;
-    attachments: unknown[];
+    attachments: ProblemAttachment[];
     status: ProblemStatus;
     createdAt: string;
     updatedAt: string;
@@ -178,8 +201,14 @@ export declare function formatDate(date: Date): string;
 export declare function makeProblemId(subject: string, now?: Date, suffix?: string): string;
 /** Default bank directory under the Harness home shared with the desktop app. */
 export declare function defaultBankDirectory(home?: string | undefined): string;
-/** Path of one problem file. */
+/** Folder of one problem; the id is the folder name. */
+export declare function problemDir(directory: string, id: string): string;
+/** Path of the record inside one problem folder. */
 export declare function problemPath(directory: string, id: string): string;
+/** File extension for one accepted image type. */
+export declare function mediaTypeExtension(mediaType: string): string;
+/** Relative path one stored image keeps inside its problem folder. */
+export declare function imageRelPath(sha256: string, mediaType: string): string;
 /**
  * Validate one parsed file. Corrupt files are the caller's to skip; this throws
  * so the message names the exact field that broke.
@@ -207,11 +236,76 @@ export interface CreateProblemInput {
     statement: string;
     subject: string;
     tags?: string[];
+    /** Pictures already copied into the problem folder. */
+    attachments?: ProblemAttachment[];
     now?: Date;
     suffix?: string;
 }
 /** Create and persist one problem. */
 export declare function createProblem(directory: string, input: CreateProblemInput): Promise<ProblemRecord>;
+/**
+ * Copy one picture into a problem folder and describe it for the record.
+ *
+ * The bytes come from the inbound attachment pipeline already normalized, so
+ * the digest names the stored file and a repeated save is a no-op. The caller
+ * still has to put the returned entry into `record.attachments`.
+ * @param directory - bank directory.
+ * @param id - problem id.
+ * @param input - normalized bytes, their declared type and pixel size.
+ * @returns the entry to store in the record.
+ */
+export declare function saveProblemImage(directory: string, id: string, input: {
+    data: Uint8Array;
+    mediaType: ProblemImageMediaType;
+    width?: number;
+    height?: number;
+    now?: Date;
+}): Promise<ProblemAttachment>;
+/**
+ * Read one picture back out of a problem folder.
+ * @param directory - bank directory.
+ * @param id - problem id.
+ * @param attachment - the entry from the record.
+ * @returns the exact stored bytes.
+ * @throws a BankError when the file is missing or no longer matches its digest.
+ */
+export declare function readProblemImage(directory: string, id: string, attachment: ProblemAttachment): Uint8Array;
+/** One picture handed to {@link attachProblemImages}. */
+export interface ProblemImageInput {
+    data: Uint8Array;
+    mediaType: ProblemImageMediaType;
+    width?: number;
+    height?: number;
+}
+/**
+ * Copy pictures into one problem folder and record them, under the same lock an update takes.
+ *
+ * Entries already recorded with the same digest are left alone, so re-running with
+ * the same picture adds nothing.
+ * @param directory - bank directory.
+ * @param id - problem id.
+ * @param images - normalized bytes in the order they arrived.
+ * @returns the updated record.
+ */
+export declare function attachProblemImages(directory: string, id: string, images: readonly ProblemImageInput[]): Promise<ProblemRecord>;
+/** What one legacy migration pass did. */
+export interface LegacyMigration {
+    migrated: string[];
+    skipped: {
+        file: string;
+        reason: string;
+    }[];
+}
+/**
+ * Move `problems/<id>.json` records into `problems/<id>/problem.json` once.
+ *
+ * Idempotent and non-destructive: the legacy file is renamed to `.migrated`
+ * only after the new record reads back with the same id, and anything that
+ * cannot be moved is left exactly where it is.
+ * @param directory - bank directory.
+ * @returns the ids that moved and the files that stayed, with reasons.
+ */
+export declare function migrateLegacyProblems(directory: string): LegacyMigration;
 /** One handed-in answer from work mode. */
 export interface WorkAttemptInput {
     answer: string;
@@ -325,3 +419,31 @@ export interface BankStats {
  * @param limit - how many stalest problems to report.
  */
 export declare function summarizeStats(records: ProblemRecord[], limit?: number): BankStats;
+/** The derived table of contents: which problems the folder directory holds. */
+export interface BankIndex {
+    schema: 1;
+    updatedAt: string;
+    /** Problem ids in folder order, which is creation order. */
+    problems: string[];
+}
+/** Path of the bank index inside the problem directory. */
+export declare function indexPath(directory: string): string;
+/**
+ * Read the index, or nothing when it is missing or unreadable.
+ * @param directory - bank directory.
+ * @returns the index, if it parses.
+ */
+export declare function readBankIndex(directory: string): BankIndex | undefined;
+/**
+ * Rewrite the index from the directory listing.
+ *
+ * The index is a cache, never a source of truth: it carries ids only, rebuilds
+ * in one `readdir`, and losing it costs one extra scan. Call it after a create
+ * and at mount; a stale entry can never hide or invent a problem.
+ * @param directory - bank directory.
+ * @param now - clock injection for tests.
+ * @returns the index just written.
+ */
+export declare function rebuildIndex(directory: string, now?: Date): Promise<BankIndex>;
+/** True when the index already names exactly these ids. */
+export declare function indexIsCurrent(index: BankIndex | undefined, ids: readonly string[]): boolean;

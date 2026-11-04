@@ -12,7 +12,7 @@
 
 | 路径 | 是什么 | 何时读 |
 | --- | --- | --- |
-| `dsh-plugin-desktop/` | 上游桌面壳 fork（现 `0.1.0-alpha3`）+ 我们的改动（数据根、OOBE 裁剪、预设、皮肤、打包） | 改外壳 / 窗口 / 设置 / 打包 |
+| `dsh-plugin-desktop/` | 上游桌面壳 fork（现 `0.1.0-alpha4`）+ 我们的改动（数据根、OOBE 裁剪、预设、皮肤、打包） | 改外壳 / 窗口 / 设置 / 打包 |
 | `dsh-plugin-teaching-commons/` | 各模式共用教学文字：安全边界、说话方式、题库规则 + `skills/` 学科备注 + `readNote` | 改「怎么说话」 |
 | `dsh-plugin-coreset/` | **会话的核**：唯一 `complete` 提示段、`ctx.ileModes`、`read_note`、`context_switch` + 历史折叠；预设 `work` / `chat` 也在这 | 改共享行为 / 加模式 / 改预设 |
 | `dsh-plugin-setup/` | 开学**人格** + `setup_read` / `setup_update` + 条件注册 `setup` 预设 | 改开学问话 |
@@ -44,7 +44,7 @@
 - **`seedProfile()` 只在文件不存在时复制**：改完 `profiles/ensure-ile/` 要删 `.ensure-ile/home/profiles/desktop` 再启动，然后手跑 `pnpm install --offline`（校验用 `COREPACK_ENABLE_PROJECT_SPEC=0 corepack pnpm install --offline --no-frozen-lockfile`；直接 `corepack pnpm` 会被根 `packageManager` 挡）。
 - 会话工作区也在数据根：`workspace-controller` 的 `documentsDirectory` patch 成 `!!js dshHomePath('..')`，落 `<数据根>/deepseek-harness/default-workspace`（上游叶子目录名写死，短不了）。
 - 打包：`corepack yarn dist:win` → `dsh-plugin-desktop/dist/`；**打包后数据根 = `%LOCALAPPDATA%\ensure-ILE-data`**（2026-11-01 起；开发跑仍是仓库根的 `.ensure-ile`，`ENSURE_ILE_DATA_ROOT` 优先级最高）。
-- 版本：`dsh-plugin-desktop/package.json` 的 `version` 是唯一来源，当前 `0.1.0-alpha3`（α 线，与上游 2.0.18 脱钩）。**每笔加功能 / 修 bug 的提交都递增这个号**（李 2026-11-01 定），顺带同步 `dsh-plugin-desktop/tests/package.spec.ts:812` 的断言——不同步单测直接红。
+- 版本：`dsh-plugin-desktop/package.json` 的 `version` 是唯一来源，当前 `0.1.0-alpha4`（α 线，与上游 2.0.18 脱钩）。**每笔加功能 / 修 bug 的提交都递增这个号**（李 2026-11-01 定），顺带同步 `dsh-plugin-desktop/tests/package.spec.ts:812` 的断言——不同步单测直接红。
 
 ## 上游是谁、我们在哪一层改它（2026-10-29）
 
@@ -62,7 +62,7 @@
 
 | 数据 | 路径 | 写 | 读 |
 | --- | --- | --- | --- |
-| 题目 | `<DSH_HOME>/bank/problems/<id>.json` | `bank_*` | guide / work / hrl / schedule |
+| 题目 | `<DSH_HOME>/bank/problems/<id>/{problem.json,images/}`，索引 `problems/index.json`（派生，可重建） | `bank_*` | guide / work / hrl / schedule |
 | 课表与进度 | `<DSH_HOME>/schedule/schedule.json` | `schedule_update` | `schedule_plan` |
 | 开学问话 | `<DSH_HOME>/setup.json` | `setup_update` | `setup_read` |
 | 学生档案 | `<DSH_HOME>/profile/{grade,schedule,rhythm,preference}.md` | `profile_write` | `profile_read`（不进检索、不占注入预算） |
@@ -83,7 +83,7 @@
 ## 模式与交接（2026-10-25 定稿，事实都有代码出处）
 
 - **预设管组队，模式管姿态（2026-10-30 落成）**。预设两个加一个：`work`（起步 `guide`）、`chat`（起步 `chat`）、`setup`（办完条件不注册）。前两个**都挂** coreset + guide + work + hrl + `ile-time-context`，**只差起步模式**——模式清单是「这个预设里挂了哪些人格」的产物（`ileModes` 在 isolate 域里，一预设一份），少挂一个包就等于少一个可切模式；2026-11-01 真机踩过：chat 预设只挂核时 `context_switch({to:'work'})` 必报「没有「work」这个模式」，而 `prompts/chat.md` 恰恰让它一切到做题就切。换**预设** = 开新会话：`agentPresets.select` 只认空会话（`boundary.lastTurn > 0` 即锁，`deepseek-harness/packages/preset/agent-preset-registry/src/index.ts:351`），UI 只给空会话挂选择器（`client/ui-agent-preset/src/client/seat-store.ts:214`），resume 按 `meta.agentPreset` 还原，缺预设直接拒。
-- **会话内换人格，不换工具集**：`context_switch({ to, summary })` 只置待办意图（不改历史、不动工具表），**学生下次开口第一个 pre-step** 才落——把 `nodes[1] … nodes.at(-1)` 折成一条交接 `user/message`（`surfaceOp: replace`，node 0 不碰，runtime 随后原地归一 system），同时 append log-only `ile/mode` 事件（重启靠它恢复）。`step !== 1` 一律放过，否则折掉进行中的 tool call、留下无 result 孤儿。
+- **会话内换人格，不换工具集**：`context_switch({ to, summary })` 只置待办意图（不改历史、不动工具表），**学生下次开口第一个 pre-step** 才落——把 `nodes[1] … nodes.at(-1)` 折成一条交接 `user/message`（`surfaceOp: replace`，node 0 不碰，runtime 随后原地归一 system），同时 append log-only `ile/mode` 事件（重启靠它恢复）。**原题的照片跟着走**：折叠前 `foldedImages()` 把被折段里的图片块捞出来（去重、最近 ≤4 张、跳过已 offload 的），接在同一条消息的正文后面——引用不复制，切之前拍的那张题图切之后照样看得见。`step !== 1` 一律放过，否则折掉进行中的 tool call、留下无 result 孤儿。
 - **工具集只能加不能减**（flash `toolUpdate: 'addition-only'`），同预设里任何模式看到的工具都是并集；换模式只换 `complete` 段文本。**模型不自己切模式**：提示词与工具描述写死「学生没提不要切」，`setup` 更是 `switchable: false`。
 - **跨会话只靠 bank + memory，零注入**。新会话靠提示词让模型开场 `bank_list` 找 pending `handoff`，不用 `agent.inject()`（要额外 host 插件、时机含糊、永久占 user 位）。代价：模型可能忘记读。
 - **交接卡片**：模型写 `handoff` → 壳渲染卡片 → 学生点 → 客户端 `session.create` + `uiWorkspace.openSession` + `conversation.input.requestDraftInitialization` 把「接着上次那道题：<id>（<状态>）」填进输入框（学生自己回车，零注入不变）+ `/bank/api` 的 `handoff.consume`。幂等靠列表 + `localStorage`（Host `sessionId` 不能自命名）。`create` 拿已开始过的 sessionId 会静默新开（`api/session-controller/src/agent.ts:488`），点前先查列表。
@@ -177,7 +177,7 @@
 - **billion-context 没接**：0.1.208 装在 `~/.dsh/profiles/desktop`，**改请求不改历史**（全 dist 里 `CompactionEngine` / `compactRegion` / `surfaceOp` 各 0 次），bundle patch 只给 `preset-standard/ptc/minimal/cordis` 加 `inject`，我们两个预设不在名单（host 平面 hook 理论生效，需真机验）。接进来要连 `mysql2` + `zod` 一起 vendor 才能离线装。
 - **旧会话不可恢复**：四个静态预设 `guide` / `work` / `hrl` / `setup` 的声明都撤了（现在 `work` 是新做题预设，`guide`/`work`/`hrl` 只是会话内人格）。`meta.agentPreset` 指旧 id 的会话 resume 会被直接拒；要兼容得写一次旧 meta 迁移，暂不做。
 - **`scripts/verify-patch-references.mjs` 要不要接进 `check:layout`**：现在孤儿。接进去补丁失配当天就红；代价是它把「vendor 里留着一个没人装的包」这种合法状态也判失败（当前会红一次）。
-- **图片链路**（拍照发题 → 模型看得见 → 存进 `attachments`）：李 2026-10-23 说之后搞。
+- **图片链路：代码已通，真机没验**（2026-11-04）。`bank_add` 把当前消息（及 10 分钟内紧邻带图消息）的图复制进 `<id>/images/`，`bank_image` 读回并回灌 `ctx.attachments.saveImage()` 给模型。**还没做的**：真机让学生拍一张真照片走完一轮，确认 deepseek-flash 的 Files API 上传（`llm-deepseek/src/files-api.ts`，7 天过期 / 单请求 20 MB）在真 key 下通得过——单测替不了这一段。
 - **独立 Evaluator**（廉价模型按五条硬规则校验上一轮回复：给动作了吗、含答案了吗、一次两个视角了吗、超两句话了吗、空表扬了吗）：等第一条效果数据。
 
 ## 明确不做
@@ -221,7 +221,7 @@
 2. `dsh-plugin-desktop/dist/` 会堆到 1.5G（Setup 262MB + `win-unpacked` 1.2G）；腾地方先删 `win-unpacked`（可重建）。
 3. **根 `node_modules` 没有 `.bin`**：包内别写 `../node_modules/.bin/vitest`，一律 `corepack yarn workspace <pkg> typecheck|test|build`。`build:client` 需要包里有 `vite`（bankmanager devDependencies 8.2.1，同桌面包版本）。
 4. **根 `corepack yarn check` 不跑插件包单测**（根 `test` 只有 `yarn workspace dsh-plugin-desktop test`）——改插件必须自己跑。`corepack yarn check:plugins` 是补的那道（9 包 typecheck + setup/bankmanager/memory/textbook/schedule 单测，串行约 100 s），**故意不接进 `check`**：接进去全量门从 346 s 涨到约 445 s，且 memory 189 用例在并行负载下会撞 5 s 超时（独占跑 23.5 s 全过）——那种红是调度抖动不是缺陷。
-5. **双语门 2026-11-01 拆了**（李定：删 `README.en.md` / `PRIVACY.*` / `CONTRIBUTING.*` / `CODE_OF_CONDUCT.*` 那批上游模板的同时）：`scripts/bilingual-docs.mjs` / `verify-bilingual-docs.mjs` / `record-bilingual-docs.mjs` / 同名 test 与 44 份 `*.i18n.yaml` 全删，`check:layout` 只剩 inspector-compat、icons、vendored runtime、verify-layout 四路；`docs:record` / `check:bilingual-docs` / `test:bilingual-docs` 三个脚本一并没了——别再 `yarn docs:record`。改完成对文档以前要重算哈希，现在不用管。
+5. **双语门 2026-11-01 拆了**（李定：删 `README.en.md` / `PRIVACY.*` / `CONTRIBUTING.*` / `CODE_OF_CONDUCT.*` 那批上游模板的同时）：`scripts/bilingual-docs.mjs` / `verify-bilingual-docs.mjs` / `record-bilingual-docs.mjs` / 同名 test 与 44 份 `*.i18n.yaml` 全删，`check:layout` 只剩 inspector-compat、icons、vendored runtime、verify-layout 四路；`docs:record` / `check:bilingual-docs` / `test:bilingual-docs` 三个脚本一并没了——别再 `yarn docs:record`。改完成对文档以前要重算哈希，现在不用管。**但漏了一处没拆干净**：`dsh-community-fabric/scripts/verify-docs.mjs` 还把 44 份 yaml 里的 10 份 fabric 记录列为必需文件并做 `git hash-object` 对账，`corepack yarn check` 因此从 2026-11-01 起一直是红的（`verify-fabric-docs: README.i18n.yaml is missing`），两天没人跑全量门。2026-11-03 把那段 pairs 对账与 `.i18n.yaml` 清单一起删了，`package.json` 的 `files` 也去掉 `README.i18n.yaml`；fabric 仍有 `.md`（英文）+ `.zh.md`（中文）成对正文，只是不再有哈希门。**教训**：删门禁配套文件时，grep 一遍谁在 `existsSync` 它们——门禁自己也会因为没人跑而静默。
 6. 26 个 Windows 基线单测的教训（已修，别改回去）：POSIX 字面量 `file:///tmp/...` 在 Windows 上 `fileURLToPath` 直接抛 `File URL path must be absolute`，而 `filePath()` 吞异常返回 `undefined` → Profile 边界识别全失效，fixture 要用 `pathToFileURL(join(tmpdir(), ...))`；PATH 用例不能拿 `D:` 喂按 `:` 切分的 PATH；`windowsNodeShim` 要用 `for %%I in ("%~dp0..") do set "X=%%~fI"` 规范化，否则留下未规范化的 `bin\..`。
 7. `scripts/verify-cli-runtime.mjs` 期望 `runAsNode: []` 是**断言写错了**：Windows 私有 node shim 是批处理，子进程丢掉 `ELECTRON_RUN_AS_NODE` 就会起 GUI 而不是 Node，保留是有意设计。
 8. CI 2026-10-25 剪到 Windows：只留 `changes`、`check`、`desktop-windows`、`upstream-command-windows`；macOS/Linux 打包整段删（学生只装 Windows）。2026-10-31 加 `release-windows.yml`：推 `v*` tag 才出 Release，tag 与 `package.json` 版本不一致直接失败。
@@ -251,7 +251,7 @@
 ### 上游与文档
 
 1. `deepseek-harness/` 禁止修改；子模块 pin 更新单独提交，别和桌面行为改动混一起。
-2. 命名规矩：**文档单语中文**（2026-11-01 起）。`README.en.md` / `PRIVACY.*` / `CONTRIBUTING.*` / `CODE_OF_CONDUCT.*` 连同 `*.i18n.yaml` 一并删了，根目录只留 `README.md` / `AGENTS.md` / `CLAUDE.md` / `LICENSE`；`README.zh.md` 兼容页更早（同日）已删。别再新增英文对照页——没有门禁会提醒你它们对不上了。
+2. 命名规矩：**文档单语中文**（2026-11-01 起）。`README.en.md` / `PRIVACY.*` / `CONTRIBUTING.*` / `CODE_OF_CONDUCT.*` 连同 `*.i18n.yaml` 一并删了，根目录只留 `README.md` / `AGENTS.md` / `CLAUDE.md` / `LICENSE`；`README.zh.md` 兼容页更早（同日）已删。别再新增英文对照页——没有门禁会提醒你它们对不上了。根目录那批删完后 `docs/` 下还留着 8 份 `*.en.md`（README / architecture / faq / plugin-development / plugin-ecosystem / upstream-sync / user-guide / why-desktop），2026-11-03 李定一并清掉：正文各删一行 `[English](…)` 切换链接，`docs/README.md` 的「README 文件怎么分工」一节改成单语说明，`dsh-community-fabric/README.md:54-55` 改指 `../docs/plugin-*.md`（fabric 的门禁会查本地链接存在性，所以删完必须同时改）。`vendor/dsh-claude-style/README.en.md` 是上游包自带的，别动。
 3. **项目记忆 `.dsh/storages/memory_project_*.json` 不进 git**（2026-10-31 李定，反转 10-28 的旧决定）：它是本机会话运行时写脏的账本，提交进来工作树永远不干净，还会把本机路径 / 会话细节一起分享出去。`.gitignore` 的 `.dsh/` 别删；要分享的项目知识写进 `AGENTS.md` / 包 `README.md` / `.agents/notes/`。
 4. **`resolutions` 的 patch 选择器是 `标识@描述符` 精确匹配**：写 `@earendil-works/pi-ai@npm:^1.0.2` 而依赖方声明 `npm:^1.1.0`，Yarn 就**静默忽略**（lock 里连 `patch:` 标记都没有，安装零告警）——pi-ai 的流式工具参数补丁因此从锁到 1.2.0 起一直没生效，2026-10-28 才被 grep 到。改依赖版本时 grep 一遍 `patches/` 选择器；`node scripts/verify-patch-references.mjs` 干这个（打印每份补丁有没有施主，非 0 表示有失效）。现对应 `@earendil-works/pi-ai@npm:^1.1.0` → `patches/pi-ai@1.2.0.patch`（删掉每次 delta 的 `block.arguments = parseStreamingJson(...)`，terminating 的 `toolcall_end` / `content_block_stop` 解析保留；副作用是流式过程中 `partial` 快照拿不到半成品 arguments）。
 5. **桌面壳同步不是 checkout 而是 rebase**：`upstream` remote = `anywhere-labs/dsh-desktop`，共享历史（分叉 `6a63b9730b`）。换新版 `git fetch upstream` 再 rebase / cherry-pick，冲突热点 `src/index.ts`、`cordis.patch.yml`、`build/installer.nsh`、`scripts/prepare-profile.mjs`；四层流程与失败信号表在 `docs/upstream-sync.md`。

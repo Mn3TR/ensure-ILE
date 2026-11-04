@@ -1,4 +1,4 @@
-import { BankError, createProblem, defaultBankDirectory, isReviewDue, listProblems, pendingHandoffs, readProblem, resumeView, summarizeProblem, summarizeStats, updateProblem } from "./store.js";
+import { BankError, attachProblemImages, createProblem, defaultBankDirectory, indexIsCurrent, isReviewDue, listProblems, migrateLegacyProblems, pendingHandoffs, readBankIndex, readProblem, readProblemImage, rebuildIndex, resumeView, summarizeProblem, summarizeStats, updateProblem } from "./store.js";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 import z from "@deepseek-ai/schemastery";
 //#region src/api.ts
@@ -227,6 +227,89 @@ function endOfToday(now = /* @__PURE__ */ new Date()) {
 function json(value) {
 	return JSON.stringify(value, null, 2);
 }
+/** A picture older than this no longer belongs to the exchange being answered. */
+const IMAGE_WINDOW_MS = 10 * 6e4;
+/** Pictures one `bank_image` call may return; the message-level image bound is the reason. */
+const MAX_IMAGES_PER_CALL = 4;
+/** Output schema of one durable image reference. */
+const IMAGE_REF_SCHEMA = {
+	type: "object",
+	additionalProperties: false,
+	properties: {
+		attachmentId: {
+			type: "string",
+			required: true,
+			description: "存储标识"
+		},
+		mediaType: {
+			type: "string",
+			required: true,
+			description: "图片类型"
+		},
+		bytes: {
+			type: "number",
+			required: true,
+			description: "字节数"
+		},
+		width: {
+			type: "number",
+			required: true,
+			description: "宽"
+		},
+		height: {
+			type: "number",
+			required: true,
+			description: "高"
+		}
+	}
+};
+/** Image references carried by one user message's content. */
+function imagesOf(content) {
+	return content.flatMap((part) => part.type === "image" ? [part.attachment] : []);
+}
+/**
+* Pictures from the prompt this call is answering.
+*
+* Walks back over the user messages of the current exchange — a photo sent on
+* its own and a "这题怎么做" typed after it are the same question — and stops
+* once the messages are older than {@link IMAGE_WINDOW_MS}, so the previous
+* problem's picture never rides along by accident.
+* @param agent - the agent owning the tool call.
+* @param now - clock injection for tests.
+*/
+function promptImages(agent, now = Date.now()) {
+	if (agent === void 0) return [];
+	const session = agent.session;
+	const nodes = session.surface.nodes;
+	for (let index = nodes.length - 1; index >= 0; index -= 1) {
+		const seq = nodes[index];
+		if (seq === void 0) continue;
+		const event = session.eventAt(seq);
+		if (event === void 0 || event.type !== "user/message") continue;
+		if (event.time > now || now - event.time > IMAGE_WINDOW_MS) return [];
+		const images = imagesOf(event.data.content);
+		if (images.length > 0) return images;
+	}
+	return [];
+}
+/** Copy the prompt's pictures into the problem folder; a no-op without an attachment store. */
+async function captureImages(ctx, agent, directory, id) {
+	const images = promptImages(agent);
+	if (images.length === 0) return 0;
+	const reader = ctx.get("attachments", false);
+	if (reader === void 0) return 0;
+	const copies = [];
+	for (const image of images) {
+		const stored = await reader.readImage(image);
+		copies.push({
+			data: stored.data,
+			mediaType: image.mediaType,
+			width: image.width,
+			height: image.height
+		});
+	}
+	return (await attachProblemImages(directory, id, copies)).attachments.length;
+}
 /**
 * Mount the bank tools on this scope.
 * @param ctx - profile-root context; the row registers host-wide tools.
@@ -234,6 +317,16 @@ function json(value) {
 */
 function apply(ctx, config) {
 	const directory = config.directory !== void 0 && config.directory.length > 0 ? config.directory : defaultBankDirectory();
+	try {
+		const migration = migrateLegacyProblems(directory);
+		if (migration.migrated.length > 0) ctx.logger.info("dsh-plugin-bankmanager: migrated %d legacy problem files into folders", migration.migrated.length);
+		for (const skipped of migration.skipped) ctx.logger.warn("dsh-plugin-bankmanager: left %s in place: %s", skipped.file, skipped.reason);
+	} catch (error) {
+		ctx.logger.warn("dsh-plugin-bankmanager: legacy migration failed: %o", error);
+	}
+	rebuildIndex(directory).catch((error) => {
+		ctx.logger.warn("dsh-plugin-bankmanager: could not rebuild bank index: %o", error);
+	});
 	const scoped = ctx;
 	if (typeof scoped.inject === "function") scoped.inject(["webServer", "webStartup"], (webCtx) => {
 		mountBankApi(webCtx, directory);
@@ -245,6 +338,7 @@ function apply(ctx, config) {
 			"用在：学生第一次把一道题发给你、或者你判断这次要开始引导一道新题时。",
 			"statement 是题干原文，尽量完整（含小问）；subject 是科目，自由写（math、arts、physics、chemistry…）；",
 			"tags 可选，放知识点。",
+			"学生这条消息里带的图片会自动存进这道题的文件夹，不用另做一步；图片不在手上了就用 bank_list 先找题。",
 			"同一道题只建一次：不确定建过没有，先用 bank_list 看。"
 		].join("\n"),
 		parameters: {
@@ -271,16 +365,106 @@ function apply(ctx, config) {
 				text: value
 			}]
 		},
-		execute: async (args) => {
+		execute: async (args, exec) => {
 			try {
 				const record = await createProblem(directory, {
 					statement: args.statement,
 					subject: args.subject,
 					...args.tags === void 0 ? {} : { tags: args.tags }
 				});
-				return "已建题：" + record.id + "\n状态：new，科目：" + record.subject;
+				let imageNote = "";
+				try {
+					const captured = await captureImages(ctx, exec.agent, directory, record.id);
+					if (captured > 0) imageNote = "\n图片：" + captured + " 张已存进题目文件夹";
+				} catch (error) {
+					imageNote = "\n图片没存成：" + explain(error);
+				}
+				return "已建题：" + record.id + "\n状态：new，科目：" + record.subject + imageNote;
 			} catch (error) {
 				return explain(error);
+			}
+		}
+	}));
+	ctx.tools.register(defineTool({
+		name: "bank_image",
+		description: [
+			"把题目里存着的图片重新给你看。",
+			"用在：bank_show 显示这道题有附件，而你要看图才能讲；或者学生问的就是图上的东西，但这条消息里没带图。",
+			"一次最多 4 张：默认全给，which 指定第几张（从 1 开始）。"
+		].join("\n"),
+		parameters: {
+			id: {
+				type: "string",
+				required: true,
+				description: "题目 id"
+			},
+			which: {
+				type: "integer",
+				description: "要第几张（从 1 开始），省略就返回全部"
+			}
+		},
+		output: {
+			schema: {
+				type: "object",
+				additionalProperties: false,
+				properties: {
+					text: {
+						type: "string",
+						required: true,
+						description: "这道题有几张图、这次给了哪几张"
+					},
+					images: {
+						type: "array",
+						required: true,
+						items: IMAGE_REF_SCHEMA
+					}
+				}
+			},
+			render: (_args, value) => [{
+				type: "text",
+				text: value.text
+			}, ...value.images.map((image) => ({
+				type: "image",
+				attachment: image
+			}))]
+		},
+		execute: async (args) => {
+			try {
+				const record = readProblem(directory, args.id.trim());
+				if (record.attachments.length === 0) return {
+					text: "这道题没有存图片：" + record.id,
+					images: []
+				};
+				const store = ctx.get("attachments", false);
+				if (store === void 0) return {
+					text: "这个 profile 没挂附件服务，图读不出来。",
+					images: []
+				};
+				const total = record.attachments.length;
+				const wanted = args.which === void 0 ? record.attachments.slice(0, MAX_IMAGES_PER_CALL) : [record.attachments[args.which - 1]].filter((entry) => entry !== void 0);
+				if (wanted.length === 0) return {
+					text: "这道题只有 " + total + " 张图，没有第 " + String(args.which) + " 张。",
+					images: []
+				};
+				const images = [];
+				for (const entry of wanted) {
+					const data = readProblemImage(directory, record.id, entry);
+					images.push(await store.saveImage({
+						data,
+						mediaType: entry.mediaType,
+						name: entry.file
+					}));
+				}
+				const left = total - images.length;
+				return {
+					text: "题目 " + record.id + " 有 " + total + " 张图，这次给了 " + images.length + " 张" + (left > 0 ? "（还有 " + left + " 张，用 which 指定）" : "") + "。",
+					images
+				};
+			} catch (error) {
+				return {
+					text: explain(error),
+					images: []
+				};
 			}
 		}
 	}));
@@ -321,6 +505,8 @@ function apply(ctx, config) {
 		execute: async (args) => {
 			try {
 				const { records, skipped } = listProblems(directory);
+				const ids = records.map((record) => record.id);
+				if (!indexIsCurrent(readBankIndex(directory), ids)) await rebuildIndex(directory);
 				let rows = records;
 				if (args.status !== void 0 && args.status.length > 0) rows = rows.filter((record) => record.status === args.status);
 				if (args.subject !== void 0 && args.subject.length > 0) {

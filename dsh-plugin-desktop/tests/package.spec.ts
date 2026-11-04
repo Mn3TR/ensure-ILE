@@ -809,7 +809,7 @@ describe('published package surface', () => {
 
   it('fixes the installed application identity', () => {
     expect(workspaceManifest.version).toBeUndefined()
-    expect(manifest.version).toBe('0.1.0-alpha3')
+    expect(manifest.version).toBe('0.1.0-alpha4')
     expect(manifest.build?.productName).toBe('ensure-ILE')
     expect(manifest.build?.appId).toBe('com.ensurelab.ensureile')
     expect(manifest.build?.asar).toBe(false)

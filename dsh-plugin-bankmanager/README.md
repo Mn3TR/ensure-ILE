@@ -4,13 +4,14 @@
 
 ## 什么时候用
 
-不是 agent preset：`cordis.patch.yml` 往 profile 根插一行 `dsh-plugin-bankmanager`，所以**所有会话**都能看到这六个工具。它是「题」的唯一事实来源。
+不是 agent preset：`cordis.patch.yml` 往 profile 根插一行 `dsh-plugin-bankmanager`，所以**所有会话**都能看到这七个工具。它是「题」的唯一事实来源。
 
 | 工具 | 用途 | 关键参数 |
 |---|---|---|
-| `bank_add` | 新建一道题，返回 id | `statement`（必填，题干原文）、`subject`（必填，自由字符串）、`tags`（可省略） |
+| `bank_add` | 新建一道题，返回 id；学生这条消息里带的图片自动存进题目文件夹 | `statement`（必填，题干原文）、`subject`（必填，自由字符串）、`tags`（可省略） |
 | `bank_list` | 按条件列题 | `status`、`subject`、`due`（`true` 只看今天到期）、`limit`（默认 20，夹到 1–100，取**最后** N 条） |
 | `bank_show` | 看一道题的全部记录 | `id`（必填） |
+| `bank_image` | 把题目里存的图重新给模型看（最多 4 张） | `id`（必填）、`which`（第几张，从 1 开始；省略＝全部） |
 | `bank_update` | 增量改，只合并传了的字段 | `id` + 任意：`status`、`guideOutcome`、`whereStuck`、`guideResult`、`insight`、`reviewNextAt`、`reviewInterval`、`reviewPassed`、`affect`、`effectiveHint`、`workAttempt{answer,verdict}`、`hrl{input,teacher,step,result}`、`handoff{from,to,why,state,detail}`、`handoffConsume`、`patch`（自由字段浅合并） |
 | `bank_resume` | 不带 `id` 列待接交接；带 `id` 返回题干 + 交接包 + `insight` + 最后一次作答 | `id`（可省略） |
 | `bank_stats` | 各状态计数，另有「待接交接：N」 | 无参数 |
@@ -32,16 +33,24 @@ new ──> guide ──> review ──> mastered
 ## 数据落在哪
 
 ```
-<DSH_HOME>/bank/problems/<id>.json
+<DSH_HOME>/bank/problems/
+  index.json          派生目录：只有 id 清单，删了能一键重建
+  <id>/
+    problem.json      记录（schema 2）
+    images/<sha256>.png  学生发来的图片，字节就存在这里
+    .lock             updateProblem / attachProblemImages 的跨进程锁
 ```
 
+- **一题一个文件夹**（2026-11-04 改；之前是一题一个 `<id>.json`）。老账本由 `migrateLegacyProblems()` 在挂载时迁一次：读回校验通过才把老文件改名 `<id>.json.migrated`，搬不动的留在原处并在日志里点名。迁移幂等，`listProblems` 只认目录。
+- 拷走一个文件夹就是完整的一道题（题干、历史、图）；反过来，只拷 `problem.json` 会留下指向不存在图片的引用。
 - `<DSH_HOME>` 没设时退 `USERPROFILE` / `HOME` 下的 `.dsh`；桌面壳里是数据根的 `home`。`Config.directory` 可覆盖。
-- id = `YYYYMMDD-<subject 归一化>-<6 位 hex>`（`randomBytes(3)`），例如 `20261023-math-a3f91c`。日期段让文件名排序等于录入顺序。
+- id = `YYYYMMDD-<subject 归一化>-<6 位 hex>`（`randomBytes(3)`），例如 `20261023-math-a3f91c`。日期段让文件夹排序等于录入顺序。
 - `schema: 2`，按模式分块 + 跨模式的 `handoff`：
 
 ```jsonc
 {
-  "schema": 2, "id": "…", "subject": "math", "tags": [], "statement": "题干", "attachments": [],
+  "schema": 2, "id": "…", "subject": "math", "tags": [], "statement": "题干",
+  "attachments": [{ "file": "images/<sha256>.png", "sha256": "…", "mediaType": "image/png", "bytes": 40043, "width": 1280, "height": 960, "addedAt": "…" }],
   "status": "new|guide|hrl|review|mastered|parked", "createdAt": "…", "updatedAt": "…",
   "guide":     { "sessions": [{ "sessionId", "startedAt", "endedAt", "outcome", "whereStuck", "result", "affect", "effectiveHint" }], "insight": "…" },
   "work":      { "attempts": [{ "at", "answer", "verdict": "ok|partial|wrong", "source" }] },
@@ -101,5 +110,5 @@ corepack yarn workspace dsh-plugin-bankmanager verify       # node scripts/verif
 
 - 不引导、不判卷、不评价——那些是各模式的事；本包只记录、调度、把交接递给下一个模式。
 - 不采集偏好信号、不做打分界面。
-- 不做图片链路：`attachments` 字段留着，拍照/粘贴入口未做。
+- 图片的账号是题目文件夹：`bank_add` 把当前这条消息里的图（以及 10 分钟内紧邻的带图消息）复制进 `images/`，`bank_image` 读的是这份字节，只在喂模型前回灌一次 `ctx.attachments.saveImage()`。上游 `attachments/v1/objects/` 里那份是可重建的缓存，删了不影响账本。
 - 不做多用户 / 多库 / 按学期分库。

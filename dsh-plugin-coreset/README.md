@@ -31,6 +31,7 @@
 - 工具**只置一个待办意图**（每会话一份），不改历史、不动工具表。返回「已安排切到「X」：学生下一次开口时…这一轮还没说完的话，现在说完」。
 - 落到历史发生在**学生下一次开口的第一个 pre-step**（`step === 1`；`step !== 1` 一律放过，否则会把进行中的 tool call 折掉、留下没有 result 的孤儿）。
 - 落的方式：先 `append('ile/mode')`，再追加一条 `user/message`——正文是交接通知（`【交接】从「引导模式」换到「独立做题」。…`），`source.kind = 'ile-handoff'`，`surfaceOp` 是 `replace(nodes[1] … nodes.at(-1))`，`sourceEventSeqs` 列出被折掉的每个节点。**node 0 不碰**：runtime 在 surface generation 变化时用新模式的文本原地替换它（不是追加第二条 system）。
+- **图会跟着走**：折叠前把被折那段的 `user/message` 里的图片块捞出来（`carriedImages`，按 attachmentId 去重、取最近 ≤4 张、跳过 `offloaded` 的），接在通知正文后面当**同一条**消息的 `[text, ...images]`。字节不复制——图片块是引用，`attachments` 里同一份；学生拍的那张题图在切换后模型照样看得见。
 - 能拒的东西在第一次 append 之前就算完（notice、range）；任何一步抛错就整段不落，意图留在 `pendingIntents` 里等下一个 turn 边界重试。
 
 ## 文本什么时候翻
@@ -64,7 +65,7 @@
 
 ```bash
 corepack yarn workspace dsh-plugin-coreset typecheck
-corepack yarn workspace dsh-plugin-coreset test    # 11 个用例（handoff 8 + presets 3）
+corepack yarn workspace dsh-plugin-coreset test    # 19 个用例（handoff 15 + presets 4）
 corepack yarn workspace dsh-plugin-coreset build
 ```
 
@@ -74,7 +75,8 @@ corepack yarn workspace dsh-plugin-coreset build
 
 ## 已知限制
 
-- 折叠**不可逆**：原文还在会话日志里，但模型与界面都看不到它了；要做「展开」得另做一套读日志的界面。
+- 折叠**不可逆**：原文还在会话日志里，但模型与界面都看不到它了；要做「展开」得另做一套读日志的界面。文字之外只有**图片**被保留（最多 4 张），别的附件类型（`file` 块）随对话一起消失。
+- 取被折那段的内容用的是已弃用的同步读 `session.eventAt()`（`foldedImages`）：上游 2026-09-09 的 Agent Note 禁止新调用者，可 Session 还没有异步窗口，而折叠必须知道它替换掉的是什么；上游自己的 `compaction-tool-result-pruner` 也是这么读的。哪天 Session 出了异步读，这处是唯一要改的地方。
 - 摘要上限 120 字（`HANDOFF_SUMMARY_MAX_CHARS`），超出截断加省略号——长交接会丢细节。
 - 一次切换只在下一个 turn 边界落一次；落失败就留到再下一个边界（日志里有 `failed to fold history at the switch` 警告）。
 - 换模式不换工具集：同一预设里工具永远是并集，模型要靠提示词约束「哪些工具此刻合适」。

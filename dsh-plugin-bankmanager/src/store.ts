@@ -1,21 +1,49 @@
 /**
- * Problem-bank storage: one JSON file per problem under `<DSH_HOME>/bank/problems`.
+ * Problem-bank storage: one directory per problem under `<DSH_HOME>/bank/problems`.
  *
- * A record holds everything that ever happened to one problem — the statement,
- * the guide sessions, attempts, the review schedule and an append-only history.
- * Files are written atomically and read defensively: one broken file is skipped
- * and reported, never a reason to fail a listing.
+ * `<id>/problem.json` holds everything that ever happened to one problem — the
+ * statement, the guide sessions, attempts, the review schedule and an append-only
+ * history; `<id>/images/` holds the pictures that came with it, copied out of the
+ * inbound attachment pipeline so a problem travels as one folder. Files are
+ * written atomically and read defensively: one broken folder is skipped and
+ * reported, never a reason to fail a listing.
  * @module dsh-plugin-bankmanager/store
  */
 
-import { randomBytes } from 'node:crypto'
-import { mkdirSync, readdirSync, readFileSync, existsSync } from 'node:fs'
+import { createHash, randomBytes } from 'node:crypto'
+import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import { writeFileAtomic, withFileLock } from '@deepseek-ai/dsh-atomic-write'
 
 /** Statuses a problem can carry. */
 export const PROBLEM_STATUSES = ['new', 'guide', 'hrl', 'review', 'mastered', 'parked'] as const
 export type ProblemStatus = (typeof PROBLEM_STATUSES)[number]
+
+/** Record file inside one problem folder. */
+export const PROBLEM_FILE = 'problem.json'
+
+/** Derived table of contents beside the problem folders. */
+export const BANK_INDEX_FILE = 'index.json'
+
+/** Image folder inside one problem folder. */
+export const IMAGES_DIR = 'images'
+
+/** Source formats accepted for problem pictures, matching the inbound pipeline. */
+export const PROBLEM_IMAGE_MEDIA_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const
+export type ProblemImageMediaType = (typeof PROBLEM_IMAGE_MEDIA_TYPES)[number]
+
+/** One picture copied into a problem folder. */
+export interface ProblemAttachment {
+  /** Path relative to the problem folder, `images/<sha256>.<ext>`. */
+  file: string
+  /** Digest of the stored bytes; the file name without its extension. */
+  sha256: string
+  mediaType: ProblemImageMediaType
+  bytes: number
+  width?: number
+  height?: number
+  addedAt: string
+}
 
 /** How one guide session ended. */
 export const GUIDE_OUTCOMES = ['solved', 'stuck', 'abandoned'] as const
@@ -154,7 +182,7 @@ export interface ProblemRecord {
   subject: string
   tags: string[]
   statement: string
-  attachments: unknown[]
+  attachments: ProblemAttachment[]
   status: ProblemStatus
   createdAt: string
   updatedAt: string
@@ -225,10 +253,31 @@ export function defaultBankDirectory(home: string | undefined = process.env.DSH_
   return join(resolved, 'bank', 'problems')
 }
 
-/** Path of one problem file. */
-export function problemPath(directory: string, id: string): string {
+/** Folder of one problem; the id is the folder name. */
+export function problemDir(directory: string, id: string): string {
   if (!/^[a-z0-9-]+$/u.test(id)) throw new BankError('题目 id 不合法：' + id, 'invalid-id')
-  return join(directory, id + '.json')
+  return join(directory, id)
+}
+
+/** Path of the record inside one problem folder. */
+export function problemPath(directory: string, id: string): string {
+  return join(problemDir(directory, id), PROBLEM_FILE)
+}
+
+/** File extension for one accepted image type. */
+export function mediaTypeExtension(mediaType: string): string {
+  switch (mediaType) {
+    case 'image/png': return 'png'
+    case 'image/jpeg': return 'jpg'
+    case 'image/webp': return 'webp'
+    case 'image/gif': return 'gif'
+    default: throw new BankError('不支持的图片类型：' + mediaType, 'invalid-input')
+  }
+}
+
+/** Relative path one stored image keeps inside its problem folder. */
+export function imageRelPath(sha256: string, mediaType: string): string {
+  return IMAGES_DIR + '/' + sha256 + '.' + mediaTypeExtension(mediaType)
 }
 
 function asString(value: unknown, field: string): string {
@@ -239,6 +288,33 @@ function asString(value: unknown, field: string): string {
 function asArray<T>(value: unknown, field: string): T[] {
   if (!Array.isArray(value)) throw new BankError('字段 ' + field + ' 必须是数组', 'invalid-record')
   return value as T[]
+}
+
+/** Validate the picture list; an older record's empty list stays valid. */
+function parseAttachments(raw: unknown): ProblemAttachment[] {
+  if (!Array.isArray(raw)) throw new BankError('字段 attachments 必须是数组', 'invalid-record')
+  return raw.map((entry: unknown) => {
+    if (typeof entry !== 'object' || entry === null) throw new BankError('attachments 的条目必须是对象', 'invalid-record')
+    const value = entry as Record<string, unknown>
+    const recorded = asString(value.file, 'attachments.file')
+    const sha256 = asString(value.sha256, 'attachments.sha256')
+    const mediaType = asString(value.mediaType, 'attachments.mediaType')
+    if (!/^images\/[a-f0-9]{64}\.(png|jpg|webp|gif)$/u.test(recorded)) {
+      throw new BankError('attachments.file 必须是 images/<sha256>.<ext>：' + recorded, 'invalid-record')
+    }
+    if (!(PROBLEM_IMAGE_MEDIA_TYPES as readonly string[]).includes(mediaType)) {
+      throw new BankError('未知图片类型 ' + mediaType, 'invalid-record')
+    }
+    return {
+      file: recorded,
+      sha256,
+      mediaType: mediaType as ProblemImageMediaType,
+      bytes: typeof value.bytes === 'number' ? value.bytes : 0,
+      ...(typeof value.width === 'number' ? { width: value.width } : {}),
+      ...(typeof value.height === 'number' ? { height: value.height } : {}),
+      addedAt: asString(value.addedAt, 'attachments.addedAt'),
+    }
+  })
 }
 
 /**
@@ -268,7 +344,7 @@ export function parseRecord(raw: unknown): ProblemRecord {
     subject: asString(value.subject, 'subject'),
     tags: asArray<string>(value.tags ?? [], 'tags'),
     statement: asString(value.statement, 'statement'),
-    attachments: asArray<unknown>(value.attachments ?? [], 'attachments'),
+    attachments: parseAttachments(value.attachments ?? []),
     status,
     createdAt: asString(value.createdAt, 'createdAt'),
     updatedAt: asString(value.updatedAt, 'updatedAt'),
@@ -310,12 +386,12 @@ export function listProblems(directory: string): ProblemListing {
   if (!existsSync(directory)) return { records: [], skipped: [] }
   const records: ProblemRecord[] = []
   const skipped: { file: string; reason: string }[] = []
-  for (const file of readdirSync(directory)) {
-    if (!file.endsWith('.json')) continue
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
     try {
-      records.push(parseRecord(JSON.parse(readFileSync(join(directory, file), 'utf8'))))
+      records.push(parseRecord(JSON.parse(readFileSync(join(directory, entry.name, PROBLEM_FILE), 'utf8'))))
     } catch (error) {
-      skipped.push({ file, reason: error instanceof Error ? error.message : String(error) })
+      skipped.push({ file: entry.name, reason: error instanceof Error ? error.message : String(error) })
     }
   }
   records.sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id))
@@ -327,6 +403,8 @@ export interface CreateProblemInput {
   statement: string
   subject: string
   tags?: string[]
+  /** Pictures already copied into the problem folder. */
+  attachments?: ProblemAttachment[]
   now?: Date
   suffix?: string
 }
@@ -342,7 +420,7 @@ export async function createProblem(directory: string, input: CreateProblemInput
   let id = ''
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const candidate = makeProblemId(subject, now, attempt === 0 ? input.suffix : undefined)
-    if (!existsSync(problemPath(directory, candidate))) {
+    if (!existsSync(problemDir(directory, candidate))) {
       id = candidate
       break
     }
@@ -354,7 +432,7 @@ export async function createProblem(directory: string, input: CreateProblemInput
     subject,
     tags: input.tags ?? [],
     statement,
-    attachments: [],
+    attachments: input.attachments ?? [],
     status: 'new',
     createdAt: at,
     updatedAt: at,
@@ -363,8 +441,162 @@ export async function createProblem(directory: string, input: CreateProblemInput
     review: { count: 0, history: [] },
     history: [{ at, event: 'created' }],
   }
+  mkdirSync(problemDir(directory, id), { recursive: true })
   await writeFileAtomic(problemPath(directory, id), JSON.stringify(record, null, 2) + '\n', { mode: 0o600, dirMode: 0o700 })
+  await rebuildIndex(directory)
   return record
+}
+
+/**
+ * Copy one picture into a problem folder and describe it for the record.
+ *
+ * The bytes come from the inbound attachment pipeline already normalized, so
+ * the digest names the stored file and a repeated save is a no-op. The caller
+ * still has to put the returned entry into `record.attachments`.
+ * @param directory - bank directory.
+ * @param id - problem id.
+ * @param input - normalized bytes, their declared type and pixel size.
+ * @returns the entry to store in the record.
+ */
+export async function saveProblemImage(
+  directory: string,
+  id: string,
+  input: { data: Uint8Array; mediaType: ProblemImageMediaType; width?: number; height?: number; now?: Date },
+): Promise<ProblemAttachment> {
+  const sha256 = createHash('sha256').update(input.data).digest('hex')
+  const file = imageRelPath(sha256, input.mediaType)
+  const folder = problemDir(directory, id)
+  mkdirSync(join(folder, IMAGES_DIR), { recursive: true })
+  const target = join(folder, file)
+  if (!existsSync(target)) {
+    await writeFileAtomic(target, input.data, { mode: 0o600, dirMode: 0o700 })
+  }
+  return {
+    file,
+    sha256,
+    mediaType: input.mediaType,
+    bytes: input.data.byteLength,
+    ...(input.width === undefined ? {} : { width: input.width }),
+    ...(input.height === undefined ? {} : { height: input.height }),
+    addedAt: (input.now ?? new Date()).toISOString(),
+  }
+}
+
+/**
+ * Read one picture back out of a problem folder.
+ * @param directory - bank directory.
+ * @param id - problem id.
+ * @param attachment - the entry from the record.
+ * @returns the exact stored bytes.
+ * @throws a BankError when the file is missing or no longer matches its digest.
+ */
+export function readProblemImage(directory: string, id: string, attachment: ProblemAttachment): Uint8Array {
+  const target = join(problemDir(directory, id), attachment.file)
+  if (!existsSync(target)) throw new BankError('题目图片缺失：' + id + '/' + attachment.file, 'not-found')
+  const data = readFileSync(target)
+  const digest = createHash('sha256').update(data).digest('hex')
+  if (digest !== attachment.sha256) throw new BankError('题目图片与记录不符：' + id + '/' + attachment.file, 'corrupt')
+  return data
+}
+
+/** One picture handed to {@link attachProblemImages}. */
+export interface ProblemImageInput {
+  data: Uint8Array
+  mediaType: ProblemImageMediaType
+  width?: number
+  height?: number
+}
+
+/**
+ * Copy pictures into one problem folder and record them, under the same lock an update takes.
+ *
+ * Entries already recorded with the same digest are left alone, so re-running with
+ * the same picture adds nothing.
+ * @param directory - bank directory.
+ * @param id - problem id.
+ * @param images - normalized bytes in the order they arrived.
+ * @returns the updated record.
+ */
+export async function attachProblemImages(
+  directory: string,
+  id: string,
+  images: readonly ProblemImageInput[],
+): Promise<ProblemRecord> {
+  if (images.length === 0) return readProblem(directory, id)
+  return withFileLock(join(problemDir(directory, id), '.lock'), async () => {
+    const record = readProblem(directory, id)
+    const at = new Date().toISOString()
+    const events: string[] = []
+    for (const image of images) {
+      const entry = await saveProblemImage(directory, id, image)
+      if (record.attachments.some(existing => existing.sha256 === entry.sha256)) continue
+      record.attachments.push(entry)
+      events.push('image ' + entry.sha256.slice(0, 12))
+    }
+    if (events.length === 0) return record
+    record.updatedAt = at
+    for (const event of events) record.history.push({ at, event })
+    await writeFileAtomic(problemPath(directory, id), JSON.stringify(record, null, 2) + '\n', { mode: 0o600, dirMode: 0o700 })
+    return record
+  })
+}
+
+/** What one legacy migration pass did. */
+export interface LegacyMigration {
+  migrated: string[]
+  skipped: { file: string; reason: string }[]
+}
+
+/**
+ * Move `problems/<id>.json` records into `problems/<id>/problem.json` once.
+ *
+ * Idempotent and non-destructive: the legacy file is renamed to `.migrated`
+ * only after the new record reads back with the same id, and anything that
+ * cannot be moved is left exactly where it is.
+ * @param directory - bank directory.
+ * @returns the ids that moved and the files that stayed, with reasons.
+ */
+export function migrateLegacyProblems(directory: string): LegacyMigration {
+  const result: LegacyMigration = { migrated: [], skipped: [] }
+  if (!existsSync(directory)) return result
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (!entry.isDirectory() && entry.name.endsWith('.json') && entry.name !== BANK_INDEX_FILE) {
+      const file = entry.name
+      const id = file.slice(0, -'.json'.length)
+      if (!/^[a-z0-9-]+$/u.test(id)) {
+        result.skipped.push({ file, reason: '不是合法的题目 id' })
+        continue
+      }
+      const legacy = join(directory, file)
+      if (existsSync(problemPath(directory, id))) {
+        renameSync(legacy, legacy + '.migrated')
+        result.skipped.push({ file, reason: '目标文件夹已存在，旧文件改名为 .migrated' })
+        continue
+      }
+      let raw: unknown
+      try {
+        raw = JSON.parse(readFileSync(legacy, 'utf8'))
+      } catch (error) {
+        result.skipped.push({ file, reason: error instanceof Error ? error.message : String(error) })
+        continue
+      }
+      try {
+        const record = parseRecord(raw)
+        if (record.id !== id) throw new BankError('记录里的 id 与文件名不一致：' + record.id, 'invalid-record')
+        const folder = problemDir(directory, id)
+        mkdirSync(folder, { recursive: true })
+        const target = problemPath(directory, id)
+        if (!existsSync(target)) writeFileSync(target, JSON.stringify(record, null, 2) + '\n')
+        const readBack = readProblem(directory, id)
+        if (readBack.id !== id) throw new BankError('迁移后读回的 id 不对：' + readBack.id, 'invalid-record')
+        renameSync(legacy, legacy + '.migrated')
+        result.migrated.push(id)
+      } catch (error) {
+        result.skipped.push({ file, reason: error instanceof Error ? error.message : String(error) })
+      }
+    }
+  }
+  return result
 }
 
 /** One handed-in answer from work mode. */
@@ -505,7 +737,7 @@ function consumeHandoff(record: ProblemRecord, sessionId: string, at: string): s
  */
 export async function updateProblem(directory: string, id: string, input: UpdateProblemInput): Promise<ProblemRecord> {
   const file = problemPath(directory, id)
-  return withFileLock(file, async () => {
+  return withFileLock(join(problemDir(directory, id), '.lock'), async () => {
     const record = readProblem(directory, id)
     const now = input.now ?? new Date()
     const at = now.toISOString()
@@ -718,4 +950,67 @@ export function summarizeStats(records: ProblemRecord[], limit = 5): BankStats {
     .slice(0, limit)
     .map(record => ({ id: record.id, status: record.status, updatedAt: record.updatedAt }))
   return { total: records.length, byStatus, bySubject, pendingHandoffs, stalest }
+}
+
+/** The derived table of contents: which problems the folder directory holds. */
+export interface BankIndex {
+  schema: 1
+  updatedAt: string
+  /** Problem ids in folder order, which is creation order. */
+  problems: string[]
+}
+
+/** Path of the bank index inside the problem directory. */
+export function indexPath(directory: string): string {
+  return join(directory, BANK_INDEX_FILE)
+}
+
+/**
+ * Read the index, or nothing when it is missing or unreadable.
+ * @param directory - bank directory.
+ * @returns the index, if it parses.
+ */
+export function readBankIndex(directory: string): BankIndex | undefined {
+  const file = indexPath(directory)
+  if (!existsSync(file)) return undefined
+  try {
+    const raw = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
+    if (raw['schema'] !== 1 || !Array.isArray(raw['problems'])) return undefined
+    return {
+      schema: 1,
+      updatedAt: typeof raw['updatedAt'] === 'string' ? raw['updatedAt'] : '',
+      problems: raw['problems'].filter((id): id is string => typeof id === 'string'),
+    }
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Rewrite the index from the directory listing.
+ *
+ * The index is a cache, never a source of truth: it carries ids only, rebuilds
+ * in one `readdir`, and losing it costs one extra scan. Call it after a create
+ * and at mount; a stale entry can never hide or invent a problem.
+ * @param directory - bank directory.
+ * @param now - clock injection for tests.
+ * @returns the index just written.
+ */
+export async function rebuildIndex(directory: string, now: Date = new Date()): Promise<BankIndex> {
+  const problems = existsSync(directory)
+    ? readdirSync(directory, { withFileTypes: true })
+      .filter(entry => entry.isDirectory())
+      .map(entry => entry.name)
+      .sort()
+    : []
+  const index: BankIndex = { schema: 1, updatedAt: now.toISOString(), problems }
+  mkdirSync(directory, { recursive: true })
+  await writeFileAtomic(indexPath(directory), JSON.stringify(index, null, 2) + '\n', { mode: 0o600, dirMode: 0o700 })
+  return index
+}
+
+/** True when the index already names exactly these ids. */
+export function indexIsCurrent(index: BankIndex | undefined, ids: readonly string[]): boolean {
+  if (index === undefined || index.problems.length !== ids.length) return false
+  return index.problems.every((id, position) => id === ids[position])
 }
