@@ -1,6 +1,5 @@
 # Agent Note: Bundled pnpm for desktop plugins
 
-English | [中文](2026-08-15-desktop-bundled-pnpm-runtime.zh.md)
 
 ## Problem
 

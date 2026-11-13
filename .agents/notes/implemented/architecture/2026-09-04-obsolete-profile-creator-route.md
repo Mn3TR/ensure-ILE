@@ -2,7 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-04-obsolete-profile-creator-route.zh.md)
 
 ## Problem
 

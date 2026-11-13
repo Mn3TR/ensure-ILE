@@ -1,7 +1,6 @@
 # System proxy inheritance for Node-side egress
 
 Status: implemented in both editions.
-English | [中文](2026-09-20-system-proxy-inheritance.zh.md)
 
 ## The gap
 

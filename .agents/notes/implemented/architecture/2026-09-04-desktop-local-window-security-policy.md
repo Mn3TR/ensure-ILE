@@ -2,7 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-09-04-desktop-local-window-security-policy.zh.md)
 
 ## Problem
 

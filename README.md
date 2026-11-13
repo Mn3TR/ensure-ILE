@@ -34,24 +34,24 @@ Node `^22.19.0` 或 `>=24`，Yarn 4.18 走 Corepack。
 
 ```bash
 corepack yarn install --immutable
-corepack yarn build                               
-corepack yarn workspace dsh-plugin-desktop start  
-corepack yarn dist:win                             
+corepack yarn workspace dsh-plugin-desktop build     # 构建桌面壳
+corepack yarn workspace dsh-plugin-desktop start     # 跑起来
+corepack yarn workspace dsh-plugin-desktop dist:win  # 出 Windows 安装包
 ```
 
 测试：
 
 ```bash
-corepack yarn test                                   # 单测
-corepack yarn typecheck                              # 类型
-corepack yarn check                                  # 全量（不含插件包单测）
-corepack yarn check:plugins                          # 九个插件包
-corepack yarn workspace dsh-plugin-desktop test:ui   # 端到端 UI
+corepack yarn check          # 全量门：仓库根 + 十个插件包 + 桌面壳（约 8 min，CI 跑这个）
+corepack yarn check:full     # 再加端到端 UI（发布前）
+corepack yarn check:repo     # 只验仓库根：布局 / 图标 / vendor / 补丁
+corepack yarn check:plugins  # 只验十个插件包
+corepack yarn check:desktop  # 只验桌面壳（构建 + 类型 + 单测 + 六条 verify）
 ```
 
 ## Plan
 
-当前版本：0.1.0-alpha4
+当前版本：0.1.0-alpha8
 
 - [ ] 开始人工介入本项目，缩减vibe比例
 - [ ] 压缩引擎（长会话撞窗口会硬失败）、权限审批交互、native 四窗换 token 后没逐屏核、交接卡片、图片链路、独立 Evaluator

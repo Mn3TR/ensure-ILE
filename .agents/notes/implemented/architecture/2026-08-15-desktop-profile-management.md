@@ -1,6 +1,5 @@
 # Agent Note: Desktop profile management
 
-English | [中文](2026-08-15-desktop-profile-management.zh.md)
 
 ## Problem
 

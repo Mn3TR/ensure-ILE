@@ -2,7 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-08-15-pinned-upstream-and-isolated-yarn-workspace.zh.md)
 
 ## Problem
 

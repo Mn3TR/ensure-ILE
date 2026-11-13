@@ -20,7 +20,7 @@
 - **zod 内联**：`build-bundle.mjs` 用 esbuild 把 `zod` 打进 `dist/index.js`，`@deepseek-ai/*` 全部 external；`zod` 从 `dependencies` 挪到 `devDependencies`，profile 安装不碰注册表
 - **client id 跟包名走**：`build-client.mjs` 从 `package.json` 读 `name`，`src/client/index.tsx` 里两处硬编码一起改
 - `src/index.ts` 加一行 type-only 的 `@deepseek-ai/dsh-system-prompt` 导入——原来缺它，`ctx.systemPrompt` 的类型补不出来
-- devDeps 对齐 host 的 `0.2.1-rc.2`（原来锁 `0.2.0-rc.1`，类型对不上）
+- devDeps 对齐 host 的 `0.2.1-rc.3`（原来锁 `0.2.0-rc.1`，类型对不上）
 
 **还没改的**（下一轮要做的）：
 

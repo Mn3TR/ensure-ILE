@@ -2,7 +2,6 @@
 
 Status: implemented
 
-English | [中文](2026-08-19-native-shell-generation-and-platform-adapters.zh.md)
 
 ## Problem
 

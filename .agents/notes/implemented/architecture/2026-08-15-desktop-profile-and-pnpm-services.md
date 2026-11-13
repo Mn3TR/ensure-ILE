@@ -1,6 +1,5 @@
 # Agent Note: Desktop profile and package-manager services
 
-English | [中文](2026-08-15-desktop-profile-and-pnpm-services.zh.md)
 
 ## Problem
 
