@@ -65,6 +65,11 @@ export interface Shell {
 export interface LaunchOptions {
   /** `'full'` enters the seven-screen upstream wizard instead of our single screen. */
   setup?: string
+  /**
+   * Extra environment for the child process. The pinned home variables below
+   * are applied afterwards, so this can never redirect the data root.
+   */
+  env?: Record<string, string>
 }
 
 export async function launchShell(dataRoot: string, options: LaunchOptions = {}): Promise<Shell> {
@@ -72,7 +77,12 @@ export async function launchShell(dataRoot: string, options: LaunchOptions = {})
   for (const [key, value] of Object.entries(process.env)) if (value !== undefined) env[key] = value
   delete env.ELECTRON_RUN_AS_NODE
   delete env.ENSURE_ILE_SETUP
+  // A developer shell usually carries a real key and endpoint; a test must never
+  // reach the paid API, so both are dropped before anything is applied.
+  delete env.DEEPSEEK_API_KEY
+  delete env.DEEPSEEK_BASE_URL
   if (options.setup !== undefined) env.ENSURE_ILE_SETUP = options.setup
+  Object.assign(env, options.env ?? {})
   Object.assign(env, {
     ENSURE_ILE_DATA_ROOT: dataRoot,
     DSH_HOME: join(dataRoot, 'home'),
