@@ -32,8 +32,8 @@ function seedTemplate(home: string): string {
     if (existsSync(join(template, file))) writeFileSync(join(profileDir, file), readFileSync(join(template, file)))
   }
   for (const name of Object.keys(source.dependencies ?? {})) {
-    // Our own packages sit at the repository root; vendored third-party source
-    // (dsh-claude-style) sits under vendor/, exactly as prepare-profile.mjs packs it.
+    // Every local package sits at the repository root, the skin included since it
+    // became a fork of ours; vendor/ stays as the fallback prepare-profile.mjs uses.
     const base = name.split('/').pop()!
     const candidates = [join(repo, base), join(repo, 'vendor', base), join(repo, 'node_modules', ...name.split('/'))]
     const target = candidates.find(candidate => existsSync(join(candidate, 'package.json')))!
@@ -84,14 +84,15 @@ describe('the ensure-ILE profile template', () => {
       'dsh-plugin-setup',
       'dsh-plugin-bankmanager',
       'dsh-plugin-schedule',
-      'dsh-claude-style',
+      'dsh-plugin-skin',
     ]))
     expect(profileDir).toBe(prepared.profile.dir)
   })
 
-  /* `seedBrandAssets()` copies these into the data root on launch. Without them
-     `dsh-claude-style` falls back to its own mark, so a shipped profile that
-     lost the files would quietly put Claude's star back on a learner's screen. */
+  /* `seedBrandAssets()` copies these into the data root on launch. The skin's
+     *built-in* default is already our artwork (lib/client.js), so a profile that
+     lost these files would still look right on the first frame — but a learner
+     could no longer replace the artwork, and the seeds are what /brand serves. */
   it('ships the brand lockup that the launch seeds into the data root', () => {
     for (const file of ['mark.svg', 'wordmark.svg']) {
       const path = join(template, 'brand', file)

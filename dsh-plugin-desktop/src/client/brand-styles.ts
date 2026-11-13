@@ -1,5 +1,5 @@
 /**
- * ensure-ILE's own brand lockup on top of `dsh-claude-style`.
+ * ensure-ILE's own brand lockup on top of the skin (`dsh-plugin-skin`).
  *
  * The skin draws the sidebar brand as two pieces: an 18px square mark, then the
  * wordmark. Our wordmark already carries the `∫` the mark would repeat, so the

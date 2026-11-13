@@ -1997,11 +1997,13 @@ function seedProfile(dataRoot: string, projectRoot: string): string {
 }
 
 /**
- * Seed our geometric brand lockup beside the seeded profile. `dsh-claude-style`
- * reads `<DSH_HOME>/dsh-claude-style/brand/{mark,wordmark}.svg` and falls back to
- * Claude's own mark when a file is absent, so a fresh data root would quietly
- * bring a competitor's logo back into the sidebar and the welcome hero. Existing
- * files win: replacing them through the skin's settings must survive restarts.
+ * Seed our geometric brand lockup beside the seeded profile. The skin
+ * (`dsh-plugin-skin`) reads `<DSH_HOME>/dsh-claude-style/brand/{mark,wordmark}.svg`
+ * — that directory name is the skin's data home, not its package name. These files
+ * are the learner-replaceable copy behind `GET /brand`; the skin's *built-in*
+ * default is already our artwork, so a fresh data root no longer falls back to
+ * Claude's mark. Existing files win: replacing them through the skin's settings
+ * must survive restarts.
  */
 function seedBrandAssets(home: string, projectRoot: string): void {
   const template = app.isPackaged

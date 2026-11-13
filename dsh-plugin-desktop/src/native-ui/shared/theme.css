@@ -7,7 +7,7 @@
  * ensure-ILE 的视觉层。
  *
  * 2026-10-31 起弃用「演算纸」（三笔迹 + 纸面），原生窗口改用与
- * dsh-claude-style 一致的底色与强调色：中性纸面换成中性画布，
+ * 皮肤（dsh-plugin-skin，dsh-claude-style 的 fork）一致的底色与强调色：中性纸面换成中性画布，
  * 主色是蓝绿 #4E9C90（深色）/ #2F7F76（浅色），与 Web 客户端的
  * customAccent 同源。
  *
