@@ -5,7 +5,7 @@
  * the repository-level template is mirrored here; `profiles/` is generated and
  * gitignored.
  *
- * The profile's seven local packages cannot be installed from a packaged app:
+ * The profile's eleven local packages cannot be installed from a packaged app:
  * electron-builder never ships sibling workspace directories, so a
  * `file:../../../../dsh-plugin-*` dependency points outside the installation.
  * They are vendored into `profiles/ensure-ile/vendor/` and the packaged copy of
@@ -33,8 +33,8 @@ const LOCAL_PACKAGES = [
   'dsh-plugin-textbook',
   'dsh-plugin-schedule',
   'dsh-plugin-coreset',
-  // Vendored third-party source kept under vendor/, not a workspace of ours.
-  'dsh-claude-style',
+  // The skin: a fork of dsh-claude-style, now a workspace of ours like the rest.
+  'dsh-plugin-skin',
 ]
 
 if (!existsSync(source)) {
@@ -47,7 +47,8 @@ console.log('prepare-profile: copied profiles/ensure-ile')
 
 const vendor = join(target, 'vendor')
 for (const name of LOCAL_PACKAGES) {
-  // A vendored package lives under vendor/<name>; everything else is a root workspace.
+  // Everything here is a root workspace; the vendor/ fallback is for a package
+  // dropped in without a workspace entry, so the lookup never silently misses.
   const from = existsSync(join(repoRoot, name, 'package.json'))
     ? join(repoRoot, name)
     : join(repoRoot, 'vendor', name)
