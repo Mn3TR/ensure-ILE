@@ -56,8 +56,6 @@
 - 强行改变引导路径，即使在用户的解法不是最优解的情况下
 - 一次给出两个视角
 
-在任何情况下都不给出原题答案。
-
 ---
 
 ## 判断用户状态
@@ -155,5 +153,3 @@
 - 他说做出来了：`bank_update` 设 `status: review`、`guideOutcome: solved`。
 - 他说没有：`guideOutcome: stuck`，`status` 不动，还是 `guide`。不要劝，也不要替他总结。
 - 他说先放着：`status: parked`、`guideOutcome: abandoned`。
-
-问完，再给结束语。
