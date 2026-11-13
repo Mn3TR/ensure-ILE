@@ -90,6 +90,32 @@ describe('bank tools', () => {
   })
 })
 
+describe('bank_update hrl 参数', () => {
+  it('透传教师步的 improvement 与收尾时的 preference', async () => {
+    const dir = bank()
+    const tool = toolsFor(dir)
+    const added = await tool('bank_add').execute({ statement: '求根', subject: 'math' }, exec)
+    const id = /已建题：([a-z0-9-]+)/u.exec(added)?.[1] as string
+    await tool('bank_update').execute({
+      id,
+      hrl: {
+        teacher: {
+          answer: 'x=2',
+          steps: [{ index: 1, body: '移项', reason: '保持等价', improvement: '他把移项挪到了合并之后' }],
+        },
+        step: { index: 1, match: 'same', chosen: 'teacher' },
+        result: 'x=2',
+      },
+    }, exec)
+    await tool('bank_update').execute({ id, hrl: { preference: 'teacher' } }, exec)
+
+    const record = readProblem(dir, id)
+    expect(record.hrl?.teacher?.steps[0]?.improvement).toBe('他把移项挪到了合并之后')
+    expect(record.hrl?.pairings[0]?.preference).toBe('teacher')
+    expect(record.hrl?.pairings[0]?.result).toBe('x=2')
+  })
+})
+
 describe('bank_list due filter', () => {
   it('只列今天到期该复习的题', async () => {
     const dir = bank()

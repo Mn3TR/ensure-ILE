@@ -40,6 +40,7 @@ import {
   type HrlUpdateInput,
   type PairingChoice,
   type PairingMatch,
+  type PairingPreference,
   type ProblemAttachment,
   type ProblemStatus,
   type WorkAttemptInput,
@@ -379,6 +380,7 @@ ctx.tools.register(defineTool({
       'hrl：答案优化的增量写入，四段都可选，按 input → teacher → step → result 的顺序应用。',
       '  input 是这次在打磨哪份答案；teacher 是教师轨迹（一次写全，按学生偏好写）；',
       '  step 是一个小步的对比，写进最近一个还没有 result 的 pairing；result 是这条 pairing 拼好的最终解。',
+      '  teacher.steps 每步的 improvement 记这一步相对他原写法改了什么（是差异，不是优劣）；preference 在收尾时写，记学生整体更喜欢哪版。',
       '  每 3 步落一次盘，pairing 结束必须写 result。',
       'handoff：交接包（from / to / why / state / detail）。同一道题最多一个未接收的，新的会顶掉旧的。',
       'handoffConsume：传会话 id 表示这份交接已被接收；传空字符串表示撤销接收，卡片重新可点。',
@@ -442,6 +444,7 @@ ctx.tools.register(defineTool({
                     index: { type: 'integer', required: true },
                     body: { type: 'string', required: true, description: '这一步做什么' },
                     reason: { type: 'string', required: true, description: '为什么能这么做' },
+                    improvement: { type: 'string', description: '这一步相对他原写法改了什么（差异，不是优劣）' },
                   },
                 },
               },
@@ -463,6 +466,7 @@ ctx.tools.register(defineTool({
             },
           },
           result: { type: 'string', description: '这条 pairing 逐条选完后拼出的解' },
+          preference: { type: 'string', description: '收尾时写：student / teacher / merged，他整体更喜欢哪版' },
         },
       },
       handoff: {
@@ -534,6 +538,7 @@ ctx.tools.register(defineTool({
             }
           }
           if (source.result !== undefined) hrl.result = source.result
+          if (source.preference !== undefined) hrl.preference = source.preference as PairingPreference
         }
         const handoff: HandoffInput | undefined = args.handoff === undefined
           ? undefined

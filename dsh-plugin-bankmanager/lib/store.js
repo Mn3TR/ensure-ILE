@@ -81,6 +81,12 @@ const PAIRING_CHOICES = [
 	"teacher",
 	"merged"
 ];
+/** Which version the learner liked better, once the whole pass is done. */
+const PAIRING_PREFERENCES = [
+	"student",
+	"teacher",
+	"merged"
+];
 /** Failure with a stable code so tools can explain themselves. */
 var BankError = class extends Error {
 	code;
@@ -466,7 +472,11 @@ function openPairing(hrl) {
 		if (pairing !== void 0 && pairing.result === void 0) return pairing;
 	}
 }
-/** Apply one HRL write; steps land in the open pairing, which `result` closes. */
+/**
+* Apply one HRL write; steps land in the open pairing, which `result` closes.
+* `preference` labels the whole pass, so it lands on the last pairing — even one
+* already closed by `result` — and is dropped when there is no pairing yet.
+*/
 function applyHrl(record, input, at) {
 	const events = [];
 	const hrl = record.hrl ?? (record.hrl = { pairings: [] });
@@ -499,6 +509,14 @@ function applyHrl(record, input, at) {
 		if (pairing === void 0) throw new BankError("没有进行中的对比，先写步骤再写结果", "invalid-input");
 		pairing.result = input.result;
 		events.push("hrl result");
+	}
+	if (input.preference !== void 0) {
+		if (!PAIRING_PREFERENCES.includes(input.preference)) throw new BankError("未知偏好 " + input.preference, "invalid-input");
+		const pairing = hrl.pairings[hrl.pairings.length - 1];
+		if (pairing !== void 0) {
+			pairing.preference = input.preference;
+			events.push("hrl preference " + input.preference);
+		}
 	}
 	return events;
 }
@@ -785,6 +803,6 @@ function indexIsCurrent(index, ids) {
 	return index.problems.every((id, position) => id === ids[position]);
 }
 //#endregion
-export { AFFECTS, BANK_INDEX_FILE, BankError, GUIDE_OUTCOMES, HINT_LEVELS, IMAGES_DIR, PAIRING_CHOICES, PAIRING_MATCHES, PROBLEM_FILE, PROBLEM_IMAGE_MEDIA_TYPES, PROBLEM_STATUSES, REVIEW_LADDER, attachProblemImages, createProblem, defaultBankDirectory, formatDate, hasPendingHandoff, imageRelPath, indexIsCurrent, indexPath, isGuideOutcome, isProblemStatus, isReviewDue, listProblems, makeProblemId, mediaTypeExtension, migrateLegacyProblems, parseRecord, pendingHandoffs, problemDir, problemPath, readBankIndex, readProblem, readProblemImage, rebuildIndex, resumeView, reviewDueAt, saveProblemImage, slugSubject, summarizeProblem, summarizeStats, updateProblem };
+export { AFFECTS, BANK_INDEX_FILE, BankError, GUIDE_OUTCOMES, HINT_LEVELS, IMAGES_DIR, PAIRING_CHOICES, PAIRING_MATCHES, PAIRING_PREFERENCES, PROBLEM_FILE, PROBLEM_IMAGE_MEDIA_TYPES, PROBLEM_STATUSES, REVIEW_LADDER, attachProblemImages, createProblem, defaultBankDirectory, formatDate, hasPendingHandoff, imageRelPath, indexIsCurrent, indexPath, isGuideOutcome, isProblemStatus, isReviewDue, listProblems, makeProblemId, mediaTypeExtension, migrateLegacyProblems, parseRecord, pendingHandoffs, problemDir, problemPath, readBankIndex, readProblem, readProblemImage, rebuildIndex, resumeView, reviewDueAt, saveProblemImage, slugSubject, summarizeProblem, summarizeStats, updateProblem };
 
 //# sourceMappingURL=store.js.map

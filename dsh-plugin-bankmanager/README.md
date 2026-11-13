@@ -1,6 +1,6 @@
 # dsh-plugin-bankmanager
 
-题库：一道题一个 JSON 文件，六个工具，guide / work / HRL / schedule 共用同一本账——它不引导、不判卷、不评价，只记录和调度。
+题库：一道题一个 JSON 文件，七个工具，guide / work / HRL / schedule 共用同一本账——它不引导、不判卷、不评价，只记录和调度。
 
 ## 什么时候用
 
@@ -12,7 +12,7 @@
 | `bank_list` | 按条件列题 | `status`、`subject`、`due`（`true` 只看今天到期）、`limit`（默认 20，夹到 1–100，取**最后** N 条） |
 | `bank_show` | 看一道题的全部记录 | `id`（必填） |
 | `bank_image` | 把题目里存的图重新给模型看（最多 4 张） | `id`（必填）、`which`（第几张，从 1 开始；省略＝全部） |
-| `bank_update` | 增量改，只合并传了的字段 | `id` + 任意：`status`、`guideOutcome`、`whereStuck`、`guideResult`、`insight`、`reviewNextAt`、`reviewInterval`、`reviewPassed`、`affect`、`effectiveHint`、`workAttempt{answer,verdict}`、`hrl{input,teacher,step,result}`、`handoff{from,to,why,state,detail}`、`handoffConsume`、`patch`（自由字段浅合并） |
+| `bank_update` | 增量改，只合并传了的字段 | `id` + 任意：`status`、`guideOutcome`、`whereStuck`、`guideResult`、`insight`、`reviewNextAt`、`reviewInterval`、`reviewPassed`、`affect`、`effectiveHint`、`workAttempt{answer,verdict}`、`hrl{input,teacher,step,result,preference}`、`handoff{from,to,why,state,detail}`、`handoffConsume`、`patch`（自由字段浅合并） |
 | `bank_resume` | 不带 `id` 列待接交接；带 `id` 返回题干 + 交接包 + `insight` + 最后一次作答 | `id`（可省略） |
 | `bank_stats` | 各状态计数，另有「待接交接：N」 | 无参数 |
 
@@ -54,14 +54,19 @@ new ──> guide ──> review ──> mastered
   "status": "new|guide|hrl|review|mastered|parked", "createdAt": "…", "updatedAt": "…",
   "guide":     { "sessions": [{ "sessionId", "startedAt", "endedAt", "outcome", "whereStuck", "result", "affect", "effectiveHint" }], "insight": "…" },
   "work":      { "attempts": [{ "at", "answer", "verdict": "ok|partial|wrong", "source" }] },
-  "hrl":       { "input": {…}, "teacher": { "answer", "note", "steps": [{ "index", "body", "reason" }] }, "pairings": [{ "steps": [...], "result" }] },
+  "hrl":       { "input": {…},
+                 "teacher": { "answer", "note", "steps": [{ "index", "body", "reason", "improvement": "相对他的写法改了什么" }] },
+                 "pairings": [{ "steps": [...], "result", "preference": "student|teacher|merged" }] },
   "handoff":   { "id": "hlt-…", "at", "from", "to", "why", "state", "detail": { "lastWords", "blocker", "nextStep" }, "consumedAt", "consumerSessionId" },
   "review":    { "nextAt", "interval", "count", "history": [] },
   "history":   [{ "at", "event", "detail" }]
 }
 ```
 
-固定枚举（`src/store.ts:51` 起）：`PROBLEM_STATUSES` 六个状态、`GUIDE_OUTCOMES`（`solved`/`stuck`/`abandoned`）、`AFFECTS`（`frustrated`/`neutral`/`excited`）、`HINT_LEVELS`（`confirm`/`position`/`feature`/`structure`/`result`）、`PAIRING_MATCHES`（`same`/`partial`/`missing`）、`PAIRING_CHOICES`（`student`/`teacher`/`merged`）。
+- **`improvement` 是差异不是评价**：每一步只说他原来的写法被改成了什么（「他把移项放到了合并之后」），不写「这样更好」——优劣由学生自己判断。
+- **`preference` 是整条 pairing 的标签，`chosen` 是过程**：`chosen` 记这一步留了谁的说法，`preference` 记逐条走完之后他整体更喜欢哪版。两层不同，别用 `chosen` 多数票去推 `preference`。两个字段都 optional，老账本读进来照旧。
+
+固定枚举（`src/store.ts:51` 起）：`PROBLEM_STATUSES` 六个状态、`GUIDE_OUTCOMES`（`solved`/`stuck`/`abandoned`）、`AFFECTS`（`frustrated`/`neutral`/`excited`）、`HINT_LEVELS`（`confirm`/`position`/`feature`/`structure`/`result`）、`PAIRING_MATCHES`（`same`/`partial`/`missing`）、`PAIRING_CHOICES`（`student`/`teacher`/`merged`）、`PAIRING_PREFERENCES`（`student`/`teacher`/`merged`）。
 
 写法上的三条规矩：
 
@@ -91,7 +96,7 @@ corepack yarn workspace dsh-plugin-bankmanager typecheck
 corepack yarn workspace dsh-plugin-bankmanager test        # 45 个用例 / 6 个文件
 corepack yarn workspace dsh-plugin-bankmanager build
 corepack yarn workspace dsh-plugin-bankmanager build:client
-corepack yarn workspace dsh-plugin-bankmanager verify       # node scripts/verify-bank.mjs：挂载冒烟，断言六个工具 + bank_add 真写了一道题
+corepack yarn workspace dsh-plugin-bankmanager verify       # node scripts/verify-bank.mjs：挂载冒烟，断言七个工具 + bank_add 真写了一道题
 ```
 
 - `build` = `tsc -p tsconfig.json` + `tsdown`；`build:client` = `vite build --config vite.client.config.ts`。两者产物（`lib/`）都入库。

@@ -73,6 +73,8 @@ export interface TeacherStep {
     index: number;
     body: string;
     reason: string;
+    /** What this step changes against the learner's own wording — a difference, not why it is valid. */
+    improvement?: string;
 }
 /** The teacher's own complete solution, written once per problem. */
 export interface TeacherTrajectory {
@@ -88,6 +90,9 @@ export type PairingMatch = (typeof PAIRING_MATCHES)[number];
 /** Which side the learner kept for one step. */
 export declare const PAIRING_CHOICES: readonly ["student", "teacher", "merged"];
 export type PairingChoice = (typeof PAIRING_CHOICES)[number];
+/** Which version the learner liked better, once the whole pass is done. */
+export declare const PAIRING_PREFERENCES: readonly ["student", "teacher", "merged"];
+export type PairingPreference = (typeof PAIRING_PREFERENCES)[number];
 /** One aligned step of the learner's rollout against the teacher's trajectory. */
 export interface PairingStep {
     index: number;
@@ -109,6 +114,12 @@ export interface Pairing {
     steps: PairingStep[];
     /** The solution assembled from the choices; present once the pass closes. */
     result?: string;
+    /**
+     * The whole-pass label: which version the learner preferred after reading both.
+     * One level up from `PairingStep.chosen`, which only says whose wording one step
+     * kept; a pass can keep most steps from the teacher and still be preferred less.
+     */
+    preference?: PairingPreference;
 }
 /** The answer-optimization state, present once HRL touched this problem. */
 export interface HrlState {
@@ -317,6 +328,8 @@ export interface HrlUpdateInput {
     teacher?: TeacherTrajectory;
     step?: PairingStep;
     result?: string;
+    /** Written once at the close of a pass; lands on the last pairing. */
+    preference?: PairingPreference;
 }
 /** A handoff to write; the id is minted when absent. */
 export interface HandoffInput {

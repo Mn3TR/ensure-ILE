@@ -91,6 +91,8 @@ export interface TeacherStep {
   index: number
   body: string
   reason: string
+  /** What this step changes against the learner's own wording — a difference, not why it is valid. */
+  improvement?: string
 }
 
 /** The teacher's own complete solution, written once per problem. */
@@ -109,6 +111,10 @@ export type PairingMatch = (typeof PAIRING_MATCHES)[number]
 /** Which side the learner kept for one step. */
 export const PAIRING_CHOICES = ['student', 'teacher', 'merged'] as const
 export type PairingChoice = (typeof PAIRING_CHOICES)[number]
+
+/** Which version the learner liked better, once the whole pass is done. */
+export const PAIRING_PREFERENCES = ['student', 'teacher', 'merged'] as const
+export type PairingPreference = (typeof PAIRING_PREFERENCES)[number]
 
 /** One aligned step of the learner's rollout against the teacher's trajectory. */
 export interface PairingStep {
@@ -132,6 +138,12 @@ export interface Pairing {
   steps: PairingStep[]
   /** The solution assembled from the choices; present once the pass closes. */
   result?: string
+  /**
+   * The whole-pass label: which version the learner preferred after reading both.
+   * One level up from `PairingStep.chosen`, which only says whose wording one step
+   * kept; a pass can keep most steps from the teacher and still be preferred less.
+   */
+  preference?: PairingPreference
 }
 
 /** The answer-optimization state, present once HRL touched this problem. */
@@ -611,6 +623,8 @@ export interface HrlUpdateInput {
   teacher?: TeacherTrajectory
   step?: PairingStep
   result?: string
+  /** Written once at the close of a pass; lands on the last pairing. */
+  preference?: PairingPreference
 }
 
 /** A handoff to write; the id is minted when absent. */
@@ -662,7 +676,11 @@ function openPairing(hrl: HrlState): Pairing | undefined {
   return undefined
 }
 
-/** Apply one HRL write; steps land in the open pairing, which `result` closes. */
+/**
+ * Apply one HRL write; steps land in the open pairing, which `result` closes.
+ * `preference` labels the whole pass, so it lands on the last pairing — even one
+ * already closed by `result` — and is dropped when there is no pairing yet.
+ */
 function applyHrl(record: ProblemRecord, input: HrlUpdateInput, at: string): string[] {
   const events: string[] = []
   const hrl = record.hrl ?? (record.hrl = { pairings: [] })
@@ -692,6 +710,16 @@ function applyHrl(record: ProblemRecord, input: HrlUpdateInput, at: string): str
     if (pairing === undefined) throw new BankError('没有进行中的对比，先写步骤再写结果', 'invalid-input')
     pairing.result = input.result
     events.push('hrl result')
+  }
+  if (input.preference !== undefined) {
+    if (!(PAIRING_PREFERENCES as readonly string[]).includes(input.preference)) {
+      throw new BankError('未知偏好 ' + input.preference, 'invalid-input')
+    }
+    const pairing = hrl.pairings[hrl.pairings.length - 1]
+    if (pairing !== undefined) {
+      pairing.preference = input.preference
+      events.push('hrl preference ' + input.preference)
+    }
   }
   return events
 }

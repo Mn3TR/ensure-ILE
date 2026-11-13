@@ -187,6 +187,55 @@ describe('answer optimization', () => {
     const record = await createProblem(dir, { statement: 'one', subject: 'math', suffix: 'aaaaab' })
     await expect(updateProblem(dir, record.id, { hrl: { result: 'x' } })).rejects.toThrow(BankError)
   })
+
+  it('教师每步记下相对学生原写法的差异', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: 'one', subject: 'math', suffix: 'cccccd' })
+    const written = await updateProblem(dir, record.id, {
+      hrl: {
+        teacher: {
+          writtenAt: '2026-10-25T00:01:00.000Z',
+          answer: 'x=2',
+          steps: [
+            { index: 1, body: '移项', reason: '保持等价', improvement: '他把移项挪到了合并之后' },
+          ],
+        },
+      },
+    })
+    expect(written.hrl?.teacher?.steps[0]?.improvement).toBe('他把移项挪到了合并之后')
+    expect(written.hrl?.teacher?.steps[0]?.reason).toBe('保持等价')
+  })
+
+  it('偏好写在最后一条 pairing 上，即使它已经被 result 关闭', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: 'one', subject: 'math', suffix: 'ddeeff' })
+    await updateProblem(dir, record.id, {
+      hrl: { step: { index: 1, studentQuote: '先移项', teacherStep: 1, match: 'same', chosen: 'teacher' } },
+    })
+    const closed = await updateProblem(dir, record.id, { hrl: { result: '教师的解' } })
+    expect(closed.hrl?.pairings[0]?.preference).toBeUndefined()
+
+    const labelled = await updateProblem(dir, record.id, { hrl: { preference: 'teacher' } })
+    expect(labelled.hrl?.pairings).toHaveLength(1)
+    expect(labelled.hrl?.pairings[0]?.preference).toBe('teacher')
+    expect(labelled.hrl?.pairings[0]?.steps[0]?.chosen).toBe('teacher')
+    expect(labelled.history.at(-1)?.event).toBe('hrl preference teacher')
+  })
+
+  it('没有 pairing 时偏好不落盘，也不报错', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: 'one', subject: 'math', suffix: 'ff0011' })
+    const written = await updateProblem(dir, record.id, { hrl: { preference: 'merged' } })
+    expect(written.hrl?.pairings).toEqual([])
+  })
+
+  it('拒绝三个取值以外的偏好', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: 'one', subject: 'math', suffix: 'ff0022' })
+    await expect(
+      updateProblem(dir, record.id, { hrl: { preference: 'both' as never } }),
+    ).rejects.toThrow(BankError)
+  })
 })
 
 describe('handoff', () => {
