@@ -58,9 +58,13 @@ jobs:
 
   # Product gate: a documentation-only change already passed diff validation
   # in `changes`.
+  #
+  # Runs on Windows because that is the only platform ensure-ILE ships, and the
+  # gate now rebuilds every plugin's committed `lib/` before testing it: a Linux
+  # runner would have to produce byte-identical bundles, which nobody verified.
   check:
     needs: changes
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Documentation-only gate
         if: needs.changes.outputs.product == 'false'
@@ -80,7 +84,8 @@ jobs:
       - name: Resolve Yarn cache folder
         if: needs.changes.outputs.product == 'true'
         id: yarn-cache
-        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
+        shell: pwsh
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$env:GITHUB_OUTPUT"
       - uses: actions/cache@v6
         if: needs.changes.outputs.product == 'true'
         with:
@@ -130,6 +135,11 @@ jobs:
       - run: yarn install --immutable
       # Typecheck is platform-neutral and already gated by `check`.
       - run: yarn workspace ${{ matrix.workspace }} check:win-package:platform
+      # The end-to-end specs drive a real Electron window; they need the build
+      # the step above just produced, so run vitest directly instead of the
+      # `test:ui` script (which would rebuild the shell first).
+      - name: Run end-to-end UI tests
+        run: yarn workspace ${{ matrix.workspace }} vitest run --config vitest.ui.config.ts
       - name: Build Windows installer
         env:
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'

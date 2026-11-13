@@ -753,30 +753,18 @@
     }
   },
   "scripts": {
-    "build": "yarn workspace dsh-plugin-desktop build",
-    "typecheck": "yarn workspace dsh-plugin-desktop typecheck",
-    "test": "yarn workspace dsh-plugin-desktop test",
-    "check:vendored-runtime": "node scripts/sync-vendored-runtime.mjs --check --channel stable",
-    "check:layout": "node scripts/run-parallel.mjs \"node --test scripts/inspector-compat.test.mjs scripts/export-app-icons.test.mjs\" \"node scripts/sync-vendored-runtime.mjs --check --channel stable\" \"node scripts/export-app-icons.mjs --check\" \"node scripts/verify-layout.mjs\"",
-    "check": "node scripts/run-parallel.mjs \"yarn check:layout\" \"yarn workspace dsh-community-fabric check\" && node scripts/run-parallel.mjs \"yarn workspace dsh-plugin-desktop check\"",
-    "check:plugins": "yarn workspace dsh-plugin-coreset typecheck && yarn workspace dsh-plugin-coreset test && yarn workspace dsh-plugin-coreset build && yarn workspace dsh-plugin-teaching-commons typecheck && yarn workspace dsh-plugin-setup typecheck && yarn workspace dsh-plugin-setup test && yarn workspace dsh-plugin-work typecheck && yarn workspace dsh-plugin-hrl typecheck && yarn workspace dsh-plugin-guide typecheck && yarn workspace dsh-plugin-bankmanager typecheck && yarn workspace dsh-plugin-bankmanager test && yarn workspace dsh-plugin-memory typecheck && yarn workspace dsh-plugin-memory test && yarn workspace dsh-plugin-textbook typecheck && yarn workspace dsh-plugin-textbook test && yarn workspace dsh-plugin-schedule typecheck && yarn workspace dsh-plugin-schedule test",
-    "dev": "yarn workspace dsh-plugin-desktop dev",
-    "start": "yarn workspace dsh-plugin-desktop start",
-    "package:dir": "yarn workspace dsh-plugin-desktop package:dir",
-    "dist:mac": "yarn workspace dsh-plugin-desktop dist:mac",
-    "dist:mac-smoke": "yarn workspace dsh-plugin-desktop dist:mac-smoke",
-    "dist:win": "yarn workspace dsh-plugin-desktop dist:win",
-    "dist:win:store": "yarn workspace dsh-plugin-desktop dist:win:store",
-    "dist:linux": "yarn workspace dsh-plugin-desktop dist:linux",
-    "dist:win-portable": "yarn workspace dsh-plugin-desktop dist:win-portable",
+    "check": "node scripts/run-parallel.mjs \"yarn check:repo\" \"yarn workspace dsh-community-fabric check\" \"yarn check:desktop\" && yarn check:plugins",
+    "check:repo": "node scripts/run-parallel.mjs \"node --test scripts/inspector-compat.test.mjs scripts/export-app-icons.test.mjs\" \"node scripts/sync-vendored-runtime.mjs --check --channel stable\" \"node scripts/export-app-icons.mjs --check\" \"node scripts/verify-layout.mjs\" && node scripts/verify-patch-references.mjs",
+    "check:plugins": "node scripts/verify-lib-sync.mjs && yarn workspace dsh-plugin-coreset typecheck && yarn workspace dsh-plugin-coreset test && yarn workspace dsh-plugin-coreset build && yarn workspace dsh-plugin-teaching-commons typecheck && yarn workspace dsh-plugin-setup typecheck && yarn workspace dsh-plugin-setup test && yarn workspace dsh-plugin-work typecheck && yarn workspace dsh-plugin-hrl typecheck && yarn workspace dsh-plugin-guide typecheck && yarn workspace dsh-plugin-bankmanager typecheck && yarn workspace dsh-plugin-bankmanager test && yarn workspace dsh-plugin-memory typecheck && yarn workspace dsh-plugin-memory test && yarn workspace dsh-plugin-textbook typecheck && yarn workspace dsh-plugin-textbook test && yarn workspace dsh-plugin-schedule typecheck && yarn workspace dsh-plugin-schedule test",
+    "check:desktop": "yarn workspace dsh-plugin-desktop check",
+    "check:full": "yarn check && yarn workspace dsh-plugin-desktop test:ui",
+    "icons:check": "node --test scripts/export-app-icons.test.mjs && node scripts/export-app-icons.mjs --check",
+    "icons:export": "node scripts/export-app-icons.mjs",
     "upstream:version": "cd deepseek-harness && corepack pnpm --version",
     "upstream:install": "cd deepseek-harness && CI=true corepack pnpm install --frozen-lockfile",
     "upstream:build": "cd deepseek-harness && corepack pnpm run build",
     "upstream:build:official": "cd deepseek-harness && CI=true DSH_BUILD_CLIENT_PROFILE=official corepack pnpm run build",
     "upstream:pack:dsh": "cd deepseek-harness && CI=true corepack pnpm run release:pack --family dsh",
-    "upstream:prepare-runtime": "yarn upstream:install && yarn upstream:build:official && yarn upstream:pack:dsh",
-    "icons:export": "node scripts/export-app-icons.mjs",
-    "icons:check": "node --test scripts/export-app-icons.test.mjs && node scripts/export-app-icons.mjs --check",
-    "test:inspector-compat": "node --test scripts/inspector-compat.test.mjs"
+    "upstream:prepare-runtime": "yarn upstream:install && yarn upstream:build:official && yarn upstream:pack:dsh"
   }
 }

@@ -6,12 +6,21 @@
 // carries no `patch:` entry, and the patch is silently inert. This script
 // reports that state instead of trusting the presence of the file.
 //
-// Orphan status: not part of `yarn check` yet. See docs/upstream-sync.md.
+// Runs as the last leg of `yarn check:repo`. Patches listed in KNOWN_INERT are
+// reported but accepted: their package is genuinely outside the dependency graph.
 import { readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
 const readJson = path => JSON.parse(readFileSync(path, 'utf8'))
+
+// Legitimately inert patches: the package they patch is not in the dependency
+// graph at all, so nothing can request it. The computer-use branch is not mounted
+// in any of our profiles; the patch waits for that row to come back and must not
+// be deleted (docs/upstream-sync.md, "坑·profile 与打包 6").
+const KNOWN_INERT = new Set([
+  'patches/dsh-experimental-computer-use-cua-driver-native@0.2.1-rc.3.patch',
+])
 
 const workspace = readJson(join(root, 'package.json'))
 const resolutions = workspace.resolutions ?? {}
@@ -56,25 +65,31 @@ for (const file of onDisk) {
     status = 'invalid'
     reason = 'no resolutions entry references this file; it can never be applied'
   } else if (!applied) {
-    status = 'invalid'
+    status = KNOWN_INERT.has(file) ? 'inert' : 'invalid'
     reason = installed.length === 0
       ? `no package requests ${packageNames.join(', ')}; the patch has no subject`
       : 'the resolution selector matched no requested descriptor (descriptor mismatch)'
+  } else if (KNOWN_INERT.has(file)) {
+    reason = 'listed in KNOWN_INERT but applied; drop the allowlist entry'
   }
   rows.push({ file, status, reason, selectors: selectors.map(entry => entry.selector), packages: packageNames })
 }
 
 const invalid = rows.filter(row => row.status === 'invalid')
 const ok = rows.filter(row => row.status === 'ok')
+const inert = rows.filter(row => row.status === 'inert')
 const lines = []
-lines.push(`verify-patch-references: ${String(rows.length)} patch files, ${String(ok.length)} effective, ${String(invalid.length)} ineffective`)
+lines.push(`verify-patch-references: ${String(rows.length)} patch files, ${String(ok.length)} effective, ${String(inert.length)} known-inert, ${String(invalid.length)} ineffective`)
 for (const row of rows) {
-  lines.push(`  ${row.status === 'ok' ? 'ok    ' : 'INERT '} ${row.file}`)
+  const tag = row.status === 'ok' ? 'ok    ' : row.status === 'inert' ? 'inert ' : 'INERT '
+  lines.push(`  ${tag} ${row.file}`)
   if (row.reason !== '') lines.push(`         ${row.reason}`)
 }
 for (const file of missingFiles) lines.push(`  MISSING ${file} is referenced by resolutions but absent from patches/`)
 if (invalid.length === 0 && missingFiles.length === 0) {
-  lines.push('all patch files are referenced and applied')
+  lines.push(inert.length === 0
+    ? 'all patch files are referenced and applied'
+    : `all patch files are referenced and applied, ${String(inert.length)} known-inert by allowlist`)
   process.stdout.write(`${lines.join('\n')}\n`)
 } else {
   process.stderr.write(`${lines.join('\n')}\n`)

@@ -82,14 +82,12 @@ const dshResolution = (name: string): unknown =>
   workspaceManifest.resolutions?.[`${name}@npm:${runtimeVersion}`]
 
 describe('published package surface', () => {
-  it('runs the desktop typecheck from the root command', () => {
-    expect(workspaceManifest.scripts?.typecheck)
-      .toBe('yarn workspace dsh-plugin-desktop typecheck')
-  })
-
-  it('runs the desktop tests from the root command', () => {
-    expect(workspaceManifest.scripts?.test)
-      .toBe('yarn workspace dsh-plugin-desktop test')
+  it('keeps desktop build, typecheck and test out of the root command surface', () => {
+    for (const script of ['build', 'typecheck', 'test', 'test:ui', 'dev', 'start']) {
+      expect(workspaceManifest.scripts?.[script]).toBeUndefined()
+    }
+    expect(workspaceManifest.scripts?.['check:desktop'])
+      .toBe('yarn workspace dsh-plugin-desktop check')
   })
 
   it('registers both npm launcher names', () => {
@@ -960,14 +958,12 @@ describe('published package surface', () => {
     expect(manifest.scripts?.['check:linux-package:platform']).not.toContain('typecheck')
     expect(manifest.scripts?.['verify:cli']).toBe('node scripts/verify-cli-runtime.mjs')
     expect(manifest.scripts?.check).toContain('yarn run verify:cli')
-    expect(workspaceManifest.scripts?.['dist:mac'])
-      .toBe('yarn workspace dsh-plugin-desktop dist:mac')
-    expect(workspaceManifest.scripts?.['dist:mac-smoke'])
-      .toBe('yarn workspace dsh-plugin-desktop dist:mac-smoke')
-    expect(workspaceManifest.scripts?.['dist:win'])
-      .toBe('yarn workspace dsh-plugin-desktop dist:win')
-    expect(workspaceManifest.scripts?.['dist:win-portable'])
-      .toBe('yarn workspace dsh-plugin-desktop dist:win-portable')
+    // The root workspace owns cross-package gates only: every Desktop action names its workspace,
+    // so packaging cannot silently run from a half-configured root.
+    expect(workspaceManifest.scripts?.['dist:win']).toBeUndefined()
+    expect(workspaceManifest.scripts?.['dist:mac']).toBeUndefined()
+    expect(workspaceManifest.scripts?.build).toBeUndefined()
+    expect(workspaceManifest.scripts?.['check:desktop']).toBe('yarn workspace dsh-plugin-desktop check')
     expect(manifest.build?.afterPack).toBe('./scripts/verify-packaged-runtime.ts')
     expect(manifest.build?.afterAllArtifactBuild).toBe('./scripts/verify-electron-fuses.ts')
     expect(manifest.build?.mac).toEqual(expect.objectContaining({

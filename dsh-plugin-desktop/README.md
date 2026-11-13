@@ -223,7 +223,7 @@ git submodule update --init --recursive
 corepack yarn install --immutable
 corepack yarn workspace dsh-plugin-desktop typecheck
 corepack yarn workspace dsh-plugin-desktop test
-corepack yarn build
+corepack yarn workspace dsh-plugin-desktop build
 ```
 
 Commands run from `/mnt/<drive>` are valid but slower than a checkout stored on WSL's native ext4 filesystem. WSL does not replace a real Linux desktop session for tray, window-manager, `.desktop` integration, or installed-package smoke tests.
@@ -235,7 +235,7 @@ Use a native Windows x64 machine with Git and x64 Node `22.23.2` (the same relea
 ```powershell
 git submodule update --init --recursive
 corepack.cmd yarn install --immutable
-corepack.cmd yarn dist:win
+corepack.cmd yarn workspace dsh-plugin-desktop dist:win
 ```
 
 Python and Visual Studio C++ Build Tools are not required. The Windows command uses `node-pty`'s bundled x64 Node-API binaries instead of asking Electron Builder to rebuild them from source, and the packaged-runtime gate rejects an installer staging tree that omits those binaries.
@@ -246,17 +246,17 @@ This local command deliberately strips Windows certificate variables and sets `s
 
 ### Windows x64 portable ZIP
 
-Use `yarn dist:win-portable` on a native Windows x64 machine to create an unsigned portable ZIP:
+Use `yarn workspace dsh-plugin-desktop dist:win-portable` on a native Windows x64 machine to create an unsigned portable ZIP:
 
 ```powershell
-corepack.cmd yarn dist:win-portable
+corepack.cmd yarn workspace dsh-plugin-desktop dist:win-portable
 ```
 
 The output is `dsh-plugin-desktop\\dist\\ensure-ILE-2.0.5-x64-Portable.zip`. Extract it to any writable directory and launch `ensure-ILE.exe` without an installer, administrator access, Start Menu registration, or uninstall step. The application still keeps its profiles, logs, and caches in the normal Windows user-data directory, so this is portable distribution rather than a self-contained data sandbox. Portable archives are not handed to the NSIS updater and must be replaced manually when a new version is released. Local builds are unsigned and may trigger an Unknown publisher or SmartScreen warning; signed portable artifacts remain a release gate.
 
 ### macOS DMG smoke
 
-`yarn dist:mac-smoke` builds one unsigned universal DMG on a native macOS host. The same package runs natively on Intel and Apple Silicon Macs. The command refuses non-macOS hosts and runs the complete product gate before packaging: repository layout and community-contract checks, then the Desktop build, every TypeScript compiler face, the full unit-test suite, runtime-closure verification, CLI/Loader/profile headless smokes, and the license audit. This includes the real login-shell tests for each supported shell installed on the macOS runner. It then packages without code-signing material, mounts the DMG, and verifies the property list, executable bit, both `x86_64` and `arm64` slices, and the `Contents/Resources/app/` runtime entries. It mirrors `dist:win`'s secret discipline by stripping every Electron Builder macOS signing and notarization variable, sets `CSC_IDENTITY_AUTO_DISCOVERY=false`, disables notarization, and never publishes. The artifact has no Developer ID signature, so Gatekeeper will block it on other machines; it exists so packaging regressions fail in CI before a manual release. The signed and notarized universal release remains `yarn dist:mac` on a credentialed macOS machine and writes its artifact to `dsh-plugin-desktop/dist/mac-release/`.
+`yarn workspace dsh-plugin-desktop dist:mac-smoke` builds one unsigned universal DMG on a native macOS host. The same package runs natively on Intel and Apple Silicon Macs. The command refuses non-macOS hosts and runs the complete product gate before packaging: repository layout and community-contract checks, then the Desktop build, every TypeScript compiler face, the full unit-test suite, runtime-closure verification, CLI/Loader/profile headless smokes, and the license audit. This includes the real login-shell tests for each supported shell installed on the macOS runner. It then packages without code-signing material, mounts the DMG, and verifies the property list, executable bit, both `x86_64` and `arm64` slices, and the `Contents/Resources/app/` runtime entries. It mirrors `dist:win`'s secret discipline by stripping every Electron Builder macOS signing and notarization variable, sets `CSC_IDENTITY_AUTO_DISCOVERY=false`, disables notarization, and never publishes. The artifact has no Developer ID signature, so Gatekeeper will block it on other machines; it exists so packaging regressions fail in CI before a manual release. The signed and notarized universal release remains `yarn workspace dsh-plugin-desktop dist:mac` on a credentialed macOS machine and writes its artifact to `dsh-plugin-desktop/dist/mac-release/`.
 
 ## Model Experience
 
