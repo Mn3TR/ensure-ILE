@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
+import { composeEntries } from '@deepseek-ai/dsh-app-boot'
 import { prepareDesktopProfile } from '../src/profile.ts'
 
 /**
@@ -87,6 +88,16 @@ describe('the ensure-ILE profile template', () => {
       'dsh-plugin-skin',
     ]))
     expect(profileDir).toBe(prepared.profile.dir)
+  })
+
+  it('disables plugin entry menus together with the plugin manager they require', () => {
+    const dir = home()
+    seedTemplate(dir)
+    const prepared = prepareDesktopProfile('1', dir, 'win32')
+    const rows = composeEntries([prepared.patches])
+    for (const id of ['ui-plugin-manager', 'entry-customization']) {
+      expect(rows.find(row => row.id === id)).toEqual(expect.objectContaining({ disabled: true }))
+    }
   })
 
   /* `seedBrandAssets()` copies these into the data root on launch. The skin's

@@ -12,7 +12,7 @@
 
 | 路径 | 是什么 | 何时读 |
 | --- | --- | --- |
-| `dsh-plugin-desktop/` | 上游桌面壳 fork（现 `0.1.0-alpha8`）+ 我们的改动（数据根、OOBE 裁剪、预设、皮肤、打包） | 改外壳 / 窗口 / 设置 / 打包 |
+| `dsh-plugin-desktop/` | 上游桌面壳 fork（现 `0.1.0-alpha9`）+ 我们的改动（数据根、OOBE 裁剪、预设、皮肤、打包） | 改外壳 / 窗口 / 设置 / 打包 |
 | `dsh-plugin-teaching-commons/` | 各模式共用教学文字：安全边界、说话方式、题库规则 + `skills/` 学科备注 + `readNote` | 改「怎么说话」 |
 | `dsh-plugin-coreset/` | **会话的核**：唯一 `complete` 提示段、`ctx.ileModes`、`read_note`、`context_switch` + 历史折叠；预设 `work` / `chat` 也在这 | 改共享行为 / 加模式 / 改预设 |
 | `dsh-plugin-setup/` | 开学**人格** + `setup_read` / `setup_update` + 条件注册 `setup` 预设 | 改开学问话 |
@@ -45,7 +45,7 @@
 - **`seedProfile()` 只在文件不存在时复制**：改完 `profiles/ensure-ile/` 要删 `.ensure-ile/home/profiles/desktop` 再启动，然后手跑 `pnpm install --offline`（校验用 `COREPACK_ENABLE_PROJECT_SPEC=0 corepack pnpm install --offline --no-frozen-lockfile`；直接 `corepack pnpm` 会被根 `packageManager` 挡）。
 - 会话工作区也在数据根：`workspace-controller` 的 `documentsDirectory` patch 成 `!!js dshHomePath('..')`，落 `<数据根>/deepseek-harness/default-workspace`（上游叶子目录名写死，短不了）。
 - 打包：`corepack yarn workspace dsh-plugin-desktop dist:win` → `dsh-plugin-desktop/dist/`；**打包后数据根 = `%LOCALAPPDATA%\ensure-ILE-data`**（2026-11-01 起；开发跑仍是仓库根的 `.ensure-ile`，`ENSURE_ILE_DATA_ROOT` 优先级最高）。
-- 版本：`dsh-plugin-desktop/package.json` 的 `version` 是唯一来源，当前 `0.1.0-alpha8`（α 线，与上游 2.0.18 脱钩）。**每笔加功能 / 修 bug 的提交都递增这个号**（李 2026-11-01 定），顺带同步 `dsh-plugin-desktop/tests/package.spec.ts:810` 的断言——不同步单测直接红。
+- 版本：`dsh-plugin-desktop/package.json` 的 `version` 是唯一来源，当前 `0.1.0-alpha9`（α 线，与上游 2.0.18 脱钩）。**每笔加功能 / 修 bug 的提交都递增这个号**（李 2026-11-01 定），顺带同步 `dsh-plugin-desktop/tests/package.spec.ts:810` 的断言——不同步单测直接红。
 
 ### 门禁入口（都在仓库根跑）
 
@@ -67,7 +67,7 @@
 - **① 源码底座**：`deepseek-harness/` 子模块，pin `1f81c047fc` = `dsh-v0.2.1-rc.3`，**工作树零改动**（`git -C deepseek-harness status --short` 必空，`verify-layout` 查）。自带 pnpm 工作区，根经 `corepack yarn upstream:*` 进。
 - **② 运行时包**：`@deepseek-ai/*` 从 registry 装，行为改动只落 `resolutions` + `patches/`（52 条 `patch:` → 29 文件）与 `vendor/dsh-runtime/` tarball。**不碰子模块**是硬约定：改它下次换 pin 就冲掉。
 - **③ 桌面壳是 fork 不是子模块**：`upstream` remote = `anywhere-labs/dsh-desktop`，共享历史（分叉 `6a63b9730b`，2026-10-18）。上游发版 = `git fetch upstream` + rebase / cherry-pick；2026-11-05 相对 `upstream/master`（`092e2ecef7`）落后 33 / 领先 83，冲突热点 `src/index.ts`、`cordis.patch.yml`、`build/installer.nsh`、`dsh-plugin-desktop/scripts/prepare-profile.mjs`。
-- **④ 运行时组合**：`profiles/ensure-ile/cordis.patch.yml` 是**运行时 patch**，8 行**全覆写、0 insert**（壳 / 通知 / 默认预设 / 工作区 / 皮肤，加 `ui-plugin-manager`、`ui-schedule`、`ui-permission` 三条 `disabled`；插行在包层 `dsh-plugin-desktop/cordis.patch.yml`）。`name` 是**守卫不是身份**：对不上打 `patch: name mismatch … skipping` 跳过，`id` 没命中打 `patch: entry … not found`——上游改 row id 或 specifier 时这里**静默不生效**，症状见 `docs/upstream-sync.md` 失败信号表。
+- **④ 运行时组合**：`profiles/ensure-ile/cordis.patch.yml` 是**运行时 patch**，9 行**全覆写、0 insert**（壳 / 通知 / 默认预设 / 工作区 / 皮肤，加 `ui-plugin-manager`、`entry-customization`、`ui-schedule`、`ui-permission` 四条 `disabled`；插行在包层 `dsh-plugin-desktop/cordis.patch.yml`）。`name` 是**守卫不是身份**：对不上打 `patch: name mismatch … skipping` 跳过，`id` 没命中打 `patch: entry … not found`——上游改 row id 或 specifier 时这里**静默不生效**，症状见 `docs/upstream-sync.md` 失败信号表。
 - 13 个 workspace 里**只有 `dsh-plugin-desktop`（`anywhere-labs/dsh-desktop` fork）、`dsh-plugin-memory`（`@max-null/dsh-memory` fork）与 `dsh-plugin-skin`（`Nwflower/dsh-claude-style` fork）有上游**，其余十个上游就是我们自己。
 
 ## 数据落在哪
@@ -150,7 +150,7 @@
 - **演算纸弃用**（李 2026-10-31 定：全盘换 claude-style）。`src/native-ui/shared/theme.css` token 换中性画布 + 蓝绿：浅 `--background:#FFFFFF` / `--primary:#2F7F76` / `--accent:#E8F1EF` / `--border:#E3E5E2`，深 `#191919` / `#4E9C90` / `#1E2B29` / `#2C2C2C`。宋/楷 `@font-face` 与 `font-song` / `font-kai` token **仍声明在 `shared/theme.css`**（`:24-38`），只是**用法**只剩画廊页（`src/native-ui/gallery.html`，进 `vite.native-ui.config.ts` input），别处别用回来。
 - **语义色照旧**：`--destructive` 朱红（判错）、`--seal` 印章青（通过）是状态编码不是装饰。
 - **皮肤 = `dsh-plugin-skin`**（`Nwflower/dsh-claude-style` 0.19.2 的 fork，我们自己的 workspace 包，版本 `0.19.2-ensure-ile.1`；上游同步规则见其 `UPSTREAM.md`），bundle 挂进 `profiles/ensure-ile/package.json`（排 `@deepseek-ai/dsh-web-app` 之后），行配置 `- id: ui-skin-claude-style`：`sodium: on` / `brandName: en∫ure` / `brandInk: accent` / `customAccent: '#4E9C90'` / `homeLayout: classic` / `mascot: off` / `permissionsControl: false`。
-- **关掉上游多出来的面**：同一 patch 里 `ui-plugin-manager`、`ui-schedule`、`ui-permission` 三条 `disabled: true`（插件 / 自动化任务两个侧栏 nav 与权限芯片行）。config 深合并，只写 `disabled` 就够。
+- **关掉上游多出来的面**：同一 patch 里 `ui-plugin-manager`、`entry-customization`、`ui-schedule`、`ui-permission` 四条 `disabled: true`（插件 / 自动化任务两个侧栏 nav、插件入口菜单与权限芯片行）。rc.3 的 `entry-customization` 强依赖插件管理器提供的 `pluginNavigation`，必须一起关闭，否则 renderer 启动报 `waiting for service: pluginNavigation` 并进入恢复页。config 深合并，只写 `disabled` 就够。
 - **默认品牌图就写在皮肤里**（2026-11-05）：`dsh-plugin-skin/lib/client.js` 顶部 `var t1=` 里三个 data URI（`--dsh-claude-image-claude-mark` / `-claude-mark-clay` / `-claude-word`）已换成我们的 mark / wordmark，所以**首帧画的就是我们的图**，不再有「闪一下 Claude 放射星」的窗口。换图时 mark 的 `stroke` 用 `#4E9C90`（hero 那条规则拿 `-mark-clay` 当 background-image，纯白在浅色画布上看不见），字标比例 `calc(18px * 494 / 160)` 跟着改。细节与编码规则见 `dsh-plugin-skin/UPSTREAM.md`。
 - **品牌图随包发、启动种进数据根**：宿主读 `<DSH_HOME>/dsh-claude-style/brand/{mark,wordmark}.{png,svg,webp}`（目录名是皮肤的数据目录，不是包名，别跟着改名）；`brandInk: accent` 走 CSS 遮罩（只吃 alpha），wordmark 自带色也没关系。源在 `docs/design/brand/mark/geometric-glyph.svg`（432×640 的 ∫）与 `docs/design/brand/wordmark/geometric.svg`（494×160 的 `en∫ure`），**发版副本在 `profiles/ensure-ile/brand/`**，`src/main.ts` 的 `seedBrandAssets()` 每次启动补缺（已有文件不动，学生换的图不会被覆盖）。**种子目标必须是本实例 `<dataRoot>/home`，不能读 `process.env.DSH_HOME`**——开发机那个变量常指向别人安装（2026-10-31 真踩过）。种下去的是**学生可替换的那份**（`/brand` 异步覆盖内置图），不是首帧来源。
 - **侧栏只留字标**：`src/client/brand-styles.ts` 一条全局规则藏 `[data-slot="sidebar"] [data-dsh-claude-part~="brand-mark"]`（字标自带 ∫）；折叠态 `rail-mark` 不藏。hero 的 `∫ + Shapen the world` 保留。

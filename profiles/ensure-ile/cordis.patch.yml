@@ -67,6 +67,10 @@
 - id: ui-plugin-manager
   disabled: true
 
+# rc.3's entry menus require pluginNavigation from the disabled plugin manager.
+- id: entry-customization
+  disabled: true
+
 - id: ui-schedule
   disabled: true
 
