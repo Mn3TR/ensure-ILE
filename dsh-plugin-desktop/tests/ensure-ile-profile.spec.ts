@@ -95,6 +95,14 @@ describe('the ensure-ILE profile template', () => {
       expect(existsSync(join(profileDir, 'node_modules', name, 'package.json'))).toBe(true)
     }
     expect(() => prepareDesktopProfile('1', dir, 'win32')).not.toThrow()
+    // Installing a manifest succeeds even when an ignored build output is absent.
+    // Resolve and exercise Setup's profile dependency from the installed package.
+    execFileSync(process.execPath, ['--input-type=module', '--eval', `
+      import assert from 'node:assert/strict'
+      import { readProfileFile, writeProfileFile } from 'dsh-plugin-memory/profile'
+      writeProfileFile('grade', 'profile-build-check', process.cwd())
+      assert.equal(readProfileFile('grade', process.cwd()), 'profile-build-check')
+    `], { cwd: profileDir, stdio: 'pipe', timeout: 10_000 })
   }, 30_000)
 
   it('keeps our own row ids beside the upstream ones they resemble', () => {

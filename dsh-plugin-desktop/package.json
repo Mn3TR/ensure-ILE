@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-desktop",
-  "version": "0.1.0-alpha13",
+  "version": "0.1.0-alpha14",
   "description": "ensure-ILE: an Electron shell composed as a DeepSeek Harness Cordis plugin",
   "desktopName": "dsh-desktop.desktop",
   "license": "MIT",
@@ -116,7 +116,7 @@
     }
   },
   "scripts": {
-    "build": "node scripts/clean.mjs && node scripts/prepare-profile.mjs && node ../scripts/run-parallel.mjs \"tsdown\" \"vite build --config vite.client.config.ts\" \"vite build --config vite.native-ui.config.ts\" \"tsc -p tsconfig.json --emitDeclarationOnly\" \"tsc -p tsconfig.client.json --emitDeclarationOnly\"",
+    "build": "yarn workspace dsh-plugin-memory build && node scripts/clean.mjs && node scripts/prepare-profile.mjs && node ../scripts/run-parallel.mjs \"tsdown\" \"vite build --config vite.client.config.ts\" \"vite build --config vite.native-ui.config.ts\" \"tsc -p tsconfig.json --emitDeclarationOnly\" \"tsc -p tsconfig.client.json --emitDeclarationOnly\"",
     "typecheck": "node ../scripts/run-parallel.mjs \"tsc -p tsconfig.native-ui.json --noEmit\" \"tsc -p tsconfig.tests.json --noEmit\" \"tsc -p tsconfig.tests.client.json --noEmit\"",
     "test": "vitest run",
     "test:ui": "yarn run build && vitest run --config vitest.ui.config.ts",

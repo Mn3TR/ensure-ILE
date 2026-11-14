@@ -12,7 +12,7 @@
 
 | 路径 | 是什么 | 何时读 |
 | --- | --- | --- |
-| `dsh-plugin-desktop/` | 上游桌面壳 fork（现 `0.1.0-alpha13`）+ 我们的改动（数据根、OOBE 裁剪、预设、皮肤、打包） | 改外壳 / 窗口 / 设置 / 打包 |
+| `dsh-plugin-desktop/` | 上游桌面壳 fork（现 `0.1.0-alpha14`）+ 我们的改动（数据根、OOBE 裁剪、预设、皮肤、打包） | 改外壳 / 窗口 / 设置 / 打包 |
 | `dsh-plugin-teaching-commons/` | 各模式共用教学文字：安全边界、说话方式、题库规则 + `skills/` 学科备注 + `readNote` | 改「怎么说话」 |
 | `dsh-plugin-coreset/` | **会话的核**：唯一 `complete` 提示段、`ctx.ileModes`、`read_note`、`context_switch` + 历史折叠；预设 `work` / `chat` 也在这 | 改共享行为 / 加模式 / 改预设 |
 | `dsh-plugin-setup/` | 开学**人格** + `setup_read` / `setup_update` + 条件注册 `setup` 预设 | 改开学问话 |
@@ -45,7 +45,7 @@
 - **`seedProfile()` 只在文件不存在时复制**：改完 `profiles/ensure-ile/` 要删 `.ensure-ile/home/profiles/desktop` 再启动，然后手跑 `pnpm install --offline`（校验用 `COREPACK_ENABLE_PROJECT_SPEC=0 corepack pnpm install --offline --no-frozen-lockfile`；直接 `corepack pnpm` 会被根 `packageManager` 挡）。
 - 会话工作区也在数据根：`workspace-controller` 的 `documentsDirectory` patch 成 `!!js dshHomePath('..')`，落 `<数据根>/deepseek-harness/default-workspace`（上游叶子目录名写死，短不了）。
 - 打包：`corepack yarn workspace dsh-plugin-desktop dist:win` → `dsh-plugin-desktop/dist/`；**打包后数据根 = `%LOCALAPPDATA%\ensure-ILE-data`**（2026-11-01 起；开发跑仍是仓库根的 `.ensure-ile`，`ENSURE_ILE_DATA_ROOT` 优先级最高）。
-- 版本：`dsh-plugin-desktop/package.json` 的 `version` 是唯一来源，当前 `0.1.0-alpha13`（α 线，与上游 2.0.18 脱钩）。**每笔加功能 / 修 bug 的提交都递增这个号**（李 2026-11-01 定），顺带同步 `dsh-plugin-desktop/tests/package.spec.ts` 的版本断言——不同步单测直接红。
+- 版本：`dsh-plugin-desktop/package.json` 的 `version` 是唯一来源，当前 `0.1.0-alpha14`（α 线，与上游 2.0.18 脱钩）。**每笔加功能 / 修 bug 的提交都递增这个号**（李 2026-11-01 定），顺带同步 `dsh-plugin-desktop/tests/package.spec.ts` 的版本断言——不同步单测直接红。
 
 ### 门禁入口（都在仓库根跑）
 
@@ -56,7 +56,7 @@
 | 提交前 / CI | `corepack yarn check` | `check:repo` + community-fabric + `check:desktop` 三路并行，**再串** `check:plugins`（memory 189 用例在并行负载下会撞 5 s 超时） | ~8 min |
 | 发布前 | `corepack yarn check:full` | `check` + 桌面壳 `test:ui` | ~10 min |
 | 只改仓库根（图标 / vendor / 布局 / 补丁） | `corepack yarn check:repo` | inspector-compat、icons、vendored runtime、verify-layout，再串 `verify-patch-references`（补丁有没有施主） | ~45 s |
-| 只改插件包 | `corepack yarn check:plugins` | 先 `node scripts/verify-lib-sync.mjs`（逐包 build，证明提交的 `lib/` 与 `src/` 同步），再 10 包 typecheck + coreset/setup/bankmanager/memory/textbook/schedule 单测 | ~140 s |
+| 只改插件包 | `corepack yarn check:plugins` | 先构建 memory（提供 setup 依赖的 `profile` 类型），再 `node scripts/verify-lib-sync.mjs`（逐包 build，证明提交的 `lib/` 与 `src/` 同步），再 10 包 typecheck + coreset/setup/bankmanager/memory/textbook/schedule 单测 | ~140 s |
 | 只改桌面壳 | `corepack yarn check:desktop` | = 桌面包 `check`：build + typecheck + 143 文件单测 + 六条 `verify:*` | ~6 min |
 | 只改界面 / 预设 | `corepack yarn workspace dsh-plugin-desktop test:ui` | 真 Electron 7 spec / 26 用例，先 build | ~3 min |
 
@@ -246,6 +246,8 @@
 10. **bundle 的 row id 不能和上游撞**（2026-10-30 首启硬失败）：web-app 已有 `id: schedule`，`dsh-plugin-schedule/cordis.patch.yml` 当年也 insert 同名行 → `prepareDesktopProfile` 的 `assertUniqueEntryIds`（`src/profile.ts:1194-1207`，在 `profile.ts:1488` 调用）抛 `duplicate loader entry id "schedule" in the composed profile`，应用进恢复页、任何插件没跑起来。现在叫 `ile-schedule`；**新 insert 行一律加 `ile-` 前缀**，别复用上游短名（`schedule` / `memory` / `textbook`）。回归是 `tests/ensure-ile-profile.spec.ts`：种模板进临时 home、依赖 junction 到仓库包、真跑 `prepareDesktopProfile` 断言 id 无重复。恢复页取消勾选只写 `desktopDeselectedBundles` 这个 UI 账本，合成 profile 只看 `dsh.profile.bundles`——那是绕过不是修好。
 
 ### 工具链
+
+- **全新检出的构建顺序（2026-11-14）**：Setup 通过 `dsh-plugin-memory/profile` 读写档案，其类型文件在未提交的 `memory/dist/`。`check:plugins` 必须先 build memory，再跑 `verify-lib-sync` 重建 Setup；桌面 `build` 同样先 build memory，再由 `prepare-profile` 复制进模板，确保独立的 UI / 打包 CI 任务也能从零启动。本机已有 dist 会掩盖顺序错误，CI 会报 `TS2307: Cannot find module 'dsh-plugin-memory/profile'`。验证此路径时先移走 memory/dist，不能只复用本机产物。
 
 1. C: 盘满过一次（Yarn 缓存 1.3G）——缓存已 junction 到 `D:\yarn-berry-cache`；pnpm store 也吃 C:。
 2. `dsh-plugin-desktop/dist/` 会堆到 1.5G（Setup 262MB + `win-unpacked` 1.2G）；腾地方先删 `win-unpacked`（可重建）。
