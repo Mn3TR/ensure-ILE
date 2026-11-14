@@ -10,9 +10,9 @@
 |---|---|---|
 | `bank_add` | 新建一道题，返回 id；学生这条消息里带的图片自动存进题目文件夹 | `statement`（必填，题干原文）、`subject`（必填，自由字符串）、`tags`（可省略） |
 | `bank_list` | 按条件列题 | `status`、`subject`、`due`（`true` 只看今天到期）、`limit`（默认 20，夹到 1–100，取**最后** N 条） |
-| `bank_show` | 看一道题的全部记录 | `id`（必填） |
+| `bank_show` | 默认全部记录；复习视图只返回题干和图片引用，隐藏旧解、线索与历史 | `id`（必填）、`recall: true`（复习先用） |
 | `bank_image` | 把题目里存的图重新给模型看（最多 4 张） | `id`（必填）、`which`（第几张，从 1 开始；省略＝全部） |
-| `bank_update` | 增量改，只合并传了的字段 | `id` + 任意：`status`、`guideOutcome`、`whereStuck`、`guideResult`、`insight`、`reviewNextAt`、`reviewInterval`、`reviewPassed`、`affect`、`effectiveHint`、`workAttempt{answer,verdict}`、`hrl{input,teacher,step,result,preference}`、`handoff{from,to,why,state,detail}`、`handoffConsume`、`patch`（自由字段浅合并） |
+| `bank_update` | 增量改，只合并传了的字段 | `id` + 任意：`status`、`guideOutcome`、`whereStuck`、`guideResult`、`insight`、`reviewNextAt`、`reviewInterval`、`reviewPassed`、`learningEvidence{context,support,outcome,answer,note,willingness}`、`affect`、`effectiveHint`、`workAttempt{answer,verdict}`、`hrl{input,teacher,step,result,preference}`、`handoff{from,to,why,state,detail}`、`handoffConsume`、`patch`（自由字段浅合并） |
 | `bank_resume` | 不带 `id` 列待接交接；带 `id` 返回题干 + 交接包 + `insight` + 最后一次作答 | `id`（可省略） |
 | `bank_stats` | 各状态计数，另有「待接交接：N」 | 无参数 |
 
@@ -27,7 +27,8 @@ new ──> guide ──> review ──> mastered
 ```
 
 - `new` 刚进来 / `guide` 待引导或引导中 / `hrl` 待优化 / `review` 等复习 / `mastered` 复习爬满 / `parked` 暂时放下。
-- `bank_update(status: 'review', reviewPassed: true)` 按 `REVIEW_LADDER = [1, 3, 7, 14, 30, 60, 120]`（天）升一档；`false` 回到第一档；爬到最后一档自动转 `mastered`。
+- 进 `review` 安排首次复习。`learningEvidence` 的 `context: delayed-recall` 自动按 `REVIEW_LADDER = [1, 3, 7, 14, 30, 60, 120]`（天）调度：仅 `support: none`、`outcome: solved` 升档，其他回第一档；爬到最后一档转 `mastered`。已掌握题再次提取失败会回 `review`。
+- `reviewPassed: true` 必须同时提交上述无帮助完成证据；与证据矛盾、拿变式冒充原题复习时原子拒绝。通常省略此兼容参数；`reviewPassed: false` 仍可单独重置。普通引导、独立作答和变式证据不自动推进复习。
 - 「状态谁说了算」：模型自己判断，但收尾必须问学生一句「这题你自己做出来了吗」再写回（规矩在 commons 的 `prompts/bank.md` 与 `guide.md` 里，代码不校验）。
 
 ## 数据落在哪
@@ -59,11 +60,16 @@ new ──> guide ──> review ──> mastered
                  "pairings": [{ "steps": [...], "result", "preference": "student|teacher|merged" }] },
   "handoff":   { "id": "hlt-…", "at", "from", "to", "why", "state", "detail": { "lastWords", "blocker", "nextStep" }, "consumedAt", "consumerSessionId" },
   "review":    { "nextAt", "interval", "count", "history": [] },
+  "learning":  { "evidence": [{ "at", "context": "guided|independent|delayed-recall|transfer",
+                                "support": "none|attention|explanation|example", "outcome": "solved|partial|stuck",
+                                "answer": "学生实际作答原文", "note": "观察或变式题干（可选）", "willingness": "continue|pause（明确表达时）" }] },
   "history":   [{ "at", "event", "detail" }]
 }
 ```
 
 - **`improvement` 是差异不是评价**：每一步只说他原来的写法被改成了什么（「他把移项放到了合并之后」），不写「这样更好」——优劣由学生自己判断。
+- **理解证据与偏好分开**：`hrl.step.decision` 记关键决策，`understanding{question,answer,verdict}` 记适用条件问题、学生原话与 `supported|partial|unclear`。补写同一步保留已有选择；没有问答就省略，不从版本选择推断理解。`learning` 与理解字段均可选，旧 schema 2 不迁移、不补造独立完成记录。
+- **帮助记本次最高程度**：注意力提示为 `attention`，概念或方法讲解为 `explanation`，示范或展示旧解为 `example`。工具校验结构、保存服务端时间；是否真正独立与延迟由模式依据实际交互判断，代码不核实学生在工具外查阅的行为。
 - **`preference` 是整条 pairing 的标签，`chosen` 是过程**：`chosen` 记这一步留了谁的说法，`preference` 记逐条走完之后他整体更喜欢哪版。两层不同，别用 `chosen` 多数票去推 `preference`。两个字段都 optional，老账本读进来照旧。
 
 固定枚举（`src/store.ts:51` 起）：`PROBLEM_STATUSES` 六个状态、`GUIDE_OUTCOMES`（`solved`/`stuck`/`abandoned`）、`AFFECTS`（`frustrated`/`neutral`/`excited`）、`HINT_LEVELS`（`confirm`/`position`/`feature`/`structure`/`result`）、`PAIRING_MATCHES`（`same`/`partial`/`missing`）、`PAIRING_CHOICES`（`student`/`teacher`/`merged`）、`PAIRING_PREFERENCES`（`student`/`teacher`/`merged`）。
@@ -93,7 +99,7 @@ new ──> guide ──> review ──> mastered
 
 ```bash
 corepack yarn workspace dsh-plugin-bankmanager typecheck
-corepack yarn workspace dsh-plugin-bankmanager test        # 81 个用例 / 6 个文件
+corepack yarn workspace dsh-plugin-bankmanager test        # 含学习证据、复习隐藏与原子拒绝回归
 corepack yarn workspace dsh-plugin-bankmanager build
 corepack yarn workspace dsh-plugin-bankmanager build:client
 corepack yarn workspace dsh-plugin-bankmanager verify       # node scripts/verify-bank.mjs：挂载冒烟，断言七个工具 + bank_add 真写了一道题
@@ -114,6 +120,6 @@ corepack yarn workspace dsh-plugin-bankmanager verify       # node scripts/verif
 ## 不做什么
 
 - 不引导、不判卷、不评价——那些是各模式的事；本包只记录、调度、把交接递给下一个模式。
-- 不采集偏好信号、不做打分界面。
+- 不做打分界面；保存学生明确选择的整体偏好、理解问答和学习证据，教学判断由各模式负责。
 - 图片的账号是题目文件夹：`bank_add` 把当前这条消息里的图（以及 10 分钟内紧邻的带图消息）复制进 `images/`，`bank_image` 读的是这份字节，只在喂模型前回灌一次 `ctx.attachments.saveImage()`。上游 `attachments/v1/objects/` 里那份是可重建的缓存，删了不影响账本。
 - 不做多用户 / 多库 / 按学期分库。

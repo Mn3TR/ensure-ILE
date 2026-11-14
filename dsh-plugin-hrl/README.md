@@ -17,9 +17,9 @@
 
 三步：
 
-- **教师轨迹**一次写全：按学生的偏好写（偏好从 memory 的档案读；memory 里**不存**偏好字段，`hrl.preference` 是这一轮结束后才有的标签，不是写教师轨迹时的输入）。每一步同时写 `improvement`——一句话，说这一步**相对他原来那步**改了什么，以他的原句为参照（「你这里用求导，教师版配方」）；是差异陈述，不是「更好 / 更清楚」这类判决。
-- **A/B** 一次只摆一步，三选一：`student`（留他的）/ `teacher`（用教师版）/ `merged`（他自己重写，正文必须由他写）。摆的时候把这一步的 `improvement` 说出来，再让他选。
-- **收尾**：全选完、写完 `hrl.result` 后问他一次整体更喜欢哪版（他原来的 / 教师版 / 混出来的），答案写进 `hrl.preference`。只问一次，不解释、不劝。
+- **教师轨迹**一次写全：按学生的偏好写（调用 `profile_read({ name: "preference" })`；未填就沿用学生原解。`hrl.preference` 是这一轮结束后的整体标签）。每一步同时写 `improvement`——一句话，说这一步**相对他原来那步**改了什么，以他的原句为参照（「你这里用求导，教师版配方」）；是差异陈述，不是「更好 / 更清楚」这类判决。
+- **比较**围绕一个关键决策，三选一：`student`（留他的）/ `teacher`（用教师版）/ `merged`（他自己重写）。相邻机械步骤可一起确认后逐条保存；有实质差异处另问一个方法适用条件问题，以 `decision`、`understanding{question,answer,verdict}` 保存理解证据，与版本选择和整体偏好分开。拒答可省略，不打分、不伪造。
+- **收尾**：每步按 `chosen` 取学生原句、教师步骤 `body` 或 `mergedText`，核对整条轨迹的完整性与衔接；冲突由学生重新选择或补写，确认成立后写 `hrl.result` 并转 `review`。再问一次整体更喜欢哪版，写进 `hrl.preference`。
 
 ## 数据落在哪
 
@@ -35,14 +35,16 @@
     "at": "…",
     "steps": [{ "index": 1, "studentQuote": "学生原句（逐字）", "teacherStep": 1,
                 "match": "same|partial|missing", "chosen": "student|teacher|merged",
-                "mergedText": "选 merged 时他重写的", "chosenAt": "…", "note": "…" }],
+                "mergedText": "选 merged 时他重写的", "chosenAt": "…", "note": "…",
+                "decision": "求导还是配方", "understanding": { "question": "…", "answer": "学生原话", "verdict": "supported|partial|unclear" } }],
     "result": "逐条选完之后拼出的解",
     "preference": "student|teacher|merged"
   }]
 }
 ```
 
-- 每步落一次 `bank_update(id, hrl: { step })`；配对结束写 `hrl.result`，题目转 `review`。
+- 学生每确认一步立即落一次 `bank_update(id, hrl: { step })`；选择未齐或推理未成立时保持 `hrl`，完整轨迹验收后才写 `hrl.result` 并转 `review`。
+- 普通回应通常两句；关键决策比较通常三句，一轮一个回应任务，必要的依据与示意可以讲清。
 - `hrl.preference` 是**整轮标签**，写一次即落在最近那条 pairing 上（已经写过 `result` 也不影响）；和逐步的 `chosen` 是两层，别混。取值 `student` / `teacher` / `merged`。
 - 人格在 `prompts/hrl.md`，挂载时读盘，`Config.promptFile` 可换路径。
 
@@ -50,12 +52,12 @@
 
 - `dsh-plugin-coreset` 提供 `ileModes` 服务并拥有提示段与 `read_note`；本包只贡献文本。
 - 题目与 `hrl` 段都在题库里，走 `bank_*` 工具读写，不 import `dsh-plugin-bankmanager` 源码。
-- 和 guide 的边界：guide 只给注意力、明确不评价；HRL 的核心动作就是评价和改——所以是两段人格，不是一段提示词里的两个分支。
+- Guide 侧重在尝试中提供并撤除支持；HRL 侧重比较已有解答的关键决策。两者均把当场完成与之后独立重建分开。
 
 | | `guide` | `hrl` |
 |---|---|---|
 | 起点 | 还没做出来 | 已有答案 |
-| 我们做什么 | 只给注意力，不评价 | 评价、指出可改处、对比 |
+| 我们做什么 | 按缺口提供支持，再逐渐撤掉 | 比较关键决策，记录选择与理解证据 |
 | 结束 | 他自己走完 | 改得更站得住，并且知道为什么 |
 
 ## 测试与构建
@@ -69,12 +71,12 @@ corepack yarn workspace dsh-plugin-hrl build
 
 ## 已知限制
 
-- A/B 的每一步选择**不打分**：没有逐步打分的界面，也没有并排阅读界面。收尾会记一条整体偏好标签（`hrl.preference`：他更喜欢哪一版），但只有这一个信号，仍然不做打分界面。
+- 比较过程不打分，也没有并排阅读界面。整体偏好 `hrl.preference` 仍只问一次；理解证据可选记录实际问答，不能从偏好推断。
 - 教师轨迹的质量完全取决于 `skills/*.md` 与提示词，没有测试兜着。
 - memory 的提示段被 coreset 的 `complete` 段吞掉，模型只能靠工具描述理解 `profile_read` 这类工具。
 
 ## 不做什么
 
 - 不从零带一道题（那是 `dsh-plugin-guide`），不判「谁对」（那是 `dsh-plugin-work`）。
-- 不做打分界面、不逐步采集信号——收尾只记一条 `hrl.preference`。
+- 不做打分界面、不逐步追问偏好分数；理解问答与收尾一次整体偏好分别保存。
 - 不写自己的数据文件；不注册任何工具。

@@ -76,6 +76,24 @@ export type Affect = (typeof AFFECTS)[number]
 export const HINT_LEVELS = ['confirm', 'position', 'feature', 'structure', 'result'] as const
 export type HintLevel = (typeof HINT_LEVELS)[number]
 
+/** Observable learning evidence; legacy records may have none. */
+export const LEARNING_CONTEXTS = ['guided', 'independent', 'delayed-recall', 'transfer'] as const
+export const SUPPORT_LEVELS = ['none', 'attention', 'explanation', 'example'] as const
+export const LEARNING_OUTCOMES = ['solved', 'partial', 'stuck'] as const
+export const UNDERSTANDING_VERDICTS = ['supported', 'partial', 'unclear'] as const
+export interface LearningEvidence {
+  at: string
+  context: (typeof LEARNING_CONTEXTS)[number]
+  /** Greatest support needed during this attempt, including previously shown solutions. */
+  support: (typeof SUPPORT_LEVELS)[number]
+  outcome: (typeof LEARNING_OUTCOMES)[number]
+  /** The learner's actual response, verbatim. */
+  answer: string
+  note?: string
+  /** Only record an explicitly expressed choice to continue or pause. */
+  willingness?: 'continue' | 'pause'
+}
+
 /** Fixed review intervals in days; the scheduler walks this ladder. */
 export const REVIEW_LADDER = [1, 3, 7, 14, 30, 60, 120] as const
 
@@ -130,6 +148,13 @@ export interface PairingStep {
   mergedText?: string
   chosenAt?: string
   note?: string
+  /** The method choice being compared, separate from preference. */
+  decision?: string
+  understanding?: {
+    question: string
+    answer: string
+    verdict: (typeof UNDERSTANDING_VERDICTS)[number]
+  }
 }
 
 /** One pass of step-by-step A/B over one handed-in answer. */
@@ -204,6 +229,7 @@ export interface ProblemRecord {
   hrl?: HrlState
   handoff?: Handoff
   review: ReviewState
+  learning?: { evidence: LearningEvidence[] }
   history: HistoryEntry[]
 }
 
@@ -339,6 +365,8 @@ const validateRecord = recordShape({
   statuses: PROBLEM_STATUSES, outcomes: GUIDE_OUTCOMES, affects: AFFECTS, hints: HINT_LEVELS,
   matches: PAIRING_MATCHES, choices: PAIRING_CHOICES, preferences: PAIRING_PREFERENCES,
   mediaTypes: PROBLEM_IMAGE_MEDIA_TYPES,
+  learningContexts: LEARNING_CONTEXTS, supportLevels: SUPPORT_LEVELS,
+  learningOutcomes: LEARNING_OUTCOMES, understandingVerdicts: UNDERSTANDING_VERDICTS,
 })
 
 export function parseRecord(raw: unknown): ProblemRecord {
@@ -377,6 +405,7 @@ export function parseRecord(raw: unknown): ProblemRecord {
     review: review as ProblemRecord['review'],
     history: asArray<HistoryEntry>(value.history ?? [], 'history'),
   }
+  if (value.learning !== undefined) record.learning = value.learning as NonNullable<ProblemRecord['learning']>
   if (hrl !== undefined) record.hrl = hrl as HrlState
   if (handoff !== undefined) record.handoff = handoff as Handoff
   return record
@@ -660,6 +689,7 @@ export interface UpdateProblemInput {
   reviewInterval?: number
   /** A review sitting: true walks one rung up, false resets to the first. */
   reviewPassed?: boolean
+  learningEvidence?: Omit<LearningEvidence, 'at'>
   affect?: string
   effectiveHint?: string
   workAttempt?: WorkAttemptInput
@@ -712,7 +742,7 @@ function applyHrl(record: ProblemRecord, input: HrlUpdateInput, at: string): str
     }
     const step = input.step
     const existing = pairing.steps.findIndex(entry => entry.index === step.index)
-    if (existing >= 0) pairing.steps[existing] = step
+    if (existing >= 0) pairing.steps[existing] = { ...pairing.steps[existing], ...step }
     else pairing.steps.push(step)
     pairing.steps.sort((left, right) => left.index - right.index)
     events.push('hrl step ' + step.index + ' ' + step.match)
@@ -835,14 +865,37 @@ export async function updateProblem(directory: string, id: string, input: Update
     }
     if (input.reviewNextAt !== undefined) record.review.nextAt = input.reviewNextAt
     if (input.reviewInterval !== undefined) record.review.interval = input.reviewInterval
-    if (input.reviewPassed !== undefined) {
-      const step = input.reviewPassed ? nextInterval(record.review.interval) : REVIEW_LADDER[0]
+    let reviewPassed = input.reviewPassed
+    if (input.learningEvidence !== undefined) {
+      const evidence = { ...input.learningEvidence, at }
+      const learning = record.learning ?? (record.learning = { evidence: [] })
+      learning.evidence.push(evidence)
+      events.push('learning ' + evidence.context + ' ' + evidence.support + ' ' + evidence.outcome)
+      if (evidence.context === 'delayed-recall') {
+        const passed = evidence.support === 'none' && evidence.outcome === 'solved'
+        if (reviewPassed !== undefined && reviewPassed !== passed) {
+          throw new BankError('reviewPassed 与延迟提取证据不一致', 'invalid-input')
+        }
+        reviewPassed = passed
+        if (!passed && record.status === 'mastered') {
+          record.status = 'review'
+          events.push('status mastered -> review')
+        }
+      } else if (reviewPassed !== undefined) {
+        throw new BankError('复习结果必须对应 delayed-recall 证据', 'invalid-input')
+      }
+    }
+    if (reviewPassed === true && input.learningEvidence?.context !== 'delayed-recall') {
+      throw new BankError('复习通过需要 delayed-recall、support=none、outcome=solved 的学习证据', 'invalid-input')
+    }
+    if (reviewPassed !== undefined) {
+      const step = reviewPassed ? nextInterval(record.review.interval) : REVIEW_LADDER[0]
       record.review.interval = step
-      record.review.count = input.reviewPassed ? record.review.count + 1 : 0
+      record.review.count = reviewPassed ? record.review.count + 1 : 0
       record.review.nextAt = new Date(now.getTime() + step * 86_400_000).toISOString()
-      record.review.history.push(at + ' ' + (input.reviewPassed ? 'pass' : 'fail') + ' +' + step + 'd')
-      events.push('review ' + (input.reviewPassed ? 'pass' : 'fail') + ' +' + step + 'd')
-      if (input.reviewPassed && step === REVIEW_LADDER[REVIEW_LADDER.length - 1]) {
+      record.review.history.push(at + ' ' + (reviewPassed ? 'pass' : 'fail') + ' +' + step + 'd')
+      events.push('review ' + (reviewPassed ? 'pass' : 'fail') + ' +' + step + 'd')
+      if (reviewPassed && step === REVIEW_LADDER[REVIEW_LADDER.length - 1]) {
         record.status = 'mastered'
         events.push('status -> mastered')
       }

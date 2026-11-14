@@ -10,5 +10,9 @@ export declare function recordShape(enums: {
     choices: readonly string[];
     preferences: readonly string[];
     mediaTypes: readonly string[];
+    learningContexts: readonly string[];
+    supportLevels: readonly string[];
+    learningOutcomes: readonly string[];
+    understandingVerdicts: readonly string[];
 }): Rule;
 export {};

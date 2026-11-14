@@ -8,6 +8,7 @@
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { readProfileFile, writeProfileFile } from 'dsh-plugin-memory/profile'
 
 /** Whether the onboarding conversation has finished. */
 export const ONBOARDING_STATES = ['pending', 'done'] as const
@@ -79,14 +80,32 @@ export function readState(file: string): SetupState {
   }
 }
 
+/** Save supplied facts and fill absent columns without replacing later profile edits. */
+function syncProfileFacts(facts: SetupFacts, profileHome: string, supplied: SetupFacts = {}): void {
+  for (const key of FACT_KEYS) {
+    const value = facts[key]
+    // Older setup prompts used this marker for unanswered questions.
+    if (value === undefined || value.trim() === '未填') continue
+    if (supplied[key] !== undefined || readProfileFile(key, profileHome) === undefined) {
+      writeProfileFile(key, value, profileHome)
+    }
+  }
+}
+
+/** Backfill an older onboarding record, including one that is already completed. */
+export function backfillProfile(file: string, profileHome: string = dirname(file)): void {
+  syncProfileFacts(readState(file).got, profileHome)
+}
+
 /**
  * Apply one patch and persist it atomically.
  * @param file - absolute path.
  * @param patch - the fields to write.
  * @param now - clock injection for tests.
- * @returns the merged record.
+ * @param profileHome - profile home; defaults to the progress file's directory for isolated stores.
+ * @returns the merged record, after explicitly supplied facts and missing profile columns are saved.
  */
-export function updateState(file: string, patch: SetupPatch, now: Date = new Date()): SetupState {
+export function updateState(file: string, patch: SetupPatch, now: Date = new Date(), profileHome: string = dirname(file)): SetupState {
   const current = readState(file)
   const got: SetupFacts = { ...current.got }
   for (const key of FACT_KEYS) {
@@ -105,6 +124,9 @@ export function updateState(file: string, patch: SetupPatch, now: Date = new Dat
       : current.next !== undefined ? { next: current.next } : {}),
     updatedAt: now.toISOString(),
   }
+  // Save profile facts before marking onboarding done. Explicit corrections may
+  // replace a column; older collected facts only fill columns that are absent.
+  syncProfileFacts(got, profileHome, patch)
   mkdirSync(dirname(file), { recursive: true })
   const temporary = file + '.tmp'
   writeFileSync(temporary, JSON.stringify(next, null, 2) + '\n')

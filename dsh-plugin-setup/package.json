@@ -33,6 +33,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "dsh-plugin-memory": "link:../dsh-plugin-memory",
     "dsh-plugin-teaching-commons": "link:../dsh-plugin-teaching-commons"
   },
   "peerDependencies": {

@@ -40,11 +40,14 @@ export declare function defaultStateFile(): string;
  * @returns the record; a corrupt file starts over rather than blocking onboarding.
  */
 export declare function readState(file: string): SetupState;
+/** Backfill an older onboarding record, including one that is already completed. */
+export declare function backfillProfile(file: string, profileHome?: string): void;
 /**
  * Apply one patch and persist it atomically.
  * @param file - absolute path.
  * @param patch - the fields to write.
  * @param now - clock injection for tests.
- * @returns the merged record.
+ * @param profileHome - profile home; defaults to the progress file's directory for isolated stores.
+ * @returns the merged record, after explicitly supplied facts and missing profile columns are saved.
  */
-export declare function updateState(file: string, patch: SetupPatch, now?: Date): SetupState;
+export declare function updateState(file: string, patch: SetupPatch, now?: Date, profileHome?: string): SetupState;

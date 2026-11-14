@@ -1,8 +1,9 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { defaultStateFile, readState, updateState } from '../src/state.ts'
+import { readProfile, readProfileFile, writeProfileFile } from 'dsh-plugin-memory/profile'
+import { backfillProfile, defaultStateFile, readState, updateState } from '../src/state.ts'
 
 const roots: string[] = []
 function file(): string {
@@ -53,6 +54,70 @@ describe('updateState', () => {
     const path = file()
     updateState(path, { next: '先做一道函数题' })
     expect(updateState(path, { grade: '高一' }).next).toBe('先做一道函数题')
+  })
+})
+
+describe('student profile synchronization', () => {
+  it('makes each collected fact readable by the profile API used in later modes', () => {
+    const path = file()
+    const home = dirname(path)
+    updateState(path, { grade: '高一', preference: '喜欢先想，偏几何' })
+    expect(readProfileFile('preference', home)).toBe('喜欢先想，偏几何')
+    updateState(path, { schedule: '周一有晚自习', rhythm: '晚上八点到家' })
+    expect(readProfile(home)).toEqual({
+      grade: '高一', schedule: '周一有晚自习', rhythm: '晚上八点到家', preference: '喜欢先想，偏几何',
+    })
+  })
+
+  it('backfills older setup facts without overwriting a profile refined later', () => {
+    const path = file()
+    const home = dirname(path)
+    writeFileSync(path, JSON.stringify({ schema: 1, onboarding: 'pending', got: {
+      grade: '高一', preference: '旧偏好',
+    } }))
+    writeProfileFile('preference', '后来补充：先画图再列式', home)
+    updateState(path, { onboarding: 'done', next: '先发一道题' })
+    expect(readProfileFile('grade', home)).toBe('高一')
+    expect(readProfileFile('preference', home)).toBe('后来补充：先画图再列式')
+  })
+
+  it('backfills completed onboarding without reopening it or replacing a later profile edit', () => {
+    const path = file()
+    const home = dirname(path)
+    const old = { schema: 1, onboarding: 'done', got: { grade: '高一', preference: '旧偏好', schedule: '未填' }, next: '先发一道题' }
+    writeFileSync(path, JSON.stringify(old))
+    writeProfileFile('preference', '后来补充的偏好', home)
+    backfillProfile(path)
+    expect(readProfileFile('grade', home)).toBe('高一')
+    expect(readProfileFile('preference', home)).toBe('后来补充的偏好')
+    expect(readProfileFile('schedule', home)).toBeUndefined()
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(old)
+    expect(readState(path).onboarding).toBe('done')
+  })
+
+  it('applies an explicit correction while preserving unrelated profile columns', () => {
+    const path = file()
+    const home = dirname(path)
+    updateState(path, { grade: '高一', preference: '偏代数' })
+    writeProfileFile('preference', '更详细的解题偏好', home)
+    updateState(path, { grade: '高二' })
+    expect(readProfileFile('grade', home)).toBe('高二')
+    expect(readProfileFile('preference', home)).toBe('更详细的解题偏好')
+  })
+
+  it('keeps the profile in its explicit home when the progress file is configured elsewhere', () => {
+    const path = file()
+    const home = join(dirname(path), 'student-home')
+    updateState(path, { preference: '先想再动笔' }, new Date(), home)
+    expect(readProfileFile('preference', home)).toBe('先想再动笔')
+    expect(readProfileFile('preference', dirname(path))).toBeUndefined()
+  })
+
+  it('does not mark onboarding done if a profile column cannot be saved', () => {
+    const path = file()
+    mkdirSync(join(dirname(path), 'profile', 'grade.md'), { recursive: true })
+    expect(() => updateState(path, { grade: '高一', onboarding: 'done', next: '先发一道题' })).toThrow()
+    expect(readState(path)).toEqual({ schema: 1, onboarding: 'pending', got: {} })
   })
 })
 

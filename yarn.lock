@@ -12332,6 +12332,12 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"dsh-plugin-memory@link:../dsh-plugin-memory::locator=dsh-plugin-setup%40workspace%3Adsh-plugin-setup":
+  version: 0.0.0-use.local
+  resolution: "dsh-plugin-memory@link:../dsh-plugin-memory::locator=dsh-plugin-setup%40workspace%3Adsh-plugin-setup"
+  languageName: node
+  linkType: soft
+
 "dsh-plugin-memory@workspace:dsh-plugin-memory":
   version: 0.0.0-use.local
   resolution: "dsh-plugin-memory@workspace:dsh-plugin-memory"
@@ -12427,6 +12433,7 @@ __metadata:
     "@deepseek-ai/schemastery": "npm:^3.19.0"
     "@types/node": "npm:^22.20.0"
     dsh-plugin-coreset: "link:../dsh-plugin-coreset"
+    dsh-plugin-memory: "link:../dsh-plugin-memory"
     dsh-plugin-teaching-commons: "link:../dsh-plugin-teaching-commons"
     tsdown: "npm:0.22.2"
     typescript: "npm:6.0.3"

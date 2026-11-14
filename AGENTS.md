@@ -12,7 +12,7 @@
 
 | 路径 | 是什么 | 何时读 |
 | --- | --- | --- |
-| `dsh-plugin-desktop/` | 上游桌面壳 fork（现 `0.1.0-alpha11`）+ 我们的改动（数据根、OOBE 裁剪、预设、皮肤、打包） | 改外壳 / 窗口 / 设置 / 打包 |
+| `dsh-plugin-desktop/` | 上游桌面壳 fork（现 `0.1.0-alpha13`）+ 我们的改动（数据根、OOBE 裁剪、预设、皮肤、打包） | 改外壳 / 窗口 / 设置 / 打包 |
 | `dsh-plugin-teaching-commons/` | 各模式共用教学文字：安全边界、说话方式、题库规则 + `skills/` 学科备注 + `readNote` | 改「怎么说话」 |
 | `dsh-plugin-coreset/` | **会话的核**：唯一 `complete` 提示段、`ctx.ileModes`、`read_note`、`context_switch` + 历史折叠；预设 `work` / `chat` 也在这 | 改共享行为 / 加模式 / 改预设 |
 | `dsh-plugin-setup/` | 开学**人格** + `setup_read` / `setup_update` + 条件注册 `setup` 预设 | 改开学问话 |
@@ -45,7 +45,7 @@
 - **`seedProfile()` 只在文件不存在时复制**：改完 `profiles/ensure-ile/` 要删 `.ensure-ile/home/profiles/desktop` 再启动，然后手跑 `pnpm install --offline`（校验用 `COREPACK_ENABLE_PROJECT_SPEC=0 corepack pnpm install --offline --no-frozen-lockfile`；直接 `corepack pnpm` 会被根 `packageManager` 挡）。
 - 会话工作区也在数据根：`workspace-controller` 的 `documentsDirectory` patch 成 `!!js dshHomePath('..')`，落 `<数据根>/deepseek-harness/default-workspace`（上游叶子目录名写死，短不了）。
 - 打包：`corepack yarn workspace dsh-plugin-desktop dist:win` → `dsh-plugin-desktop/dist/`；**打包后数据根 = `%LOCALAPPDATA%\ensure-ILE-data`**（2026-11-01 起；开发跑仍是仓库根的 `.ensure-ile`，`ENSURE_ILE_DATA_ROOT` 优先级最高）。
-- 版本：`dsh-plugin-desktop/package.json` 的 `version` 是唯一来源，当前 `0.1.0-alpha11`（α 线，与上游 2.0.18 脱钩）。**每笔加功能 / 修 bug 的提交都递增这个号**（李 2026-11-01 定），顺带同步 `dsh-plugin-desktop/tests/package.spec.ts` 的版本断言——不同步单测直接红。
+- 版本：`dsh-plugin-desktop/package.json` 的 `version` 是唯一来源，当前 `0.1.0-alpha13`（α 线，与上游 2.0.18 脱钩）。**每笔加功能 / 修 bug 的提交都递增这个号**（李 2026-11-01 定），顺带同步 `dsh-plugin-desktop/tests/package.spec.ts` 的版本断言——不同步单测直接红。
 
 ### 门禁入口（都在仓库根跑）
 
@@ -58,7 +58,7 @@
 | 只改仓库根（图标 / vendor / 布局 / 补丁） | `corepack yarn check:repo` | inspector-compat、icons、vendored runtime、verify-layout，再串 `verify-patch-references`（补丁有没有施主） | ~45 s |
 | 只改插件包 | `corepack yarn check:plugins` | 先 `node scripts/verify-lib-sync.mjs`（逐包 build，证明提交的 `lib/` 与 `src/` 同步），再 10 包 typecheck + coreset/setup/bankmanager/memory/textbook/schedule 单测 | ~140 s |
 | 只改桌面壳 | `corepack yarn check:desktop` | = 桌面包 `check`：build + typecheck + 143 文件单测 + 六条 `verify:*` | ~6 min |
-| 只改界面 / 预设 | `corepack yarn workspace dsh-plugin-desktop test:ui` | 真 Electron 5 spec / 23 用例，先 build | ~2.5 min |
+| 只改界面 / 预设 | `corepack yarn workspace dsh-plugin-desktop test:ui` | 真 Electron 7 spec / 26 用例，先 build | ~3 min |
 
 ## 上游是谁、我们在哪一层改它（2026-11-14 同步）
 
@@ -79,7 +79,7 @@
 | 题目 | `<DSH_HOME>/bank/problems/<id>/{problem.json,images/}`，索引 `problems/index.json`（派生，可重建） | `bank_*` | guide / work / hrl / schedule |
 | 课表与进度 | `<DSH_HOME>/schedule/schedule.json` | `schedule_update` | `schedule_plan` |
 | 开学问话 | `<DSH_HOME>/setup.json` | `setup_update` | `setup_read` |
-| 学生档案 | `<DSH_HOME>/profile/{grade,schedule,rhythm,preference}.md` | `profile_write` | `profile_read`（不进检索、不占注入预算） |
+| 学生档案 | `<DSH_HOME>/profile/{grade,schedule,rhythm,preference}.md` | `profile_write` / `setup_update` | `profile_read`（不进检索、不占注入预算） |
 | 记忆 | global 层 + 会话工作区 `.dsh/storages/` | `memory_*` | 全体会话 |
 | 教材 | `<数据根>/deepseek-harness/default-workspace/教材/`（7 PDF + 索引 + 教辅） | 人 | `textbook_*`（读入库语料，不是 PDF） |
 
@@ -101,15 +101,16 @@
 - **工具集只能加不能减**（flash `toolUpdate: 'addition-only'`），同预设里任何模式看到的工具都是并集；换模式只换 `complete` 段文本。**模型不自己切模式**：提示词与工具描述写死「学生没提不要切」，`setup` 更是 `switchable: false`。
 - **跨会话只靠 bank + memory，零注入**。新会话靠提示词让模型开场 `bank_list` 找 pending `handoff`，不用 `agent.inject()`（要额外 host 插件、时机含糊、永久占 user 位）。代价：模型可能忘记读。
 - **交接卡片**：模型写 `handoff` → 壳渲染卡片 → 学生点 → 客户端 `session.create`（从工具槽位 `cwd` 定位原 `workspaceId`，guide / work / hrl 统一用 `work` 预设）+ `uiWorkspace.openSession` + `conversation.input.requestDraftInitialization` 把「接着上次那道题：<id>（<状态>）」填进输入框（学生自己回车，零注入不变）+ `/bank/api` 的 `handoff.consume`（新会话未开始对话时先写 `plugin:ile/mode`，保证首轮就是目标人格；已有会话不覆盖模式）。幂等靠列表 + `localStorage`（Host `sessionId` 不能自命名）。`create` 拿已开始过的 sessionId 会静默新开（`api/session-controller/src/agent.ts:488`），点前先查列表。
-- **OOBE = 条件注册的 `setup` 预设**（`dsh-plugin-setup/presets`，`shouldRegisterSetup(stateFile)` 假就不注册——registry 没有 hidden 字段，「不注册」就是消失，重启生效），状态 `<DSH_HOME>/setup.json`，**字段级** `{ onboarding, got: { grade, schedule, rhythm, preference } }`，可中断续问；完成判据是「能给出下一步」不是「问够四样」。
-- **A/B（HRL）**：教师轨迹一次写全（按 memory 偏好）；学生轨迹是原文；逐小步 `student / teacher / merged`，`merged` 必须存学生自己重写的 `mergedText`；教师每步带 `improvement`（相对他原写法的**差异**，不是优劣），收尾写一次 `preference`（他整体更喜欢哪版）——过程用 `chosen`、标签用 `preference`，两层别混。每 3 步 flush，pairing 结束必 flush。
-- **收尾规矩**：每轮引导收尾必问一句「这题你自己做出来了吗」；做出来 → `status: review` + `guideOutcome: solved`，没做出来 → 保持 `guide` + `stuck`（写在 `guide.md`）。
-- **固定档复习**：`REVIEW_LADDER = [1,3,7,14,30,60,120]`；进 `review` 自动排第一次，`reviewPassed: true` 升一档、`false` 回第一档，爬到最后一档自动 `mastered`。读端 `bank_list` 的 due 过滤 + `bank_stats` 到期数。
+- **OOBE = 条件注册的 `setup` 预设**（`dsh-plugin-setup/presets`，`shouldRegisterSetup(stateFile)` 假就不注册——registry 没有 hidden 字段，「不注册」就是消失，重启生效），状态 `<DSH_HOME>/setup.json`，**字段级** `{ onboarding, got: { grade, schedule, rhythm, preference } }`，可中断续问；完成判据是「能给出下一步」不是「问够四样」。四项情况通过 `dsh-plugin-memory/profile` 同步学生档案：显式字段更新，旧记录只补缺栏，先保存档案再提交进度；预设初始化时也补齐已完成的旧记录，跳过「未填」并保留后续档案；不自动生成结构化课表。
+- **A/B（HRL）**：教师轨迹一次写全（`profile_read` 偏好只影响呈现，不当固定能力类型），学生轨迹逐字保留。围绕关键决策比较 `student / teacher / merged`，机械步骤可一起确认后逐条写盘，`mergedText` 必须由学生重写。`decision` 和 `understanding{question,answer,verdict}` 保存可选的适用条件问答；`supported / partial / unclear` 是观察，不能从选择推断。每步 `improvement` 仍记差异；整体 `preference` 只问一次。按 `chosen` 拼合并核对完整衔接后写 `result`、进 `review`，当场优化完成不计延迟独立通过。
+- **提示词执行口径（alpha13）**：普通回应通常两句，HRL 关键决策比较通常三句，必要依据讲清，一轮一个回应任务。Guide 默认给注意力，依据缺口可讲解一个动作或示范片段，再交回相邻步骤并逐渐减少帮助；同一视角两次接不上就整理尝试、检查缺口，给补概念/小例子/暂停的选择，不空转追问、不连续拆碎代做。具体承认困难、尊重选择，不猜情绪和固定能力类型。判卷仍检查成立性、完整性与关键依据。新独立题保留 `new`，模式切换由学生决定、下一次发言生效。
+- **收尾规矩**：完成后问一次「这题你自己做出来了吗」，作为主观反馈；实际解答成立完整才记 `review + solved`，没做出来记 `guide + stuck`，明确搁置记 `parked + abandoned`，不要求答完收尾问题才允许停。`learningEvidence` 另记实际作答、最高帮助和观察；当天不自动追加变式。
+- **固定档复习与学习证据**：梯度仍为 `[1,3,7,14,30,60,120]`，复习先 `bank_show({id,recall:true})` 只读题干与图片引用，实际作答后才看完整记录核验。`learningEvidence` 的 `context: guided / independent / delayed-recall / transfer` 区分情境，`support: none / attention / explanation / example` 记本次最高帮助，`outcome: solved / partial / stuck` 配学生原文 `answer`；`willingness` 仅记录明确的继续/暂停。只有延迟提取 `none + solved` 自动升档，其他延迟结果回第一档；`reviewPassed:true` 必须同时有这份证据，矛盾原子拒绝，变式不推进原题。旧 schema 2 不迁移、不补造独立完成。工具校验结构；是否真正延迟及是否在工具外看答案仍靠交互证据。
 - **画像字段**：`guide.sessions[]` 带 `affect`（frustrated/neutral/excited）与 `effectiveHint`（confirm/position/feature/structure/result），`bank_update` 可直接写。**进题不进 memory**。
 
 ### bank schema 2（`dsh-plugin-bankmanager/src/store.ts`）
 
-写入边界：自由 `patch` 保留扩展字段浅合并，但不能改 `schema` / `id` / `history`，拒绝原型键；状态只允许通过 `status` 参数更新，保持复习调度一致。guide / work / HRL / handoff / review 的子记录递归校验，显式参数同样校验，整份记录通过后才原子落盘。非法更新不得污染原文件。
+写入边界：自由 `patch` 保留扩展字段浅合并，但不能改 `schema` / `id` / `history`，拒绝原型键；状态只允许通过 `status` 参数更新，保持复习调度一致。guide / work / HRL / handoff / review / learning 的子记录递归校验，显式参数同样校验，整份记录通过后才原子落盘。非法更新不得污染原文件。
 
 ```jsonc
 {
@@ -164,6 +165,10 @@
 
 ## 验证记录
 
+- **2026-11-14，alpha13 学习证据与支持撤除**：落实六项改进：用延迟独立表现检验学习、按缺口提供并逐渐撤除支持、连续卡住后整理尝试并讲解、HRL 比较关键决策且单独记录理解、复习先隐藏旧解并提取、自主选择与具体承认困难。新增 `learningEvidence`、HRL 理解字段和 `bank_show({recall:true})`，schema 2 旧记录保持兼容；矛盾的独立通过原子拒绝。`check:plugins` 521 用例通过，9 包提交产物重建逐字节一致；桌面构建、五套 TypeScript 配置及打包 / profile / 插件组合 62 用例通过。完整 Electron UI 7 spec / 26 用例通过（233.77 s），新增用例经真实 Host 工具验证示范完成与独立提取证据分开保存、旧解隐藏和复习升档。模型端点为本地模拟服务，验证装配和数据链路；真实延迟、学生是否看过答案及教学效果仍需真题观察。
+
+- **2026-11-14，alpha12 提示词与档案链路**：六组改进统一句数、引导卡点诊断、判卷标准、HRL 拼合与即时写盘、模式切换和 Setup 档案同步。`check:plugins` 505 用例通过，9 包提交产物重建逐字节一致；桌面构建与五套 TypeScript 配置通过，打包 / profile / 插件组合 62 用例通过，完整 Electron UI 6 spec / 25 用例通过（184.05 s）。新增用例验证开学资料经真实工具保存后可在新会话读回，以及切换当轮保持 Chat、下次发言装入 HRL 新规则；模型端点为本地模拟服务。旧开学记录补缺栏、保留后续档案、跳过「未填」与写入失败保持进度的回归通过。
+
 - **2026-11-14，alpha11 上游同步**：以固定发布版本同步 Harness `0.2.2-rc.3`、桌面共享子树 `v2.0.23-next`、memory `0.23.0` 与 skin `0.21.0`；保留教学、数据根和品牌。资源紧张，本次将 `check:full` 的组成门禁串行执行：桌面 143 文件 / 1814 用例（1785 通过、29 跳过，含空 store 离线首启回归），插件 499 用例通过，9 个提交产物重建逐字节一致，真实 Electron UI 5 spec / 23 用例全部通过；构建、五套 TypeScript 配置、运行时闭包 / CLI / loader / profile / 许可 / 操作门禁、仓库门、community-fabric 与 `install --immutable` 全部通过。运行时 375 个 vendored 包，34 份补丁中 33 份有效、1 份 known-inert；第三方声明覆盖 624 个生产包。正常压缩 unsigned Windows 安装包 181,476,170 B（173.07 MiB），包内清单与安装器校验通过；未改动的打包程序在全新临时数据根完成离线安装、品牌图种入和首轮 32 工具对话（本地模拟模型端点），21.71 s 通过并核对截图。详见 `.agents/notes/implemented/2026-11-14-upstream-sync.md`。
 
 - **2026-11-13，alpha10**：`corepack yarn check:full` `EXIT=0`（314 s）。桌面 141 文件 / 1797 用例（1769 通过、28 跳过），插件 383 用例通过，Electron UI 5 spec / 23 用例通过；9 个可复现构建插件的 `lib/` 重建逐字节一致。新增验证涵盖真实重启后恢复待切换意图、交接卡片保留工作区且首轮使用目标人格、非法补丁不改变原文件、已脏产物内容变化仍被门禁发现。
@@ -177,7 +182,7 @@
 
 ## 自动化 UI 测试（2026-10-31 落地，李要求）
 
-- 入口 `corepack yarn workspace dsh-plugin-desktop test:ui`（先 `build` 再 `vitest --config vitest.ui.config.ts`），5 spec / 23 用例 / 约 2.5 min（shell 10、surface 4、flows 3、onboarding 1、conversation 5）。单测门 `yarn test` 用 `vitest.config.ts` 的 `exclude` 排掉 `tests/ui/**`——它要 `lib/` 且慢一个数量级，别接进 `check`。
+- 入口 `corepack yarn workspace dsh-plugin-desktop test:ui`（先 `build` 再 `vitest --config vitest.ui.config.ts`），7 spec / 26 用例 / 约 3 min（shell 10、surface 4、flows 3、onboarding 1、conversation 5、setup-profile 2、learning-evidence 1）。单测门 `yarn test` 用 `vitest.config.ts` 的 `exclude` 排掉 `tests/ui/**`——它要 `lib/` 且慢一个数量级，别接进 `check`。
 - 选型 `playwright-core`（1.64.1，devDependency）+ vitest 做 runner，**不引 `@playwright/test`**：不下载 Chromium，驱动 Electron 自带内核，不多一个 runner。代价是没有自动重试 `expect`，用 `tests/ui/fixture.ts` 的 `expectVisible` / `expectHidden` 与 `expect.poll`。
 - `tests/ui/fixture.ts` 提供 `createRoot()` / `launchShell()` / `clientPage()` / `skipDesktopSetup()`：临时数据根在 `tmpdir()`，profile 目录照 `profiles/ensure-ile` 写 `package.json` / `cordis.patch.yml` / `pnpm-workspace.yaml`，再给每个 dependency 建 junction；`launchShell(dataRoot, { setup: 'full' })` 逐个覆盖 `ENSURE_ILE_DATA_ROOT` / `DSH_HOME` / `ENSURE_ILE_HOME` / `DSH_AGENTS_HOME` / `DSH_DESKTOP_USER_DATA`（继承的 `DSH_HOME` 会指向真实安装）。
 - **三个非显然前置**：① `createRoot()` 必须写 `node_modules/.modules.yaml`（`nodeLinker: hoisted` / `packageManager: pnpm@…` / `virtualStoreDirMaxLength: 60`）与 `pnpm-lock.yaml`（`settings: autoInstallPeers: false`），否则 `src/profile.ts` 的 `profileDependencyMigrationRequired()` 判成 legacy 布局，而开发启动没有打包 pnpm 可迁移 → 停在恢复页；② 跳过开学两步：点「跳过」后再点确认框「跳过设置」（`skipDesktopSetup()` 已封装）；③ `[data-desktop-onboarding-surface]` 遮罩在 Host 回执前**一直挂着吞点击**，等它 `detached`，别等 composer 可见。
@@ -186,6 +191,7 @@
   - 顺带发现（未处理）：上游这条七屏仍有「选择插件市场」（`关闭插件市场` / `dsh-market` / `自定义插件市场`），可我们不发市场、也关了 `ui-plugin-manager`。学生走不到（只有 `ENSURE_ILE_SETUP=full` 才出现），哪天放开 `full` 就得先删这屏。
 - 断言面（都实测过）：窗口标题、`data-dsh-claude-style`、两张 `dsh-desktop-{brand,workspace}-styles` 样式表、侧栏只剩字标（`brand-mark` hidden / `brand-name` visible）、侧栏无「插件」「自动化任务」、工作区芯片与「添加工作区」/ `row-actions` 隐藏而分组头仍在、`.dsh-claude-perm-btn` 为 0、hero 的 `Shapen the world` + `hero-mark`、贴图后 `[data-has-attachments="true"]` 与缩略图、新会话预设芯片 `Work`、预设选单 `Work`/`Chat`/`Setup` 三条描述、选 `Chat` 后芯片变 `Chat`、品牌图种进 `<root>/home/dsh-claude-style/brand/`。
 - **窗口标题别用 `page.title()`**：那是 `document.title`（仍是上游 `DeepSeek Harness`）；Electron 标题要 `app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getTitle())`。
+- **开学到后续模式的档案链路**（`tests/ui/setup-profile.spec.ts`）：真实调用 `setup_update` 保存四项情况，再新建 Chat 会话用 `profile_read` 读回；核对切换当轮仍为 Chat、下次发言收到 HRL 新规则。模型端点为本地模拟服务，测试覆盖工具、存储和装配，不评价真实模型的引导质量。
 - **假 DeepSeek 服务**（`tests/ui/fake-deepseek.ts`）：`llm-deepseek` 说的是 Anthropic Messages（`POST <base>/v1/messages`，SSE 帧按 `event.type` 校验、`message_stop` 收尾），这个端点在本地答那套协议，于是**不用真 key 也能断言提示词、工具面、历史与折叠**。`fixture.launchShell(root, { env: { DEEPSEEK_BASE_URL: fake.url, DEEPSEEK_API_KEY: 'dummy-key' } })` 把端点注进去，主进程原样透传给 Host 子进程，不用改 profile。默认每轮回 `FAKE_REPLY_TEXT`；要脚本化就 `fake.script([...])` 排队接下来的对话响应——`{ kind: 'tool_use', name, input }`（`context_switch` 折叠那条用例就是这么走的）或 `{ kind: 'failure', status: 429 | 500 }`（验重试；**别填 `retryAfterSeconds`**，> 10 s 上游直接放弃重试），队列空了回默认文本；`fake.served` 记每个对话请求实际拿到的那条，数重试次数就看它。请求体照旧落 `fake.dumpDir/request-NNN.json`，调试时直接翻。
 - **一轮会发两个模型请求**（对话 + AI 标题生成），标题那发 `tools` 为空、`max_tokens` 4096、system 约 481 字符，还可能比对话那发先到：**挑请求一律按 `tools` 非空筛，别取 `requests[0]`**；假服务的脚本队列也只被带 tools 的那发消费。同理，「这一轮说完了」别拿同一句回复文本当锚点——上一轮的气泡会让它立刻为真（429 那条用例就这么假绿过一次），每轮脚本一句不同的话，或者等 `button[aria-label="停止生成"]` 消失。
 

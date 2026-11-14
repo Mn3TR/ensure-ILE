@@ -21,6 +21,8 @@
 
 - 人格在 `prompts/guide.md`，用 `fileURLToPath(new URL('../prompts/guide.md', import.meta.url))` 定位，**挂载时同步读盘**——改文件不用重建，重启会话即生效；`Config.promptFile` 可换路径。
 - 科目备注在 `dsh-plugin-teaching-commons/skills/`，不在本包。
+- 先区分信息、知识与策略缺口。默认给注意力，必要时明确讲解一个方法动作或示范一个片段，再由学生完成相邻且未示范的步骤，下次尝试减少帮助；同一视角两次接不上就整理尝试、检查缺口，不反复追问。学生可选择补概念、看小例子或暂停。
+- 完成后仍问一次学生的感受，另用 `learningEvidence` 记录 `context: guided`、本次最重帮助和实际作答。引导中完成与之后独立完成分开；当天不自动追加变式。
 - 题、课表、教材分别由 `bank_*` / `schedule_*` / `textbook_*` 读写，本包不碰。
 
 ## 和邻居的关系
@@ -47,6 +49,6 @@ corepack yarn workspace dsh-plugin-guide build
 
 ## 不做什么
 
-- 不给答案、不给动作，只给注意力——只写在 `prompts/guide.md` 里，代码不强制。
+- 不代做整题；必要支持要能逐渐撤掉，帮助程度如实记录——教学行为由 `prompts/guide.md` 规定。
 - 不批改、不评价学生（那是 `dsh-plugin-hrl`）。
 - 只给一个下一步：一次有两个视角就退化成「讲题」。

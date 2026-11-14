@@ -28,6 +28,7 @@
 ## `context_switch` 的语义
 
 - `to` 必须是 `switchable` 的模式（开学不是：它的两个工具只挂在开学预设里）；`summary` 不能空——它同时是给下一个模式的交接词。
+- 聊天提示词按目标选择 `guide` / `work` / `hrl`；Work 是预设名。共用脚注要求告知下次发言生效，本轮继续当前模式；摘要优先保留题号、学生原话、当前成果、卡点与下一步。
 - 工具先用 `appendPluginRecord` 追加 `plugin:ile/switch-requested`，**只置一个可重放的待办意图**（每会话一份），不改对话表面、不动工具表。确认后即使重启，下次开口仍会执行。返回「已安排切到「X」：学生下一次开口时…这一轮还没说完的话，现在说完」。
 - 落到历史发生在**学生下一次开口的第一个 pre-step**（`step === 1`；`step !== 1` 一律放过，否则会把进行中的 tool call 折掉、留下没有 result 的孤儿）。
 - 落的方式：先追加一条交接 `user/message`，成功后再追加 `plugin:ile/mode` 清除待切换意图——正文是交接通知（`【交接】从「引导模式」换到「独立做题」。…`），`source.kind = 'ile-handoff'`，`surfaceOp` 是 `replace(nodes[1] … nodes.at(-1))`，`sourceEventSeqs` 列出被折掉的每个节点。**node 0 不碰**：runtime 在 surface generation 变化时用新模式的文本原地替换它（不是追加第二条 system）。
@@ -78,7 +79,7 @@ corepack yarn workspace dsh-plugin-coreset build
 
 - 折叠**不可逆**：原文还在会话日志里，但模型与界面都看不到它了；要做「展开」得另做一套读日志的界面。文字之外只有**图片**被保留（最多 4 张），别的附件类型（`file` 块）随对话一起消失。
 - 取被折那段的内容用的是已弃用的同步读 `session.eventAt()`（`foldedImages`）：上游 2026-09-09 的 Agent Note 禁止新调用者，可 Session 还没有异步窗口，而折叠必须知道它替换掉的是什么；上游自己的 `compaction-tool-result-pruner` 也是这么读的。哪天 Session 出了异步读，这处是唯一要改的地方。
-- 摘要上限 120 字（`HANDOFF_SUMMARY_MAX_CHARS`），超出截断加省略号——长交接会丢细节。
+- 摘要上限 120 字（`HANDOFF_SUMMARY_MAX_CHARS`），超出截断加省略号——提示词要求先压缩且把关键字段放前面，工具仍保留最后截断防线。
 - 一次切换只在下一个 turn 边界落一次；落失败就留到再下一个边界（日志里有 `failed to fold history at the switch` 警告）。
 - 换模式不换工具集：同一预设里工具永远是并集，模型要靠提示词约束「哪些工具此刻合适」。
 - 本包没有客户端：界面上的聊天记录靠 `replace` 后的表面自然变短（只剩 head + 那条交接通知），不做额外遮蔽。

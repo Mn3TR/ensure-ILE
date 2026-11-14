@@ -44,6 +44,7 @@ npm install @max-null/dsh-memory
 ## 提供的服务与工具
 
 - **服务** `ctx.memory`：`remember` / `list` / `search` / `forget` / `update` / `move` / `setStatus` / `setInjected` / `supersede` / `retract` / `sweep` / `demoteStale` / `verifyAnchors` / `reload` 等
+- **学生档案接口**：`dsh-plugin-memory/profile` 导出纯文件读写与目录解析，供 Setup 同步开学信息；与 `profile_read` / `profile_write` 共用存储，不加载完整记忆服务。
 - **工具**（默认 16 个）：`profile_read` / `profile_write` 读写学生档案的年级、课表、作息、偏好四个固定栏目（不进检索、不占注入预算）；另外包括 `memory_save`、`memory_list`、`memory_search`、`memory_update`、`memory_confirm`、`memory_forget`、`memory_move`、`memory_sweep`，提示词模板四件套 `prompt_search`、`prompt_get`、`prompt_list`、`prompt_add`，加日记两件套 `diary_read`、`diary_write`
 - **注入**：`tool:memory` 指引 section（工具用法 + 常驻注入判据）+ `memory:self` 机制自述 + `memory:recall` 召回 context（global 的 `approved + injected` + 当前会话工作区的 `approved + injected`，带 `[memory:<id>:<namespace>]` 来源标记；摘要化 + 预算截断）+ `memory:diary` 指针（只有目录与最近日期，不含正文）
 - **检索**：BM25（CJK 单字 + 2-gram，content 与 keywords 字段分离加权；中文多字查询精度显著优于单字切分）；可选语义融合（见「可选配置」）

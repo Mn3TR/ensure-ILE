@@ -38,6 +38,8 @@ import {
   updateProblem,
   type HandoffInput,
   type HrlUpdateInput,
+  type LearningEvidence,
+  type PairingStep,
   type PairingChoice,
   type PairingMatch,
   type PairingPreference,
@@ -298,7 +300,7 @@ ctx.tools.register(defineTool({
       '用在：学生说「接着上次那道题」，或者你想知道现在手上有哪些题。',
       'status 可选：new / guide / hrl / review / mastered / parked；不传则全部。',
       'due: true 只看今天该复习的（review.nextAt 已到期，含今天），用来开复习场。',
-      '看到合适的那道题，用 bank_show 读完整记录。',
+      '接续时用 bank_show 读完整记录；复习先传 bank_show({ id, recall: true }) 隐藏旧解，学生实际作答后再核验。',
     ].join('\n'),
     parameters: {
       status: { type: 'string', description: '只看某个状态' },
@@ -350,12 +352,14 @@ ctx.tools.register(defineTool({
   ctx.tools.register(defineTool({
     name: 'bank_show',
     description: [
-      '读一道题的完整记录（题干、引导会话、尝试、复习、历史）。',
+      '读一道题；默认返回完整记录（题干、引导会话、尝试、复习、历史）。',
+      '复习开始先传 recall: true，只返回题干和图片引用，不返回旧答案、insight、交接或学习记录；先让学生独立重建，再按需读完整记录核验。',
       'id 来自 bank_add 或 bank_list。',
       '接着引导一道旧题前，先读它，别让学生重复讲一遍题干。',
     ].join('\n'),
     parameters: {
       id: { type: 'string', required: true, description: '题目 id' },
+      recall: { type: 'boolean', description: '复习先用 true：只读题干和图片引用，隐藏旧解与线索' },
     },
     output: {
       schema: { type: 'string' },
@@ -363,7 +367,10 @@ ctx.tools.register(defineTool({
     },
     execute: async (args) => {
       try {
-        return json(readProblem(directory, args.id))
+        const record = readProblem(directory, args.id)
+        return json(args.recall === true
+          ? { id: record.id, subject: record.subject, statement: record.statement, attachments: record.attachments }
+          : record)
       } catch (error) {
         return explain(error)
       }
@@ -374,20 +381,22 @@ ctx.tools.register(defineTool({
     name: 'bank_update',
     description: [
       '更新一道题。显式字段：status、guideOutcome（solved / stuck / abandoned）、whereStuck、guideResult、insight、reviewNextAt、reviewInterval、reviewPassed。',
-      '判过（status 变 review）会自动排第一次复习；之后每复习一次用 reviewPassed 报结果：true 升一档 1/3/7/14/30/60/120 天，false 回第一档，爬到最后一档自动 mastered。',
+      '判过（status 变 review）自动排第一次复习。learningEvidence 记录实际作答：guided / independent / delayed-recall / transfer，support 记本次用过的最重帮助，answer 逐字。引导中完成不等于之后独立完成。',
+      'delayed-recall 证据会自动更新复习：仅 support=none 且 outcome=solved 升一档 1/3/7/14/30/60/120 天，其余回第一档。reviewPassed=true 必须同时有这份证据；可省略 reviewPassed，不能与证据矛盾。transfer 单独记，不推进原题复习。',
       'affect（frustrated / neutral / excited）与 effectiveHint（confirm / position / feature / structure / result）记这一轮的学生状态和哪个档的视角有效，写进当前引导会话。',
       'workAttempt：交一次卷——answer 原文 + verdict（ok / partial / wrong）。只放学生独立做的卷；引导里做出来的写 guideResult。',
       'hrl：答案优化的增量写入，四段都可选，按 input → teacher → step → result 的顺序应用。',
       '  input 是这次在打磨哪份答案；teacher 是教师轨迹（一次写全，按学生偏好写）；',
-      '  step 是一个小步的对比，写进最近一个还没有 result 的 pairing；result 是这条 pairing 拼好的最终解。',
+      '  step 写进最近一个还没有 result 的 pairing；围绕关键决策比较，机械步骤可随同确认后逐条保存；result 是这条 pairing 拼好的最终解。',
+      '  step.decision 记比较的决策，understanding{question,answer,verdict} 记方法适用条件的问题、学生原话和 supported / partial / unclear；与 chosen、整体 preference 分开，没问或拒答就不编造。',
       '  teacher.steps 每步的 improvement 记这一步相对他原写法改了什么（是差异，不是优劣）；preference 在收尾时写，记学生整体更喜欢哪版。',
-      '  每 3 步落一次盘，pairing 结束必须写 result。',
+      '  学生每确认一步就立即写 step；按 chosen 取 studentQuote / teacherStep 对应的 body / mergedText，核对整条推理衔接后写 result，未完成时保持 hrl。',
       'handoff：交接包（from / to / why / state / detail）。同一道题最多一个未接收的，新的会顶掉旧的。',
       'handoffConsume：传会话 id 表示这份交接已被接收；传空字符串表示撤销接收，卡片重新可点。',
       'patch 是自由对象，浅合并进记录（数组整体替换），用来写工具还没覆盖的字段。',
       '每次修改都会追加 history，updatedAt 自动刷新。',
-      '收尾：先问学生「这题你自己做出来了吗」。做出来 → status=review、guideOutcome=solved；',
-      '没做出来 → guideOutcome=stuck，status 保持 guide，下次还能接着引导。',
+      '引导模式收尾：学生已给出结果并说明关键依据后，问「这题你自己做出来了吗」。做出来 → status=review、guideOutcome=solved；',
+      '没做出来 → guideOutcome=stuck，status 保持 guide。独立做题按 workAttempt 判卷，答案优化按逐步选择后的完整轨迹验收，不写虚构的引导结局。',
     ].join('\n'),
     parameters: {
       id: { type: 'string', required: true, description: '题目 id' },
@@ -398,7 +407,20 @@ ctx.tools.register(defineTool({
       insight: { type: 'string', description: '这道题的关键转折，写给以后的自己' },
       reviewNextAt: { type: 'string', description: '下次复习时间（ISO 8601）' },
       reviewInterval: { type: 'integer', description: '复习间隔（天）' },
-      reviewPassed: { type: 'boolean', description: '一次复习的结果：true 升一档（1/3/7/14/30/60/120 天），false 回第一档' },
+      reviewPassed: { type: 'boolean', description: '可省略；true 需同次提交 delayed-recall、none、solved 证据，false 回第一档' },
+      learningEvidence: {
+        type: 'object',
+        additionalProperties: false,
+        description: '本次实际学习证据；延迟提取会自动更新复习，时间由服务端填写',
+        properties: {
+          context: { type: 'string', required: true, description: 'guided / independent / delayed-recall / transfer' },
+          support: { type: 'string', required: true, description: '本次最重帮助：none / attention / explanation / example；看过旧解计 example' },
+          outcome: { type: 'string', required: true, description: 'solved / partial / stuck' },
+          answer: { type: 'string', required: true, description: '学生实际作答原文，包括明确表示不会；不编造' },
+          note: { type: 'string', description: '观察依据、哪处帮助撤掉了；变式的题干也记在这里' },
+          willingness: { type: 'string', description: '学生明确表达的 continue / pause；没有表达则省略' },
+        },
+      },
       affect: { type: 'string', description: '这一轮学生的状态：frustrated / neutral / excited' },
       effectiveHint: { type: 'string', description: '这一轮哪个档的视角有效：confirm / position / feature / structure / result' },
       workAttempt: {
@@ -463,6 +485,16 @@ ctx.tools.register(defineTool({
               mergedText: { type: 'string', description: 'chosen=merged 时学生自己重写的这步' },
               chosenAt: { type: 'string', description: 'ISO 时间' },
               note: { type: 'string', description: '为什么这么选' },
+              decision: { type: 'string', description: '本组关键决策，如求导还是配方' },
+              understanding: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  question: { type: 'string', required: true, description: '围绕适用条件或变化情形问的一个问题' },
+                  answer: { type: 'string', required: true, description: '学生实际回答，逐字；拒答不伪造' },
+                  verdict: { type: 'string', required: true, description: 'supported / partial / unclear；依据实际解释，不按偏好推断' },
+                },
+              },
             },
           },
           result: { type: 'string', description: '这条 pairing 逐条选完后拼出的解' },
@@ -535,6 +567,8 @@ ctx.tools.register(defineTool({
               ...(step.mergedText === undefined ? {} : { mergedText: step.mergedText }),
               ...(step.chosenAt === undefined ? {} : { chosenAt: step.chosenAt }),
               ...(step.note === undefined ? {} : { note: step.note }),
+              ...(step.decision === undefined ? {} : { decision: step.decision }),
+              ...(step.understanding === undefined ? {} : { understanding: step.understanding as NonNullable<PairingStep['understanding']> }),
             }
           }
           if (source.result !== undefined) hrl.result = source.result
@@ -559,6 +593,7 @@ ctx.tools.register(defineTool({
           ...(args.reviewNextAt === undefined ? {} : { reviewNextAt: args.reviewNextAt }),
           ...(args.reviewInterval === undefined ? {} : { reviewInterval: args.reviewInterval }),
           ...(args.reviewPassed === undefined ? {} : { reviewPassed: args.reviewPassed }),
+          ...(args.learningEvidence === undefined ? {} : { learningEvidence: args.learningEvidence as Omit<LearningEvidence, 'at'> }),
           ...(args.affect === undefined ? {} : { affect: args.affect }),
           ...(args.effectiveHint === undefined ? {} : { effectiveHint: args.effectiveHint }),
           ...(workAttempt === undefined ? {} : { workAttempt }),

@@ -59,6 +59,23 @@ export type Affect = (typeof AFFECTS)[number];
  */
 export declare const HINT_LEVELS: readonly ["confirm", "position", "feature", "structure", "result"];
 export type HintLevel = (typeof HINT_LEVELS)[number];
+/** Observable learning evidence; legacy records may have none. */
+export declare const LEARNING_CONTEXTS: readonly ["guided", "independent", "delayed-recall", "transfer"];
+export declare const SUPPORT_LEVELS: readonly ["none", "attention", "explanation", "example"];
+export declare const LEARNING_OUTCOMES: readonly ["solved", "partial", "stuck"];
+export declare const UNDERSTANDING_VERDICTS: readonly ["supported", "partial", "unclear"];
+export interface LearningEvidence {
+    at: string;
+    context: (typeof LEARNING_CONTEXTS)[number];
+    /** Greatest support needed during this attempt, including previously shown solutions. */
+    support: (typeof SUPPORT_LEVELS)[number];
+    outcome: (typeof LEARNING_OUTCOMES)[number];
+    /** The learner's actual response, verbatim. */
+    answer: string;
+    note?: string;
+    /** Only record an explicitly expressed choice to continue or pause. */
+    willingness?: 'continue' | 'pause';
+}
 /** Fixed review intervals in days; the scheduler walks this ladder. */
 export declare const REVIEW_LADDER: readonly [1, 3, 7, 14, 30, 60, 120];
 /** One handed-in answer from a session where the learner worked alone. */
@@ -106,6 +123,13 @@ export interface PairingStep {
     mergedText?: string;
     chosenAt?: string;
     note?: string;
+    /** The method choice being compared, separate from preference. */
+    decision?: string;
+    understanding?: {
+        question: string;
+        answer: string;
+        verdict: (typeof UNDERSTANDING_VERDICTS)[number];
+    };
 }
 /** One pass of step-by-step A/B over one handed-in answer. */
 export interface Pairing {
@@ -183,6 +207,9 @@ export interface ProblemRecord {
     hrl?: HrlState;
     handoff?: Handoff;
     review: ReviewState;
+    learning?: {
+        evidence: LearningEvidence[];
+    };
     history: HistoryEntry[];
 }
 /** Failure with a stable code so tools can explain themselves. */
@@ -346,6 +373,7 @@ export interface UpdateProblemInput {
     reviewInterval?: number;
     /** A review sitting: true walks one rung up, false resets to the first. */
     reviewPassed?: boolean;
+    learningEvidence?: Omit<LearningEvidence, 'at'>;
     affect?: string;
     effectiveHint?: string;
     workAttempt?: WorkAttemptInput;

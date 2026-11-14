@@ -12,11 +12,13 @@
  */
 
 import { readFileSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { composePrompt } from 'dsh-plugin-teaching-commons'
+import { profileDirectory } from 'dsh-plugin-memory/profile'
 import { defaultStateFile, readState, updateState } from './state.ts'
 // Type-only: resolves the required ctx.ileModes service declaration.
 import type {} from 'dsh-plugin-coreset'
@@ -63,6 +65,7 @@ export function apply(ctx: Context, config: Config): void {
   const stateFile = config.stateFile !== undefined && config.stateFile.length > 0
     ? config.stateFile
     : defaultStateFile()
+  const profileHome = dirname(profileDirectory())
 
   // Not switchable: its tools are mounted only inside the 开学 preset, so
   // switching into it from 做题 would leave the persona asking for tools that
@@ -86,7 +89,7 @@ export function apply(ctx: Context, config: Config): void {
     name: 'setup_update',
     description: [
       '写开学进度。字段：onboarding（pending / done）、grade、schedule、rhythm、preference、next。',
-      '问到一样就写一样；没问到的别传，传了的字段会覆盖。',
+      '问到一样就写一样；没问到的别传，传了的字段会覆盖，并立即同步到对应学生档案栏目。未传字段只在档案缺失时用已有开学记录补齐。',
       '收尾：能说出「下一步做什么」时才写 onboarding=done 并把那句话放进 next——不是四样问齐。',
     ].join('\n'),
     parameters: {
@@ -106,7 +109,7 @@ export function apply(ctx: Context, config: Config): void {
         ...(args.rhythm === undefined ? {} : { rhythm: args.rhythm }),
         ...(args.preference === undefined ? {} : { preference: args.preference }),
         ...(args.next === undefined ? {} : { next: args.next }),
-      })
+      }, new Date(), profileHome)
       const filled = FACT_KEYS.filter(key => state.got[key] !== undefined)
       return '已记：' + (filled.length === 0 ? '（还没有）' : filled.join('、'))
         + '；状态 ' + state.onboarding

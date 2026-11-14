@@ -316,7 +316,7 @@ describe('review ladder', () => {
     const rungs: number[] = []
     let current = record.id
     for (let i = 0; i < 7; i += 1) {
-      const next = await updateProblem(dir, current, { reviewPassed: true, now: new Date('2026-10-25T00:00:00Z') })
+      const next = await updateProblem(dir, current, { reviewPassed: true, learningEvidence: { context: 'delayed-recall', support: 'none', outcome: 'solved', answer: '学生独立重建的解答' }, now: new Date('2026-10-25T00:00:00Z') })
       rungs.push(next.review.interval as number)
       current = next.id
     }
@@ -329,7 +329,7 @@ describe('review ladder', () => {
     const dir = bank()
     const record = await createProblem(dir, { statement: 'one', subject: 'math', suffix: 'ffffff' })
     await updateProblem(dir, record.id, { status: 'review', now: new Date('2026-10-25T00:00:00Z') })
-    await updateProblem(dir, record.id, { reviewPassed: true, now: new Date('2026-10-25T00:00:00Z') })
+    await updateProblem(dir, record.id, { reviewPassed: true, learningEvidence: { context: 'delayed-recall', support: 'none', outcome: 'solved', answer: '学生独立重建的解答' }, now: new Date('2026-10-25T00:00:00Z') })
     const failed = await updateProblem(dir, record.id, { reviewPassed: false, now: new Date('2026-10-25T00:00:00Z') })
     expect(failed.review.interval).toBe(1)
     expect(failed.review.count).toBe(0)

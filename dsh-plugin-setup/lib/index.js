@@ -1,9 +1,11 @@
-import { i as updateState, n as defaultStateFile, r as readState, t as ONBOARDING_STATES } from "./state-AWeyxRsN.js";
+import { a as updateState, i as readState, r as defaultStateFile, t as ONBOARDING_STATES } from "./state-BcIiKfk4.js";
 import { readFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import z from "@deepseek-ai/schemastery";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 import { composePrompt } from "dsh-plugin-teaching-commons";
+import { profileDirectory } from "dsh-plugin-memory/profile";
 //#region src/index.ts
 /**
 * First-run conversation for ensure-ILE.
@@ -46,6 +48,7 @@ const FACT_KEYS = [
 function apply(ctx, config) {
 	const promptFile = config.promptFile !== void 0 && config.promptFile.length > 0 ? config.promptFile : DEFAULT_PROMPT_FILE;
 	const stateFile = config.stateFile !== void 0 && config.stateFile.length > 0 ? config.stateFile : defaultStateFile();
+	const profileHome = dirname(profileDirectory());
 	ctx.effect(() => ctx.ileModes.registerMode({
 		id: SETUP_MODE,
 		name: MODE_NAME,
@@ -69,7 +72,7 @@ function apply(ctx, config) {
 		name: "setup_update",
 		description: [
 			"写开学进度。字段：onboarding（pending / done）、grade、schedule、rhythm、preference、next。",
-			"问到一样就写一样；没问到的别传，传了的字段会覆盖。",
+			"问到一样就写一样；没问到的别传，传了的字段会覆盖，并立即同步到对应学生档案栏目。未传字段只在档案缺失时用已有开学记录补齐。",
 			"收尾：能说出「下一步做什么」时才写 onboarding=done 并把那句话放进 next——不是四样问齐。"
 		].join("\n"),
 		parameters: {
@@ -113,7 +116,7 @@ function apply(ctx, config) {
 				...args.rhythm === void 0 ? {} : { rhythm: args.rhythm },
 				...args.preference === void 0 ? {} : { preference: args.preference },
 				...args.next === void 0 ? {} : { next: args.next }
-			});
+			}, /* @__PURE__ */ new Date(), profileHome);
 			const filled = FACT_KEYS.filter((key) => state.got[key] !== void 0);
 			return "已记：" + (filled.length === 0 ? "（还没有）" : filled.join("、")) + "；状态 " + state.onboarding + (state.next === void 0 ? "" : "；下一步：" + state.next);
 		}

@@ -262,7 +262,7 @@ export class IleModes extends Service {
       '',
       '## 切换模式',
       `现在能切到：${targets.map((candidate) => `${candidate.id}（${candidate.name}）`).join('、')}。`,
-      `学生明确要换的时候，调 ${CONTEXT_SWITCH}（参数 to 和 summary）：summary 写「这段做到哪、卡在哪、下一步从哪接」。切换在学生下一次开口时生效，之前那段对话只留这份摘要。学生没提，不要主动切。`,
+      `学生明确要换的时候，调 ${CONTEXT_SWITCH}（参数 to 和 summary）：summary 保留题目 id 或题干、已有作答、这段做到哪、卡在哪、下一步从哪接。Work 是预设，guide（引导）/ work（独立做题）/ hrl（答案优化）是会话内模式；to 只能填上面列出的模式 id。切换在学生下一次开口时生效，之前那段对话只留这份摘要。工具确认后说明生效时机，请他发送下一步内容，本轮不提前执行目标模式。学生没提，不要主动切。`,
       '',
     ].join('\n')
   }

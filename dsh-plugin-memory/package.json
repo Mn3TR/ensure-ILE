@@ -11,6 +11,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./profile": {
+      "types": "./dist/profile-files.d.ts",
+      "default": "./dist/profile-files.js"
+    },
     "./client": "./client.js",
     "./package.json": "./package.json"
   },

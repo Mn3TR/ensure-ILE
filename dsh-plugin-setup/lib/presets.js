@@ -1,5 +1,7 @@
-import { n as defaultStateFile, r as readState } from "./state-AWeyxRsN.js";
+import { i as readState, n as backfillProfile, r as defaultStateFile } from "./state-BcIiKfk4.js";
+import { dirname } from "node:path";
 import z from "@deepseek-ai/schemastery";
+import { profileDirectory } from "dsh-plugin-memory/profile";
 import { Service } from "@deepseek-ai/cordis";
 //#region src/presets.ts
 /**
@@ -58,7 +60,9 @@ var SetupPresets = class {
 		this.config = config;
 	}
 	async *[Service.init]() {
-		if (!shouldRegisterSetup(this.config.stateFile !== void 0 && this.config.stateFile.length > 0 ? this.config.stateFile : defaultStateFile())) {
+		const file = this.config.stateFile !== void 0 && this.config.stateFile.length > 0 ? this.config.stateFile : defaultStateFile();
+		backfillProfile(file, dirname(profileDirectory()));
+		if (!shouldRegisterSetup(file)) {
 			yield () => {};
 			return;
 		}

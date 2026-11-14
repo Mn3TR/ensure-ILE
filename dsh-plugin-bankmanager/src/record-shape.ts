@@ -19,6 +19,7 @@ const object = (fields: Record<string, Rule>): Rule => (value, path) => {
 export function recordShape(enums: {
   statuses: readonly string[], outcomes: readonly string[], affects: readonly string[], hints: readonly string[],
   matches: readonly string[], choices: readonly string[], preferences: readonly string[], mediaTypes: readonly string[],
+  learningContexts: readonly string[], supportLevels: readonly string[], learningOutcomes: readonly string[], understandingVerdicts: readonly string[],
 }): Rule {
   return object({
     schema: choice([2]), id: text, subject: text, statement: text, status: choice(enums.statuses),
@@ -33,6 +34,10 @@ export function recordShape(enums: {
     })), insight: optional(text) }),
     work: object({ attempts: array(object({ at: text, answer: text, verdict: text, source: choice(['text']) })) }),
     review: object({ nextAt: optional(text), interval: optional(positive), count: integer, history: array(text) }),
+    learning: optional(object({ evidence: array(object({
+      at: text, context: choice(enums.learningContexts), support: choice(enums.supportLevels), outcome: choice(enums.learningOutcomes),
+      answer: text, note: optional(text), willingness: optional(choice(['continue', 'pause'])),
+    })) })),
     history: optional(array(object({ at: text, event: text, detail: optional(text) }))),
     handoff: optional(object({
       id: text, at: text, from: text, to: text, why: text, state: text, consumedAt: optional(text), consumerSessionId: optional(text),
@@ -49,6 +54,9 @@ export function recordShape(enums: {
         steps: array(object({
           index: positive, studentQuote: optional(text), teacherStep: optional(positive), match: choice(enums.matches),
           chosen: optional(choice(enums.choices)), mergedText: optional(text), chosenAt: optional(text), note: optional(text),
+          decision: optional(text), understanding: optional(object({
+            question: text, answer: text, verdict: choice(enums.understandingVerdicts),
+          })),
         })),
       })),
     })),

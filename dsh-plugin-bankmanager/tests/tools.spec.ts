@@ -116,6 +116,39 @@ describe('bank_update hrl 参数', () => {
   })
 })
 
+describe('learning and recall tools', () => {
+  it('hides prior solutions, hints, tags and history in the recall view', async () => {
+    const dir = bank()
+    const tool = toolsFor(dir)
+    const added = await tool('bank_add').execute({ statement: 'x²=1，求解集', subject: 'math', tags: ['SECRET_TAG'] }, exec)
+    const id = /已建题：([a-z0-9-]+)/u.exec(added)?.[1] as string
+    await tool('bank_update').execute({ id, insight: 'SECRET_HINT', workAttempt: { answer: 'SECRET_ANSWER', verdict: 'ok' } }, exec)
+    const hidden = JSON.parse(await tool('bank_show').execute({ id, recall: true }, exec))
+    expect(hidden).toEqual({ id, subject: 'math', statement: 'x²=1，求解集', attachments: [] })
+    const full = await tool('bank_show').execute({ id }, exec)
+    expect(full).toContain('SECRET_ANSWER')
+    expect(full).toContain('SECRET_HINT')
+  })
+
+  it('passes evidence through the tool and derives the review result', async () => {
+    const dir = bank()
+    const tool = toolsFor(dir)
+    const added = await tool('bank_add').execute({ statement: '求根', subject: 'math' }, exec)
+    const id = /已建题：([a-z0-9-]+)/u.exec(added)?.[1] as string
+    await tool('bank_update').execute({ id, status: 'review' }, exec)
+    const response = await tool('bank_update').execute({ id, learningEvidence: {
+      context: 'delayed-recall', support: 'none', outcome: 'solved', answer: '学生的原文', willingness: 'continue',
+    }, hrl: { step: { index: 1, match: 'same', chosen: 'student', decision: '选方法', understanding: {
+      question: '什么条件下用它？', answer: '这里满足定义域', verdict: 'supported',
+    } } } }, exec)
+    expect(response).toContain('已更新')
+    const record = readProblem(dir, id)
+    expect(record.learning?.evidence[0]).toMatchObject({ answer: '学生的原文', willingness: 'continue' })
+    expect(record.review.interval).toBe(3)
+    expect(record.hrl?.pairings[0]?.steps[0]?.understanding?.answer).toBe('这里满足定义域')
+  })
+})
+
 describe('bank_list due filter', () => {
   it('只列今天到期该复习的题', async () => {
     const dir = bank()

@@ -11,6 +11,7 @@
 - 包名、bundle 行的包名、客户端 loader id 和设置页 tab id 使用 `dsh-plugin-memory`。
 - `profile_read` / `profile_write` 继续读写 `<DSH_HOME>/profile/{grade,schedule,rhythm,preference}.md`。
   档案不参与记忆检索，也不占常驻注入预算；默认工具共 16 个，显式启用云同步后为 18 个。
+- 导出 `dsh-plugin-memory/profile` 纯文件子路径（`dist/profile-files.js` 与类型声明），供 Setup 直接同步同一份档案，不加载记忆服务或注册额外工具。
 - `build-bundle.mjs` 内联 zod、isomorphic-git 及代理实现，保持 profile 离线安装。
   `@deepseek-ai/*` 保持 external，由 Host 提供同一份实例；CommonJS 依赖通过 ESM 的 `createRequire` 加载。
 - 所有构建依赖放在 devDependencies，profile 不需要从注册表下载运行时依赖。

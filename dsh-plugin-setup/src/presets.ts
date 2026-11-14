@@ -8,11 +8,13 @@
  * @module dsh-plugin-setup/presets
  */
 
+import { dirname } from 'node:path'
 import { Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { Context } from '@deepseek-ai/cordis'
 import type { PresetDefinition } from '@deepseek-ai/dsh-agent-preset-registry'
-import { defaultStateFile, readState } from './state.ts'
+import { profileDirectory } from 'dsh-plugin-memory/profile'
+import { backfillProfile, defaultStateFile, readState } from './state.ts'
 
 /** The one preset this package owns. */
 export const SETUP_PRESET: PresetDefinition = {
@@ -72,6 +74,7 @@ export default class SetupPresets {
     const file = this.config.stateFile !== undefined && this.config.stateFile.length > 0
       ? this.config.stateFile
       : defaultStateFile()
+    backfillProfile(file, dirname(profileDirectory()))
     if (!shouldRegisterSetup(file)) {
       yield () => {}
       return
