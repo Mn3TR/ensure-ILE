@@ -28,6 +28,8 @@ describe.sequential('the shell a learner opens', () => {
   })
 
   test('the window is branded ensure-ILE while the skin dresses the client', async () => {
+    expect(await shell.app.evaluate(({ app }) => app.getLocale())).toMatch(/^zh/i)
+    expect(await shell.page.evaluate(() => navigator.language)).toMatch(/^zh/i)
     const title = await shell.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getTitle() ?? '')
     expect(title).toBe('ensure-ILE')
     const skin = await shell.page.evaluate(() => document.body.getAttribute('data-dsh-claude-style'))

@@ -12,7 +12,7 @@
 
 | 路径 | 是什么 | 何时读 |
 | --- | --- | --- |
-| `dsh-plugin-desktop/` | 上游桌面壳 fork（现 `0.1.0-alpha14`）+ 我们的改动（数据根、OOBE 裁剪、预设、皮肤、打包） | 改外壳 / 窗口 / 设置 / 打包 |
+| `dsh-plugin-desktop/` | 上游桌面壳 fork（现 `0.1.0-alpha15`）+ 我们的改动（数据根、OOBE 裁剪、预设、皮肤、打包） | 改外壳 / 窗口 / 设置 / 打包 |
 | `dsh-plugin-teaching-commons/` | 各模式共用教学文字：安全边界、说话方式、题库规则 + `skills/` 学科备注 + `readNote` | 改「怎么说话」 |
 | `dsh-plugin-coreset/` | **会话的核**：唯一 `complete` 提示段、`ctx.ileModes`、`read_note`、`context_switch` + 历史折叠；预设 `work` / `chat` 也在这 | 改共享行为 / 加模式 / 改预设 |
 | `dsh-plugin-setup/` | 开学**人格** + `setup_read` / `setup_update` + 条件注册 `setup` 预设 | 改开学问话 |
@@ -45,7 +45,7 @@
 - **`seedProfile()` 只在文件不存在时复制**：改完 `profiles/ensure-ile/` 要删 `.ensure-ile/home/profiles/desktop` 再启动，然后手跑 `pnpm install --offline`（校验用 `COREPACK_ENABLE_PROJECT_SPEC=0 corepack pnpm install --offline --no-frozen-lockfile`；直接 `corepack pnpm` 会被根 `packageManager` 挡）。
 - 会话工作区也在数据根：`workspace-controller` 的 `documentsDirectory` patch 成 `!!js dshHomePath('..')`，落 `<数据根>/deepseek-harness/default-workspace`（上游叶子目录名写死，短不了）。
 - 打包：`corepack yarn workspace dsh-plugin-desktop dist:win` → `dsh-plugin-desktop/dist/`；**打包后数据根 = `%LOCALAPPDATA%\ensure-ILE-data`**（2026-11-01 起；开发跑仍是仓库根的 `.ensure-ile`，`ENSURE_ILE_DATA_ROOT` 优先级最高）。
-- 版本：`dsh-plugin-desktop/package.json` 的 `version` 是唯一来源，当前 `0.1.0-alpha14`（α 线，与上游 2.0.18 脱钩）。**每笔加功能 / 修 bug 的提交都递增这个号**（李 2026-11-01 定），顺带同步 `dsh-plugin-desktop/tests/package.spec.ts` 的版本断言——不同步单测直接红。
+- 版本：`dsh-plugin-desktop/package.json` 的 `version` 是唯一来源，当前 `0.1.0-alpha15`（α 线，与上游 2.0.18 脱钩）。**每笔加功能 / 修 bug 的提交都递增这个号**（李 2026-11-01 定），顺带同步 `dsh-plugin-desktop/tests/package.spec.ts` 的版本断言——不同步单测直接红。
 
 ### 门禁入口（都在仓库根跑）
 
@@ -185,6 +185,7 @@
 - 入口 `corepack yarn workspace dsh-plugin-desktop test:ui`（先 `build` 再 `vitest --config vitest.ui.config.ts`），7 spec / 26 用例 / 约 3 min（shell 10、surface 4、flows 3、onboarding 1、conversation 5、setup-profile 2、learning-evidence 1）。单测门 `yarn test` 用 `vitest.config.ts` 的 `exclude` 排掉 `tests/ui/**`——它要 `lib/` 且慢一个数量级，别接进 `check`。
 - 选型 `playwright-core`（1.64.1，devDependency）+ vitest 做 runner，**不引 `@playwright/test`**：不下载 Chromium，驱动 Electron 自带内核，不多一个 runner。代价是没有自动重试 `expect`，用 `tests/ui/fixture.ts` 的 `expectVisible` / `expectHidden` 与 `expect.poll`。
 - `tests/ui/fixture.ts` 提供 `createRoot()` / `launchShell()` / `clientPage()` / `skipDesktopSetup()`：临时数据根在 `tmpdir()`，profile 目录照 `profiles/ensure-ile` 写 `package.json` / `cordis.patch.yml` / `pnpm-workspace.yaml`，再给每个 dependency 建 junction；`launchShell(dataRoot, { setup: 'full' })` 逐个覆盖 `ENSURE_ILE_DATA_ROOT` / `DSH_HOME` / `ENSURE_ILE_HOME` / `DSH_AGENTS_HOME` / `DSH_DESKTOP_USER_DATA`（继承的 `DSH_HOME` 会指向真实安装）。
+- **测试语言固定**：`launchShell()` 以 `--lang=zh-CN` 启动 Electron，shell 用例同时核对主进程和浏览器语言；测试中文标签不依赖 Windows runner 的英文系统语言。英文启动会显示 `Skip`，若仍等 `跳过` 会把整套 UI 测试拖进超时。仅测试夹具指定语言，产品默认仍跟随用户设置。
 - **三个非显然前置**：① `createRoot()` 必须写 `node_modules/.modules.yaml`（`nodeLinker: hoisted` / `packageManager: pnpm@…` / `virtualStoreDirMaxLength: 60`）与 `pnpm-lock.yaml`（`settings: autoInstallPeers: false`），否则 `src/profile.ts` 的 `profileDependencyMigrationRequired()` 判成 legacy 布局，而开发启动没有打包 pnpm 可迁移 → 停在恢复页；② 跳过开学两步：点「跳过」后再点确认框「跳过设置」（`skipDesktopSetup()` 已封装）；③ `[data-desktop-onboarding-surface]` 遮罩在 Host 回执前**一直挂着吞点击**，等它 `detached`，别等 composer 可见。
 - 主题与外壳：`page.emulateMedia({ colorScheme: 'dark' })`（`nativeTheme.themeSource` 打不动渲染进程），浅色断言 `document.documentElement` 背景 `rgb(255, 255, 255)`、深色最亮通道 < 80；折叠侧栏后 `rail-mark` 可见、`brand-name` 隐藏、`aria-label` 从「收起侧边栏」变「打开侧边栏」（不是「展开」）；`账号菜单 → 设置` 的对话框含「桌面设置」、无「插件市场」；composer 占位「描述任务或提出问题」，附件可移除（`aria-label*="移除"`）。
 - 七屏向导（`{ setup: 'full' }`）：六标题「选择窗口模式 / 选择窗口材质 / 选择插件市场 / 设置桌面通知 / 设置浏览器访问 / 设置完成」，每屏 `h1` 单行且 ≤40px；点「开始使用」后落回 composer，`appdata/profile-setup/<hash>/state.json` 的 `outcome` → `completed`、同名 `.pending` 消失（**写完对话框几秒后才落盘，要 `expect.poll`**）；同数据根重启后「开始设置」为 0。

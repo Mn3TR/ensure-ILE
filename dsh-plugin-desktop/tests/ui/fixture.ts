@@ -92,7 +92,8 @@ export async function launchShell(dataRoot: string, options: LaunchOptions = {})
   })
   const app = await electron.launch({
     executablePath: electronBinary,
-    args: [join(packageRoot, 'lib', 'main.js')],
+    // The assertions use Chinese labels; GitHub's Windows image defaults to English.
+    args: ['--lang=zh-CN', join(packageRoot, 'lib', 'main.js')],
     cwd: packageRoot,
     env,
   })
