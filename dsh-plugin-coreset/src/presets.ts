@@ -38,7 +38,7 @@ function ileRealm(rows: PresetDefinition['plugins']): PresetDefinition['plugins'
     name: 'cordis:group',
     group: true,
     isolate: { ileModes: true },
-    config: rows,
+    config: [...rows, compactionRealm()],
   }]
 }
 
@@ -62,6 +62,24 @@ const TIME_CONTEXT_ROW = {
   id: 'ile-time-context',
   name: '@deepseek-ai/dsh-time-context',
   config: { timeZone: 'Asia/Shanghai', refreshIntervalMs: 60_000 },
+}
+
+/** Upstream automatic/manual compaction, isolated per preset like its standard preset. */
+function compactionRealm() {
+  return {
+    id: 'ile-compaction',
+    name: 'cordis:group',
+    group: true,
+    isolate: { compaction: true, toolResultPruner: true },
+    config: [
+      { id: 'ile-compaction-basic', name: '@deepseek-ai/dsh-compaction-basic', config: { auto: true } },
+      { id: 'ile-command-compact', name: '@deepseek-ai/dsh-command-compact' },
+      {
+        id: 'ile-tool-result-pruner', name: '@deepseek-ai/dsh-compaction-tool-result-pruner',
+        config: { thresholdChars: 8192, headChars: 4096, tailChars: 1024 },
+      },
+    ],
+  }
 }
 
 /** 做题: the three study personas behind one switch. */

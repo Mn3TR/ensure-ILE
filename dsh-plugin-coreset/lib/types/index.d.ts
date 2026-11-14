@@ -17,10 +17,10 @@
  */
 import { Service } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
-import { z as zod } from 'zod';
 import type { Context } from '@deepseek-ai/cordis';
 import type { Session } from '@deepseek-ai/dsh-session';
-import type { IleModeDefinition, IleUnitState } from './types.ts';
+import type { IleModeDefinition } from './types.ts';
+export { ileProjectionDefinition } from './mode-state.ts';
 export { CHAT_MODE, ILE_SECTION } from './types.ts';
 export type { IleModeDefinition, IleModeEvent, IleProjection, IleUnitState } from './types.ts';
 /** Tool name the model calls to ask for a mode change. */
@@ -30,27 +30,6 @@ export interface CoreSetConfig {
     /** Mode a session starts in before any `ile/mode` event. */
     mode?: string;
 }
-/** Projection of the logged mode and its handoff summary. */
-export declare const ileProjectionDefinition: {
-    key: "ile";
-    stateVersion: number;
-    stateSchema: zod.ZodObject<{
-        mode: zod.ZodString;
-        summary: zod.ZodNullable<zod.ZodString>;
-    }, zod.core.$strict>;
-    init: () => IleUnitState;
-    apply: (state: NoInfer<IleUnitState>, event: import("@deepseek-ai/dsh-session").SessionEvent) => IleUnitState;
-    wire: {
-        viewSchema: zod.ZodObject<{
-            mode: zod.ZodString;
-            summary: zod.ZodNullable<zod.ZodString>;
-        }, zod.core.$strict>;
-        view: (state: NoInfer<IleUnitState>) => {
-            mode: string;
-            summary: string | null;
-        };
-    };
-};
 declare module '@deepseek-ai/cordis' {
     interface Context {
         /** The mode registry every persona plugin contributes to. */
@@ -69,8 +48,8 @@ export declare class IleModes extends Service {
     private readonly defaultMode;
     /** Modes this preset can be in, by id. Per instance: a preset owns its persona set. */
     private readonly modes;
-    /** Switches waiting for the next turn boundary, per session. */
-    private readonly pendingIntents;
+    /** Read replayable intent instead of keeping acknowledged requests in memory. */
+    private pendingIntent;
     constructor(ctx: Context, config?: CoreSetConfig);
     /**
      * Contribute a mode to this preset.

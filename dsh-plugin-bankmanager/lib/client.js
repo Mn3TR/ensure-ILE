@@ -6,6 +6,22 @@ window.__ModuleLoader__.load({
 		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 		let react = require("react");
 		let react_jsx_runtime = require("react/jsx-runtime");
+		//#region src/handoff-target.ts
+		/** A handoff selects a mode inside a preset; study modes all belong to Work. */
+		function handoffMode(mode) {
+			const key = mode?.trim().toLowerCase();
+			if (key === "guide" || key === "引导模式") return "guide";
+			if (key === "work" || key === "独立做题") return "work";
+			if (key === "hrl" || key === "答案优化") return "hrl";
+			if (key === "chat" || key === "聊天") return "chat";
+			if (key === "setup" || key === "开学") return "setup";
+		}
+		function presetForMode(mode) {
+			const target = handoffMode(mode);
+			if (target === "guide" || target === "work" || target === "hrl") return "work";
+			return target;
+		}
+		//#endregion
 		//#region src/client/handoff-model.ts
 		function asText(value) {
 			return typeof value === "string" && value.trim().length > 0 ? value : void 0;
@@ -52,15 +68,6 @@ window.__ModuleLoader__.load({
 		function resumeText(view) {
 			return resumeSentence(view.id, view.status);
 		}
-		/** 交接包里的模式名 → 预设 id。认模型写的中文显示名；不认识的交回 Host 默认。 */
-		function presetForMode(mode) {
-			if (mode === void 0) return void 0;
-			const key = mode.trim().toLowerCase();
-			if (key === "guide" || key === "引导模式") return "guide";
-			if (key === "work" || key === "独立做题") return "work";
-			if (key === "hrl" || key === "答案优化") return "hrl";
-			if (key === "setup" || key === "开学") return "setup";
-		}
 		/**
 		* 解析 `handoff.pending` 的返回值；形状不对的行直接丢，不抛。
 		* @param value - route 返回的 value（数组）。
@@ -100,14 +107,15 @@ window.__ModuleLoader__.load({
 			return parts.length === 0 ? void 0 : parts.join("\n");
 		}
 		/** 交接卡片：在聊天里替模型把「上次停在哪」摊开，学生一眼看见就能接着做。 */
-		function HandoffCard({ phase, block, resume }) {
+		function HandoffCard({ phase, block, cwd, resume }) {
 			if (phase !== "result") return null;
 			const text = textOf(block);
 			const view = text === void 0 ? void 0 : readHandoffView(text);
 			if (view === void 0) return null;
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(HandoffBody, {
 				view,
-				resume
+				resume,
+				cwd
 			});
 		}
 		var HINT = {
@@ -126,7 +134,7 @@ window.__ModuleLoader__.load({
 			failed: "复制这句",
 			copied: "已复制"
 		};
-		function HandoffBody({ view, resume }) {
+		function HandoffBody({ view, resume, cwd }) {
 			const [state, setState] = (0, react.useState)("idle");
 			const copy = () => {
 				navigator.clipboard?.writeText(resumePrompt(view)).then(() => {
@@ -146,7 +154,7 @@ window.__ModuleLoader__.load({
 				}
 				setState("busy");
 				try {
-					setState(await resume(view));
+					setState(await resume(view, cwd));
 				} catch {
 					setState("failed");
 				}
@@ -358,7 +366,8 @@ window.__ModuleLoader__.load({
 		var inject = [
 			"slots",
 			"sessions",
-			"uiWorkspace"
+			"uiWorkspace",
+			"workspaces"
 		];
 		/** 记住「这道交接上一次开的是哪个会话」，让重复点击变成跳转而不是再开一个。 */
 		var RESUME_MEMO_PREFIX = "dsh-plugin-bankmanager:resume:";
@@ -398,7 +407,7 @@ window.__ModuleLoader__.load({
 		* @param view - 卡片上的交接。
 		* @returns 三种结局，卡片按它选提示。
 		*/
-		async function openResume(ctx, view) {
+		async function openResume(ctx, view, cwd) {
 			const sessions = ctx.get("sessions");
 			const uiWorkspace = ctx.get("uiWorkspace");
 			if (sessions === void 0) return "failed";
@@ -407,13 +416,20 @@ window.__ModuleLoader__.load({
 				uiWorkspace?.openSession(remembered);
 				return "opened";
 			}
+			const workspaces = ctx.get("workspaces");
+			const workspace = cwd === void 0 ? void 0 : workspaces?.list.getSnapshot().items.find((item) => item.path === cwd);
+			if (workspace === void 0) return "failed";
 			const preset = presetForMode(view.to);
 			let sessionId;
 			try {
-				sessionId = await sessions.create(preset === void 0 ? {} : { agentPreset: preset });
+				sessionId = await sessions.create({
+					workspaceId: workspace.workspaceId,
+					...preset === void 0 ? {} : { agentPreset: preset }
+				});
 			} catch {
 				return "failed";
 			}
+			const consumed = await consumeHandoff(view.id, sessionId);
 			memoWrite(view.id, sessionId);
 			uiWorkspace?.openSession(sessionId);
 			const conversation = ctx.get("conversation");
@@ -426,7 +442,7 @@ window.__ModuleLoader__.load({
 					});
 				} catch {}
 			}
-			return await consumeHandoff(view.id, sessionId) ? "opened" : "opened-unconsumed";
+			return consumed ? "opened" : "opened-unconsumed";
 		}
 		/**
 		* 注册题库的浏览器面：聊天里的交接卡片，和空白会话首页的「接着上次的题」。
@@ -437,7 +453,7 @@ window.__ModuleLoader__.load({
 			ctx.effect(() => ctx.slots.inject("tool.call.toolview", () => ctx.slots.register({
 				name: "tool.call.toolview",
 				key: "bank_resume",
-				inject: () => ({ resume: (view) => openResume(ctx, view) })
+				inject: () => ({ resume: (view, cwd) => openResume(ctx, view, cwd) })
 			}, HandoffCard)), "dsh-plugin-bankmanager: bank_resume card");
 			ctx.effect(() => ctx.slots.inject("conversation.hero.options", () => ctx.slots.register({
 				name: "conversation.hero.options",

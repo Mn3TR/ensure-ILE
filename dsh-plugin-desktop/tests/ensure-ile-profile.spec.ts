@@ -36,7 +36,7 @@ function seedTemplate(home: string): string {
     // Every local package sits at the repository root, the skin included since it
     // became a fork of ours; vendor/ stays as the fallback prepare-profile.mjs uses.
     const base = name.split('/').pop()!
-    const candidates = [join(repo, base), join(repo, 'vendor', base), join(repo, 'node_modules', ...name.split('/'))]
+    const candidates = [join(repo, base), join(repo, 'vendor', base), join(repo, 'node_modules', ...name.split('/')), join(repo, 'dsh-plugin-desktop', 'node_modules', ...name.split('/'))]
     const target = candidates.find(candidate => existsSync(join(candidate, 'package.json')))!
     const link = join(profileDir, 'node_modules', ...name.split('/'))
     mkdirSync(join(link, '..'), { recursive: true })

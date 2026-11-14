@@ -17,12 +17,17 @@ const rows = (list: readonly Row[]): Row[] =>
   list.flatMap((row) => (row.group === true ? rows(row.config as Row[]) : [row]))
 
 const names = (preset: { plugins: readonly unknown[] }) => rows(top(preset)).map((row) => row.name)
+const compactionPlugins = [
+  '@deepseek-ai/dsh-compaction-basic',
+  '@deepseek-ai/dsh-command-compact',
+  '@deepseek-ai/dsh-compaction-tool-result-pruner',
+]
 
 describe('presets', () => {
   it('starts 做题 in 引导模式 and mounts all three study personas', () => {
     expect(WORK_PRESET.id).toBe('work')
     expect(WORK_PRESET.name).toBe('Work')
-    expect(names(WORK_PRESET)).toEqual([
+    expect(names(WORK_PRESET).filter(name => !compactionPlugins.includes(name))).toEqual([
       'dsh-plugin-coreset',
       'dsh-plugin-guide',
       'dsh-plugin-work',
@@ -35,7 +40,7 @@ describe('presets', () => {
   it('starts 聊天 and can still switch into the study modes', () => {
     expect(CHAT_PRESET.id).toBe('chat')
     expect(CHAT_PRESET.name).toBe('Chat')
-    expect(names(CHAT_PRESET)).toEqual([
+    expect(names(CHAT_PRESET).filter(name => !compactionPlugins.includes(name))).toEqual([
       'dsh-plugin-coreset',
       'dsh-plugin-guide',
       'dsh-plugin-work',
@@ -55,6 +60,16 @@ describe('presets', () => {
       const [group] = top(preset)
       expect(group.group).toBe(true)
       expect(group.isolate).toEqual({ ileModes: true })
+    }
+  })
+
+  it('mounts automatic and manual compaction in a separate realm per preset', () => {
+    for (const preset of [WORK_PRESET, CHAT_PRESET]) {
+      expect(names(preset).filter(name => compactionPlugins.includes(name))).toEqual(compactionPlugins)
+      const children = top(preset)[0].config as Row[]
+      const group = children.find(row => row.id === 'ile-compaction')!
+      expect(group.isolate).toEqual({ compaction: true, toolResultPruner: true })
+      expect((group.config as Row[])[0].config).toEqual({ auto: true })
     }
   })
 

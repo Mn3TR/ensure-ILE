@@ -10,6 +10,14 @@
  * 那时只有卡片画不出来，模型侧一个字节都不少。
  */
 import type { Context } from '@deepseek-ai/cordis';
+declare module '@deepseek-ai/dsh-session/types' {
+    interface PluginRecordMap {
+        'plugin:ile/mode': {
+            readonly mode: string;
+            readonly summary: string | null;
+        };
+    }
+}
 /**
  * Mount the browser data channel.
  * @param ctx - profile-root context.

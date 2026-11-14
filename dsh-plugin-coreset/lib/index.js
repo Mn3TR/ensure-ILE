@@ -3,8 +3,93 @@ import { fileURLToPath } from "node:url";
 import { Service } from "@deepseek-ai/cordis";
 import z from "@deepseek-ai/schemastery";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
+import { appendPluginRecord, pluginRecordOf } from "@deepseek-ai/dsh-session";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 import { composePrompt, readNote } from "dsh-plugin-teaching-commons";
+/** Flatten and bound a summary the way context notices do. */
+function boundSummary(summary) {
+	const flat = summary.replace(/\s+/g, " ").trim();
+	return flat.length <= 120 ? flat : `${flat.slice(0, 119)}…`;
+}
+/**
+* The one user-role message that survives a switch. It is both the model's
+* memory of the folded conversation and the student's marker that the switch
+* happened.
+*/
+function handoffNotice({ from, to, summary, imageCount = 0 }) {
+	const body = summary.trim();
+	const kept = imageCount > 0 ? `之前那段对话收成了这段摘要，原来那 ${imageCount} 张图还在下面：` : "之前那段对话不在这条上下文里了，只留下这段摘要：";
+	return [
+		`【交接】从「${from}」换到「${to}」。`,
+		kept,
+		"",
+		body === "" ? "（没留摘要。）" : body,
+		"",
+		"从这里接着走。"
+	].join("\n");
+}
+/**
+* The pictures a folded range keeps.
+*
+* Newest occurrences win, and one attachment takes one slot however often the
+* student pasted it. Offloaded pictures stay out: the route already refused
+* their bytes once, so re-sending them would only spend the same budget again.
+* @param blocks - content of the messages being folded, in model order.
+* @param limit - most pictures to carry.
+*/
+function carriedImages(blocks, limit = 4) {
+	const kept = [];
+	const seen = /* @__PURE__ */ new Set();
+	for (let index = blocks.length - 1; index >= 0 && kept.length < limit; index -= 1) {
+		const block = blocks[index];
+		if (block === void 0 || block.type !== "image" || block.offloaded === true) continue;
+		if (seen.has(block.attachment.attachmentId)) continue;
+		seen.add(block.attachment.attachmentId);
+		kept.unshift(block);
+	}
+	return kept;
+}
+/**
+* The one message a switch leaves behind: the notice text, then the pictures
+* the folded history was about. The bytes stay in the attachment store — the
+* blocks are references, so a switch re-points at the same picture instead of
+* copying it.
+*/
+function handoffContent({ images = [], ...notice }) {
+	return [{
+		type: "text",
+		text: handoffNotice({
+			...notice,
+			imageCount: images.length
+		})
+	}, ...images];
+}
+/**
+* Every surface node except the system head. Node 0 holds the system prompt and
+* may only be rewritten by a `system/message` over exactly that node, so a
+* switch starts at node 1 and the runtime's own normalization replaces the head
+* with the new mode's text.
+*
+* @returns null when there is nothing after the head to replace.
+*/
+function replacementRange(nodes) {
+	const shadowed = nodes.slice(1);
+	const first = shadowed[0];
+	const last = shadowed[shadowed.length - 1];
+	if (first === void 0 || last === void 0) return null;
+	return {
+		startSeq: first,
+		endSeq: last,
+		sourceEventSeqs: [...shadowed]
+	};
+}
+//#endregion
+//#region src/types.ts
+/** Name of the one `complete` prompt section ensure-ILE owns. */
+const ILE_SECTION = "ile";
+/** The mode every session can fall back to; always registered by the core. */
+const CHAT_MODE = "chat";
+//#endregion
 //#region node_modules/zod/v4/core/core.js
 var _a$1;
 function $constructor(name, initializer, params) {
@@ -3626,89 +3711,47 @@ function refine(fn, _params = {}) {
 function superRefine(fn, params) {
 	return /* @__PURE__ */ _superRefine(fn, params);
 }
-/** Flatten and bound a summary the way context notices do. */
-function boundSummary(summary) {
-	const flat = summary.replace(/\s+/g, " ").trim();
-	return flat.length <= 120 ? flat : `${flat.slice(0, 119)}…`;
-}
-/**
-* The one user-role message that survives a switch. It is both the model's
-* memory of the folded conversation and the student's marker that the switch
-* happened.
-*/
-function handoffNotice({ from, to, summary, imageCount = 0 }) {
-	const body = summary.trim();
-	const kept = imageCount > 0 ? `之前那段对话收成了这段摘要，原来那 ${imageCount} 张图还在下面：` : "之前那段对话不在这条上下文里了，只留下这段摘要：";
-	return [
-		`【交接】从「${from}」换到「${to}」。`,
-		kept,
-		"",
-		body === "" ? "（没留摘要。）" : body,
-		"",
-		"从这里接着走。"
-	].join("\n");
-}
-/**
-* The pictures a folded range keeps.
-*
-* Newest occurrences win, and one attachment takes one slot however often the
-* student pasted it. Offloaded pictures stay out: the route already refused
-* their bytes once, so re-sending them would only spend the same budget again.
-* @param blocks - content of the messages being folded, in model order.
-* @param limit - most pictures to carry.
-*/
-function carriedImages(blocks, limit = 4) {
-	const kept = [];
-	const seen = /* @__PURE__ */ new Set();
-	for (let index = blocks.length - 1; index >= 0 && kept.length < limit; index -= 1) {
-		const block = blocks[index];
-		if (block === void 0 || block.type !== "image" || block.offloaded === true) continue;
-		if (seen.has(block.attachment.attachmentId)) continue;
-		seen.add(block.attachment.attachmentId);
-		kept.unshift(block);
-	}
-	return kept;
-}
-/**
-* The one message a switch leaves behind: the notice text, then the pictures
-* the folded history was about. The bytes stay in the attachment store — the
-* blocks are references, so a switch re-points at the same picture instead of
-* copying it.
-*/
-function handoffContent({ images = [], ...notice }) {
-	return [{
-		type: "text",
-		text: handoffNotice({
-			...notice,
-			imageCount: images.length
-		})
-	}, ...images];
-}
-/**
-* Every surface node except the system head. Node 0 holds the system prompt and
-* may only be rewritten by a `system/message` over exactly that node, so a
-* switch starts at node 1 and the runtime's own normalization replaces the head
-* with the new mode's text.
-*
-* @returns null when there is nothing after the head to replace.
-*/
-function replacementRange(nodes) {
-	const shadowed = nodes.slice(1);
-	const first = shadowed[0];
-	const last = shadowed[shadowed.length - 1];
-	if (first === void 0 || last === void 0) return null;
-	return {
-		startSeq: first,
-		endSeq: last,
-		sourceEventSeqs: [...shadowed]
-	};
-}
 //#endregion
-//#region src/types.ts
-/** Name of the one `complete` prompt section ensure-ILE owns. */
-const ILE_SECTION = "ile";
-/** The mode every session can fall back to; always registered by the core. */
-const CHAT_MODE = "chat";
+//#region src/mode-state.ts
+const modeSchema = object({
+	mode: string(),
+	summary: string().nullable()
+}).strict();
+/** Both completed switches and acknowledged pending intents replay from the log. */
+const ileProjectionDefinition = {
+	key: "ile",
+	stateVersion: 2,
+	stateSchema: modeSchema.extend({ pending: modeSchema.nullable() }).strict(),
+	init: () => ({
+		mode: "",
+		summary: null,
+		pending: null
+	}),
+	apply: (state, event) => {
+		if (event.type === "ile/mode") return {
+			...event.data,
+			pending: null
+		};
+		const record = pluginRecordOf(event);
+		if (record?.type !== "plugin:ile/switch-requested" && record?.type !== "plugin:ile/mode") return state;
+		const parsed = modeSchema.safeParse(record.data);
+		if (!parsed.success) return state;
+		return record.type === "plugin:ile/switch-requested" ? {
+			...state,
+			pending: parsed.data
+		} : {
+			...parsed.data,
+			pending: null
+		};
+	},
+	wire: {
+		viewSchema: modeSchema,
+		view: (state) => ({
+			mode: state.mode,
+			summary: state.summary
+		})
+	}
+};
 //#endregion
 //#region src/index.ts
 /**
@@ -3731,36 +3774,6 @@ const CHAT_MODE = "chat";
 const CHAT_PROMPT_FILE = fileURLToPath(new URL("../prompts/chat.md", import.meta.url));
 /** Tool name the model calls to ask for a mode change. */
 const CONTEXT_SWITCH = "context_switch";
-/** Projection of the logged mode and its handoff summary. */
-const ileProjectionDefinition = {
-	key: "ile",
-	stateVersion: 1,
-	stateSchema: object({
-		mode: string(),
-		summary: string().nullable()
-	}).strict(),
-	init: () => ({
-		mode: "",
-		summary: null
-	}),
-	apply: (state, event) => {
-		if (event.type === "ile/mode") return {
-			mode: event.data.mode,
-			summary: event.data.summary
-		};
-		return state;
-	},
-	wire: {
-		viewSchema: object({
-			mode: string(),
-			summary: string().nullable()
-		}).strict(),
-		view: (state) => ({
-			mode: state.mode,
-			summary: state.summary
-		})
-	}
-};
 /**
 * Pictures the folded messages carried, in model order.
 *
@@ -3799,8 +3812,10 @@ var IleModes = class extends Service {
 	defaultMode;
 	/** Modes this preset can be in, by id. Per instance: a preset owns its persona set. */
 	modes = /* @__PURE__ */ new Map();
-	/** Switches waiting for the next turn boundary, per session. */
-	pendingIntents = /* @__PURE__ */ new WeakMap();
+	/** Read replayable intent instead of keeping acknowledged requests in memory. */
+	pendingIntent(session) {
+		return this.ctx.sessionProjections.stateOf(session, "ile")?.pending ?? void 0;
+	}
 	constructor(ctx, config = {}) {
 		super(ctx, "ileModes");
 		this.defaultMode = config.mode ?? "chat";
@@ -3875,7 +3890,7 @@ var IleModes = class extends Service {
 				const summary = args.summary.trim();
 				if (summary === "") throw new Error(`${CONTEXT_SWITCH} 需要 summary：把这段对话压成交接摘要再切。`);
 				if (this.effectiveMode(agent.session) === target.id) return `已经在「${target.name}」里，没有切换。`;
-				this.pendingIntents.set(agent.session, {
+				appendPluginRecord(agent.session, "plugin:ile/switch-requested", {
 					mode: target.id,
 					summary
 				});
@@ -3885,7 +3900,7 @@ var IleModes = class extends Service {
 		ctx.sessionProjections.register(ileProjectionDefinition);
 		ctx.on("agent/pre-step", async ({ agent, step, signal }, next) => {
 			const decision = await next();
-			const pending = this.pendingIntents.get(agent.session);
+			const pending = this.pendingIntent(agent.session);
 			if (decision.kind === "reject" || signal.aborted || pending === void 0 || step !== 1) return decision;
 			try {
 				this.commit(agent, pending);
@@ -3931,7 +3946,7 @@ var IleModes = class extends Service {
 	* before the fold happens; mid-turn steps keep the logged mode.
 	*/
 	effectiveMode(session) {
-		const pending = this.pendingIntents.get(session);
+		const pending = this.pendingIntent(session);
 		if (pending !== void 0 && this.isTurnStart(session)) return pending.mode;
 		return this.loggedMode(session);
 	}
@@ -3987,7 +4002,6 @@ var IleModes = class extends Service {
 				summary: boundSummary(summary)
 			}
 		});
-		session.append("ile/mode", pending);
 		if (range === null) session.append("user/message", notice, { surfaceOp: "append" });
 		else session.append("user/message", notice, {
 			surfaceOp: {
@@ -3997,7 +4011,7 @@ var IleModes = class extends Service {
 			},
 			sourceEventSeqs: range.sourceEventSeqs
 		});
-		this.pendingIntents.delete(session);
+		appendPluginRecord(session, "plugin:ile/mode", pending);
 	}
 };
 //#endregion

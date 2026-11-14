@@ -20,8 +20,8 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { z as zod } from 'zod'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { appendPluginRecord } from '@deepseek-ai/dsh-session'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { composePrompt, readNote } from 'dsh-plugin-teaching-commons'
 import type { Context } from '@deepseek-ai/cordis'
@@ -30,10 +30,11 @@ import type {} from '@deepseek-ai/dsh-session-projection'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock, ImageBlock } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
-import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import { boundSummary, carriedImages, handoffContent, replacementRange } from './handoff.ts'
 import { CHAT_MODE, ILE_SECTION } from './types.ts'
-import type { IleModeDefinition, IleModeEvent, IleUnitState } from './types.ts'
+import type { IleModeDefinition, IleModeEvent } from './types.ts'
+import { ileProjectionDefinition } from './mode-state.ts'
+export { ileProjectionDefinition } from './mode-state.ts'
 
 export { CHAT_MODE, ILE_SECTION } from './types.ts'
 export type { IleModeDefinition, IleModeEvent, IleProjection, IleUnitState } from './types.ts'
@@ -48,34 +49,6 @@ export interface CoreSetConfig {
   /** Mode a session starts in before any `ile/mode` event. */
   mode?: string
 }
-
-const ileStateSchema = zod.object({
-  mode: zod.string(),
-  summary: zod.string().nullable(),
-}).strict()
-
-const ileViewSchema = zod.object({
-  mode: zod.string(),
-  summary: zod.string().nullable(),
-}).strict()
-
-/** Projection of the logged mode and its handoff summary. */
-export const ileProjectionDefinition = {
-  key: 'ile',
-  stateVersion: 1,
-  stateSchema: ileStateSchema,
-  init: (): IleUnitState => ({ mode: '', summary: null }),
-  apply: (state, event) => {
-    if (event.type === 'ile/mode') {
-      return { mode: event.data.mode, summary: event.data.summary }
-    }
-    return state
-  },
-  wire: {
-    viewSchema: ileViewSchema,
-    view: (state) => ({ mode: state.mode, summary: state.summary }),
-  },
-} satisfies ProjectionDefinition<'ile', IleUnitState>
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -126,8 +99,10 @@ export class IleModes extends Service {
   /** Modes this preset can be in, by id. Per instance: a preset owns its persona set. */
   private readonly modes = new Map<string, IleModeDefinition>()
 
-  /** Switches waiting for the next turn boundary, per session. */
-  private readonly pendingIntents = new WeakMap<Session, IleModeEvent>()
+  /** Read replayable intent instead of keeping acknowledged requests in memory. */
+  private pendingIntent(session: Session): IleModeEvent | undefined {
+    return this.ctx.sessionProjections.stateOf(session, 'ile')?.pending ?? undefined
+  }
 
   constructor(ctx: Context, config: CoreSetConfig = {}) {
     super(ctx, 'ileModes')
@@ -197,7 +172,7 @@ export class IleModes extends Service {
         if (summary === '') throw new Error(`${CONTEXT_SWITCH} 需要 summary：把这段对话压成交接摘要再切。`)
         const from = this.effectiveMode(agent.session)
         if (from === target.id) return `已经在「${target.name}」里，没有切换。`
-        this.pendingIntents.set(agent.session, { mode: target.id, summary })
+        appendPluginRecord(agent.session, 'plugin:ile/switch-requested', { mode: target.id, summary })
         return `已安排切到「${target.name}」：学生下一次开口时，之前的对话会收成这段摘要，之后按「${target.name}」的规矩来。这一轮还没说完的话，现在说完。`
       },
     })), 'coreset.contextSwitch()')
@@ -210,7 +185,7 @@ export class IleModes extends Service {
     // the step in flight without its result.
     ctx.on('agent/pre-step', async ({ agent, step, signal }, next): Promise<PreStepDecision> => {
       const decision = await next()
-      const pending = this.pendingIntents.get(agent.session)
+      const pending = this.pendingIntent(agent.session)
       if (decision.kind === 'reject' || signal.aborted || pending === undefined || step !== 1) return decision
       try {
         this.commit(agent, pending)
@@ -259,7 +234,7 @@ export class IleModes extends Service {
    * before the fold happens; mid-turn steps keep the logged mode.
    */
   effectiveMode(session: Session): string {
-    const pending = this.pendingIntents.get(session)
+    const pending = this.pendingIntent(session)
     if (pending !== undefined && this.isTurnStart(session)) return pending.mode
     return this.loggedMode(session)
   }
@@ -304,9 +279,8 @@ export class IleModes extends Service {
     const session = agent.session
     const from = this.loggedMode(session)
     const summary = pending.summary ?? ''
-    // Everything that can reject is computed before the first append: a failed
-    // fold then leaves the session untouched, and the intent stays pending for
-    // the next boundary instead of vanishing.
+    // Compute the replacement before writing, and clear the durable intent only
+    // after the notice is published so a failed replacement remains retryable.
     const range = replacementRange(session.surface.nodes)
     const images = range === null ? [] : foldedImages(session, range.sourceEventSeqs)
     const notice = createUserMessage({
@@ -318,7 +292,6 @@ export class IleModes extends Service {
       }),
       source: { kind: 'ile-handoff', form: 'notice', summary: boundSummary(summary) },
     })
-    session.append('ile/mode', pending)
     if (range === null) {
       session.append('user/message', notice, { surfaceOp: 'append' })
     } else {
@@ -327,7 +300,7 @@ export class IleModes extends Service {
         sourceEventSeqs: range.sourceEventSeqs,
       })
     }
-    this.pendingIntents.delete(session)
+    appendPluginRecord(session, 'plugin:ile/mode', pending)
   }
 }
 

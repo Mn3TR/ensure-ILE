@@ -44,6 +44,8 @@ export interface IleModeEvent {
 export interface IleUnitState {
   readonly mode: string
   readonly summary: string | null
+  /** Durable intent, applied at the next turn boundary and cleared by plugin:ile/mode. */
+  readonly pending: IleModeEvent | null
 }
 
 /** Wire value of the `ile` projection. */
@@ -54,12 +56,14 @@ export interface IleProjection {
 
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
-    /**
-     * Log-only record of a committed mode switch: the mode now in force and the
-     * handoff summary that replaced the conversation before it. Not a surface
-     * event — the prompt section and the replacement notice carry the content.
-     */
+    /** Legacy in-memory events are still understood by the projection. */
     'ile/mode': IleModeEvent
+  }
+  interface PluginRecordMap {
+    /** Ignorable, replayable mode state; never enters the conversation surface. */
+    'plugin:ile/mode': IleModeEvent
+    /** Logged before context_switch acknowledges the request. */
+    'plugin:ile/switch-requested': IleModeEvent
   }
 }
 

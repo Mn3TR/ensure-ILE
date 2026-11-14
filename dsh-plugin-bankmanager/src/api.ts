@@ -10,7 +10,15 @@
  * 那时只有卡片画不出来，模型侧一个字节都不少。
  */
 import type { Context } from '@deepseek-ai/cordis'
-import { BankError, listProblems, pendingHandoffs, updateProblem } from './store.ts'
+import { appendPluginRecord, type Session } from '@deepseek-ai/dsh-session'
+
+declare module '@deepseek-ai/dsh-session/types' {
+  interface PluginRecordMap {
+    'plugin:ile/mode': { readonly mode: string, readonly summary: string | null }
+  }
+}
+import { BankError, listProblems, pendingHandoffs, readProblem, updateProblem, type ProblemRecord } from './store.ts'
+import { handoffMode } from './handoff-target.ts'
 
 /** Body size bound of one JSON request. */
 const MAX_BODY_BYTES = 1 << 16
@@ -161,6 +169,31 @@ function pendingRows(directory: string): { id: string, subject: string, status: 
   return rows
 }
 
+interface HostServices {
+  get?: (name: string, strict?: false) => unknown
+  effect?: (fn: () => () => void, label: string) => unknown
+}
+
+/** Only log the learner-selected mode in an idle, previously unused study session. */
+function initializeHandoffMode(host: HostServices, record: ProblemRecord, sessionId: string): void {
+  const mode = handoffMode(record.handoff?.to)
+  if (mode === undefined || mode === 'setup' || record.handoff?.consumerSessionId === sessionId) return
+  const sessions = host.get?.('sessions', false) as { get(id: string): Session | undefined } | undefined
+  const projections = host.get?.('sessionProjections', false) as { stateOf(session: Session, key: string): unknown } | undefined
+  const session = sessions?.get(sessionId)
+  if (session === undefined || projections === undefined) throw new BankApiError('session-unavailable', '交接会话尚未就绪，请重试', 409)
+  const boundary = projections.stateOf(session, 'turnBoundary') as { lastTurn: number, openTurnStartSeq: unknown } | undefined
+  if (boundary === undefined) throw new BankApiError('session-unavailable', '交接会话尚未就绪，请重试', 409)
+  // Reopening a session must preserve the mode the learner subsequently chose.
+  if (boundary.lastTurn !== 0 || boundary.openTurnStartSeq !== null) return
+  const preset = projections.stateOf(session, 'agentPreset')
+  if (preset !== 'work' && preset !== 'chat') throw new BankApiError('invalid-preset', '请在 Work 或 Chat 中接着做题', 409)
+  const current = projections.stateOf(session, 'ile') as { mode: string } | undefined
+  if (current === undefined) throw new BankApiError('session-unavailable', '交接会话缺少模式服务，请重试', 409)
+  if (current.mode !== '') return
+  appendPluginRecord(session, 'plugin:ile/mode', { mode, summary: record.handoff?.state ?? null })
+}
+
 /** One API method. */
 type BankApiMethod = (payload: Record<string, unknown>) => Promise<unknown> | unknown
 
@@ -170,10 +203,7 @@ type BankApiMethod = (payload: Record<string, unknown>) => Promise<unknown> | un
  * @param directory - bank directory the client reads and writes through this route.
  */
 export function mountBankApi(ctx: Context, directory: string): void {
-  const host = ctx as unknown as {
-    get?: (name: string) => unknown
-    effect?: (fn: () => () => void, label: string) => unknown
-  }
+  const host = ctx as unknown as HostServices
   // 直接调 apply 的测试与 headless profile 都没有这两个服务：安静退回，工具照旧。
   if (typeof host.get !== 'function' || typeof host.effect !== 'function') return
   const webServer = host.get('webServer') as WebServerService | undefined
@@ -187,6 +217,7 @@ export function mountBankApi(ctx: Context, directory: string): void {
       const sessionId = typeof payload.sessionId === 'string' ? payload.sessionId : ''
       if (id === '') throw new BankApiError('bad-request', 'missing or invalid "id"')
       if (sessionId === '') throw new BankApiError('bad-request', 'missing or invalid "sessionId"')
+      initializeHandoffMode(host, readProblem(directory, id), sessionId)
       const record = await updateProblem(directory, id, { handoffConsume: sessionId })
       return {
         id: record.id,

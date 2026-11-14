@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 // Node rejects a POSIX-only file URL on Windows ("File URL path must be
@@ -161,6 +162,45 @@ describe('installProfilePackageResolver', () => {
     })
     expect(harness.overlay).toHaveBeenCalledWith('@deepseek-ai/dsh-web-app', expect.any(Object))
     expect(harness.overlay).toHaveBeenCalledWith('dsh-plugin-desktop', expect.any(Object))
+  })
+
+  it.each(['install', 'profile'] as const)('shares the %s Session runtime with linked plugin helpers', source => {
+    const profileBaseUrl = fixtureUrl('profiles', 'desktop', 'package.json')
+    const pluginUrl = fixtureUrl('linked-plugin', 'lib', 'index.js')
+    harness.sources.set('plugin', 'profile')
+    harness.sources.set('@deepseek-ai/dsh-session', source)
+    installProfilePackageResolver(profileBaseUrl)
+    const nextResolve = vi.fn((specifier: string, context: { parentURL?: string }) => ({
+      url: specifier === 'plugin' ? pluginUrl : fixtureUrl('runtime', 'session.js'), context,
+    }))
+    harness.resolve?.('plugin', { parentURL: profileBaseUrl }, nextResolve)
+    const resolved = harness.resolve?.('@deepseek-ai/dsh-session', { parentURL: pluginUrl }, nextResolve) as { context: { parentURL?: string } }
+    expect(resolved.context.parentURL).not.toBe(pluginUrl)
+    if (source === 'profile') expect(resolved.context.parentURL).toBe(profileBaseUrl)
+    else expect(resolved.context.parentURL).toMatch(/\/lib\/index\.js$/u)
+    expect(harness.overlay).toHaveBeenCalledWith('@deepseek-ai/dsh-session', expect.any(Object))
+  })
+
+  it.each(['install', 'profile'] as const)('shares the %s Session package with linked CommonJS plugins', source => {
+    const directory = mkdtempSync(join(tmpdir(), 'dsh-session-overlay-'))
+    try {
+      const packageDirectory = join(directory, 'node_modules', '@deepseek-ai', 'dsh-session')
+      mkdirSync(packageDirectory, { recursive: true })
+      writeFileSync(join(packageDirectory, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-session', exports: { './package.json': './package.json' } }))
+      const profileBaseUrl = pathToFileURL(join(directory, 'package.json')).href
+      const pluginPath = join(directory, 'linked-plugin', 'index.cjs')
+      harness.sources.set('plugin', 'profile')
+      harness.sources.set('@deepseek-ai/dsh-session', source)
+      installProfilePackageResolver(profileBaseUrl)
+      harness.resolve?.('plugin', { parentURL: profileBaseUrl }, () => ({ url: pathToFileURL(pluginPath).href }))
+      harness.overlay.mockClear()
+      const resolved = harness.cjsModule._resolveFilename('@deepseek-ai/dsh-session/package.json', { filename: pluginPath }, false)
+      if (source === 'profile') expect(resolved).toBe(join(packageDirectory, 'package.json'))
+      else expect(resolved).not.toBe(join(packageDirectory, 'package.json'))
+      expect(harness.overlay).toHaveBeenCalledWith('@deepseek-ai/dsh-session', expect.any(Object))
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
   })
 
   it('caches one overlay selection per Profile generation and package root', () => {

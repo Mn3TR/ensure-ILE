@@ -220,11 +220,6 @@ export declare function problemPath(directory: string, id: string): string;
 export declare function mediaTypeExtension(mediaType: string): string;
 /** Relative path one stored image keeps inside its problem folder. */
 export declare function imageRelPath(sha256: string, mediaType: string): string;
-/**
- * Validate one parsed file. Corrupt files are the caller's to skip; this throws
- * so the message names the exact field that broke.
- * @param raw - parsed JSON of one problem file.
- */
 export declare function parseRecord(raw: unknown): ProblemRecord;
 /** Read one problem, or throw a model-facing error. */
 export declare function readProblem(directory: string, id: string): ProblemRecord;

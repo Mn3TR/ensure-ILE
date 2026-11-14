@@ -71,7 +71,7 @@ new ──> guide ──> review ──> mastered
 写法上的三条规矩：
 
 - **原子写 + 跨进程锁**（`@deepseek-ai/dsh-atomic-write` 的 `writeFileAtomic` / `withFileLock`）：中途断掉不会留半个文件。
-- **写前先读、只合并自己认识的字段**：手改过的文件不会被整份冲掉。
+- **写前先读、校验后落盘**：`patch` 仍可浅合并扩展字段，但不能改 `schema` / `id` / `history`，拒绝原型键；状态必须走 `status` 参数以保持复习调度一致。递归校验 guide / work / HRL / handoff / review 子记录，显式参数与自由补丁都在最后做整份记录校验，通过才原子落盘，拒绝时原文件不变。
 - **单文件坏了只跳过那一个**并记日志，不让 `bank_list` 全挂。`schema: 1` 的老文件解析失败会被跳过，**不迁移**。
 
 ## 和邻居的关系
@@ -82,18 +82,18 @@ new ──> guide ──> review ──> mastered
 | `dsh-plugin-schedule` | 只读：`import { defaultBankDirectory, listProblems } from 'dsh-plugin-bankmanager/store'`（子路径，不深引 `src/` / `lib/` 文件） |
 | `dsh-plugin-memory` | 不互相引用：记忆存「这个学生的稳定事实」，题库存「这道题的过程」 |
 
-浏览器半边（`src/client/`，产物 `lib/client.js`，按上游客户端插件协议包成 `window.__ModuleLoader__.load({ id, factory })`）：
+浏览器半边（`src/client/`，产物 `lib/client.js`，按上游客户端插件协议包成 `window.__ModuleLoader__.load({ id, factory })`）：包的 `exports` 必须包含 `./package.json`，加载器才能读取客户端清单；否则会无报错地退回普通工具行。
 
 - `tool.call.toolview` 的 `bank_resume` → **交接卡片**（题干宋体、学生原话楷体、卡点、下一步、一个按钮）。字段缺一块就静默不渲染，退回通用工具行。
 - `conversation.hero.options` 的 `ile-resume` → 空白会话首页列出待接交接，点一下只把「接着上次那道题：<id>（<状态>）」填进输入框，不替学生发。
-- 「接着做」= `sessions.create({ agentPreset })`（按交接的 `to`，也认中文显示名）+ `uiWorkspace.openSession` + `conversation.input.requestDraftInitialization`。幂等靠会话列表 + `localStorage` 里「这道交接开过的会话 id」。
+- 「接着做」= `sessions.create({ workspaceId, agentPreset })` + `uiWorkspace.openSession` + `conversation.input.requestDraftInitialization`。按工具槽位的 `cwd` 找到原工作区，避免新会话落进「未分组」后没有可用输入框；guide / work / hrl（含中文别名）统一使用实际存在的 `work` 预设；消费交接前服务端确认会话尚无对话，再写入 `plugin:ile/mode`，让首轮使用目标人格。重开已有会话保留学生后来选的模式，会话未就绪时不提前消费交接。幂等靠会话列表 + `localStorage`；setup 仍使用条件注册的 `setup` 预设。
 - 宿主侧路由 `/bank/api`（`src/api.ts`）：`handoff.pending` / `handoff.consume`；信任围栏同 `/api`（loopback / `trustedHosts`、拒 cross-site）。通道走嵌套 `ctx.inject(['webServer', 'webStartup'])`，路由缺席时工具一个不少。
 
 ## 测试与构建
 
 ```bash
 corepack yarn workspace dsh-plugin-bankmanager typecheck
-corepack yarn workspace dsh-plugin-bankmanager test        # 45 个用例 / 6 个文件
+corepack yarn workspace dsh-plugin-bankmanager test        # 81 个用例 / 6 个文件
 corepack yarn workspace dsh-plugin-bankmanager build
 corepack yarn workspace dsh-plugin-bankmanager build:client
 corepack yarn workspace dsh-plugin-bankmanager verify       # node scripts/verify-bank.mjs：挂载冒烟，断言七个工具 + bank_add 真写了一道题

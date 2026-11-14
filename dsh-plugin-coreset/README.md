@@ -21,18 +21,18 @@
 | 服务 | `ctx.ileModes` | `registerMode()` / `switchableModes()` / `startMode` / `loggedMode()` / `effectiveMode()` |
 | 工具 | `read_note` | 委托 `dsh-plugin-teaching-commons.readNote`（`math` / `arts`） |
 | 工具 | `context_switch` | `to` + `summary`，只记意图 |
-| 事件 | `ile/mode` | log-only，`{ mode, summary }`；重启后靠它恢复模式 |
-| 投影 | `ile`（`stateVersion: 1`） | 把 `ile/mode` 投成 `{ mode, summary }` |
+| 记录 | `plugin:ile/switch-requested` / `plugin:ile/mode` | `ignorable: true` 的插件记录，`{ mode, summary }`；分别持久化待切换意图与已生效模式，兼容运行时恢复白名单 |
+| 投影 | `ile`（`stateVersion: 2`） | 内部保存 `{ mode, summary, pending }`；客户端仍接收 `{ mode, summary }` |
 | 监听 | `agent/pre-step` | 在 turn 边界执行折叠 |
 
 ## `context_switch` 的语义
 
 - `to` 必须是 `switchable` 的模式（开学不是：它的两个工具只挂在开学预设里）；`summary` 不能空——它同时是给下一个模式的交接词。
-- 工具**只置一个待办意图**（每会话一份），不改历史、不动工具表。返回「已安排切到「X」：学生下一次开口时…这一轮还没说完的话，现在说完」。
+- 工具先用 `appendPluginRecord` 追加 `plugin:ile/switch-requested`，**只置一个可重放的待办意图**（每会话一份），不改对话表面、不动工具表。确认后即使重启，下次开口仍会执行。返回「已安排切到「X」：学生下一次开口时…这一轮还没说完的话，现在说完」。
 - 落到历史发生在**学生下一次开口的第一个 pre-step**（`step === 1`；`step !== 1` 一律放过，否则会把进行中的 tool call 折掉、留下没有 result 的孤儿）。
-- 落的方式：先 `append('ile/mode')`，再追加一条 `user/message`——正文是交接通知（`【交接】从「引导模式」换到「独立做题」。…`），`source.kind = 'ile-handoff'`，`surfaceOp` 是 `replace(nodes[1] … nodes.at(-1))`，`sourceEventSeqs` 列出被折掉的每个节点。**node 0 不碰**：runtime 在 surface generation 变化时用新模式的文本原地替换它（不是追加第二条 system）。
+- 落的方式：先追加一条交接 `user/message`，成功后再追加 `plugin:ile/mode` 清除待切换意图——正文是交接通知（`【交接】从「引导模式」换到「独立做题」。…`），`source.kind = 'ile-handoff'`，`surfaceOp` 是 `replace(nodes[1] … nodes.at(-1))`，`sourceEventSeqs` 列出被折掉的每个节点。**node 0 不碰**：runtime 在 surface generation 变化时用新模式的文本原地替换它（不是追加第二条 system）。
 - **图会跟着走**：折叠前把被折那段的 `user/message` 里的图片块捞出来（`carriedImages`，按 attachmentId 去重、取最近 ≤4 张、跳过 `offloaded` 的），接在通知正文后面当**同一条**消息的 `[text, ...images]`。字节不复制——图片块是引用，`attachments` 里同一份；学生拍的那张题图在切换后模型照样看得见。
-- 能拒的东西在第一次 append 之前就算完（notice、range）；任何一步抛错就整段不落，意图留在 `pendingIntents` 里等下一个 turn 边界重试。
+- notice、range 在写入前计算；替换通知失败时不会先清除意图。`pending` 在会话日志与投影中保留，等下一个 turn 边界重试。
 
 ## 文本什么时候翻
 
@@ -45,14 +45,15 @@
 | 预设 id | 显示名 | 起步模式 | 挂的插件 |
 |---|---|---|---|
 | `work` | 做题（`order: 45`） | `guide` | coreset + guide + work + hrl |
-| `chat` | 聊天（`order: 60`） | `chat` | coreset |
+| `chat` | 聊天（`order: 60`） | `chat` | coreset + guide + work + hrl |
 
 - `setup` 预设不在这里：它由 `dsh-plugin-setup/presets` **条件注册**（入学办完就消失）。
 - 起步模式来自本行的 `Config.mode`（默认 `chat`）。构造里先登记 chat，所以任何预设都有一个兜底人格。
+- 两个预设各自挂载独立的 `compaction` / `toolResultPruner` realm：上游 `compaction-basic`（`auto: true`）、`command-compact`、工具结果裁剪。支持自动压力压缩与 `/compact`，不再让长会话仅依赖切换模式时折叠。profile 显式声明这三个上游包，沿用已有离线运行时。
 
 ## 数据落在哪
 
-本包**不写盘**。一个会话的模式就是它日志里的 `ile/mode` 事件，加上切换时那条交接 `user/message`；投影 `ile` 是读它们的结果。人格正文在各自的 `prompts/`，学科备注在 `dsh-plugin-teaching-commons/skills/`。
+本包**不维护独立数据文件**。模式与待切换意图通过 `plugin:ile/mode`、`plugin:ile/switch-requested` 写入上游会话日志；使用上游 `appendPluginRecord`，不再追加白名单之外的非 ignorable 事件，加上切换时那条交接 `user/message`；投影 `ile` 负责重放恢复。人格正文在各自的 `prompts/`，学科备注在 `dsh-plugin-teaching-commons/skills/`。
 
 ## 和邻居的关系
 
@@ -65,7 +66,7 @@
 
 ```bash
 corepack yarn workspace dsh-plugin-coreset typecheck
-corepack yarn workspace dsh-plugin-coreset test    # 19 个用例（handoff 15 + presets 4）
+corepack yarn workspace dsh-plugin-coreset test    # 含预设隔离与模式意图重放回归
 corepack yarn workspace dsh-plugin-coreset build
 ```
 
@@ -84,6 +85,6 @@ corepack yarn workspace dsh-plugin-coreset build
 
 ## 不做什么
 
-- 不做通用压缩引擎（省 token 是 `billion-context` 那半边）；这里只折叠「换模式」这一刀。
+- 不自研通用压缩引擎；预设复用上游压缩组件，本包自己的历史折叠只处理换模式。
 - 不注册任何具体科目的人格，也不认识题库 / 课表 / 教材的数据结构。
 - 不替学生切模式：工具调不调由学生那句话决定，提示词里写死「学生没提，不要主动切」。

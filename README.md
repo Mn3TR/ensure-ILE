@@ -51,10 +51,10 @@ corepack yarn check:desktop  # 只验桌面壳（构建 + 类型 + 单测 + 六�
 
 ## Plan
 
-当前版本：0.1.0-alpha9
+当前版本：0.1.0-alpha10
 
 - [ ] 开始人工介入本项目，缩减vibe比例
-- [ ] 压缩引擎（长会话撞窗口会硬失败）、权限审批交互、native 四窗换 token 后没逐屏核、交接卡片、图片链路、独立 Evaluator
+- [ ] 真实长会话的自动压缩验收、权限审批交互、native 四窗换 token 后没逐屏核、交接卡片、图片链路、独立 Evaluator
 
 
 ## 暂时不做

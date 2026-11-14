@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Locator, Page } from 'playwright-core'
 import { clientPage, createRoot, expectVisible, launchShell, removeRoot, skipDesktopSetup, type Shell } from './fixture.ts'
@@ -192,7 +193,7 @@ describe.sequential('一轮对话在线上长什么样', () => {
       + String(messages.length))
   }, 300_000)
 
-  test('context_switch 之后，下一次开口时旧历史被折成一条交接通知', async () => {
+  test('context_switch 已确认后重启，下一次开口仍按新模式折叠旧历史', async () => {
     const started = Date.now()
     const beforeSwitch = turnRequests(fake).length
     fake.script([
@@ -216,6 +217,15 @@ describe.sequential('一轮对话在线上长什么样', () => {
       .flatMap(message => message.content)
       .find(block => block.type === 'tool_result')
     expect(JSON.stringify(result ?? {}), '工具回执里应当说已经安排切换').toContain('独立做题')
+
+    // The acknowledged intent must survive a real Host/Electron restart.
+    await shell.close()
+    shell = await launchShell(home, { env: { DEEPSEEK_BASE_URL: fake.url, DEEPSEEK_API_KEY: 'dummy-key' } })
+    page = await clientPage(shell.app)
+    input = page.locator('[data-dsh-claude-part~="composer-stack"]').first()
+      .locator('textarea, [contenteditable="true"], input[type="text"]').first()
+    await expectVisible(input, 60_000)
+    await expectVisible(page.getByText(REPLY_SWITCH, { exact: false }).first(), 60_000)
 
     // 页面稳定后再开口：pre-step 在 turn 边界折叠。
     const beforeFold = turnRequests(fake).length
@@ -241,6 +251,44 @@ describe.sequential('一轮对话在线上长什么样', () => {
 
     console.log('  [context_switch 折叠] ' + String(Date.now() - started) + ' ms, 折叠后 messages '
       + String(messages.length) + ' 条 [' + blocks + '], 正文 ' + String(notice.length) + ' 字符')
+  }, 300_000)
+
+  test('交接卡片使用 Work 预设，并从第一轮就进入目标答案优化模式', async () => {
+    const id = '20261113-math-abcdef'
+    const directory = join(home, 'home', 'bank', 'problems', id)
+    mkdirSync(directory, { recursive: true })
+    const timestamp = new Date().toISOString()
+    writeFileSync(join(directory, 'problem.json'), JSON.stringify({
+      schema: 2, id, subject: 'math', tags: [], statement: '已知 x+1=3，优化我的解答', attachments: [],
+      status: 'hrl', createdAt: timestamp, updatedAt: timestamp, guide: { sessions: [] }, work: { attempts: [] },
+      review: { count: 0, history: [] }, history: [],
+      handoff: { id: 'hlt-ui-test', at: timestamp, from: 'work', to: 'hrl', why: '打磨答案', state: '从第一步开始' },
+    }))
+    fake.script([
+      { kind: 'tool_use', name: 'bank_resume', input: { id } },
+      { kind: 'text', text: '交接卡片已经准备好（handoff-probe）' },
+    ])
+    const beforeResume = turnRequests(fake).length
+    await ask('把上次的答案拿来接着优化', '交接卡片已经准备好（handoff-probe）')
+    const resumeResults = turnRequests(fake).slice(beforeResume).flatMap(wireMessages)
+      .filter(message => message.role === 'user').flatMap(message => message.content)
+      .filter(block => block.type === 'tool_result')
+    expect(JSON.stringify(resumeResults), 'bank_resume 应返回种入的题目').toContain('优化我的解答')
+    // 皮肤会收起已完成的工具组；先按学生实际操作展开，再点击卡片。
+    await page.locator('button[data-turn-process][aria-expanded="false"]').last().click()
+    await page.locator('button[data-process-activity="tools"][aria-expanded="false"]').last().click()
+    const card = page.locator(`[data-ile-handoff="${id}"]`)
+    await expectVisible(card, 10_000)
+    await card.getByRole('button', { name: '接着做', exact: true }).click()
+    await expect.poll(() => input.textContent(), { timeout: 15_000 }).toContain(id)
+    const stored = JSON.parse(readFileSync(join(directory, 'problem.json'), 'utf8'))
+    expect(stored.handoff.consumerSessionId).toBeTruthy()
+    const before = turnRequests(fake).length
+    fake.script([{ kind: 'text', text: '已按答案优化模式继续（hrl-probe）' }])
+    await ask((await input.textContent()) ?? '', '已按答案优化模式继续（hrl-probe）')
+    const first = at(turnRequests(fake).slice(before), 0, '新会话首轮请求')
+    expect(systemOf(first)).toContain('# 答案优化')
+    expect(wireMessages(first).map(message => message.role)).toEqual(['user'])
   }, 300_000)
 
   test('429 之后仍然拿到回复，并记下实际重试了几次', async () => {

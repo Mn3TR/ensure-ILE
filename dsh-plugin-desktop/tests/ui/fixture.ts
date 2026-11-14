@@ -29,7 +29,7 @@ export function createRoot(): string {
     // root, vendored third-party source under vendor/. A junction keeps the test
     // data root disposable without reinstalling anything.
     const base = basename(name)
-    const target = [join(repoRoot, base), join(repoRoot, 'vendor', base)]
+    const target = [join(repoRoot, base), join(repoRoot, 'vendor', base), join(packageRoot, 'node_modules', name)]
       .find(candidate => existsSync(join(candidate, 'package.json')))
     if (target === undefined) throw new Error('fixture: cannot resolve profile dependency ' + name)
     const link = join(profileDir, 'node_modules', name)

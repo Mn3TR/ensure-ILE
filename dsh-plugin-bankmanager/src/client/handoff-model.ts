@@ -81,16 +81,8 @@ export function resumeText(view: HandoffView): string {
   return resumeSentence(view.id, view.status)
 }
 
-/** 交接包里的模式名 → 预设 id。认模型写的中文显示名；不认识的交回 Host 默认。 */
-export function presetForMode(mode: string | undefined): string | undefined {
-  if (mode === undefined) return undefined
-  const key = mode.trim().toLowerCase()
-  if (key === 'guide' || key === '引导模式') return 'guide'
-  if (key === 'work' || key === '独立做题') return 'work'
-  if (key === 'hrl' || key === '答案优化') return 'hrl'
-  if (key === 'setup' || key === '开学') return 'setup'
-  return undefined
-}
+/** 交接模式与预设分开解析，客户端和 Host 使用同一份映射。 */
+export { presetForMode } from '../handoff-target.ts'
 
 /** `/bank/api` 的待接行，只留首页入口要用的字段。 */
 export interface PendingHandoff {

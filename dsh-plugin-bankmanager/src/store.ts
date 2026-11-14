@@ -14,6 +14,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import { writeFileAtomic, withFileLock } from '@deepseek-ai/dsh-atomic-write'
+import { recordShape } from './record-shape.ts'
 
 /** Statuses a problem can carry. */
 export const PROBLEM_STATUSES = ['new', 'guide', 'hrl', 'review', 'mastered', 'parked'] as const
@@ -334,10 +335,21 @@ function parseAttachments(raw: unknown): ProblemAttachment[] {
  * so the message names the exact field that broke.
  * @param raw - parsed JSON of one problem file.
  */
+const validateRecord = recordShape({
+  statuses: PROBLEM_STATUSES, outcomes: GUIDE_OUTCOMES, affects: AFFECTS, hints: HINT_LEVELS,
+  matches: PAIRING_MATCHES, choices: PAIRING_CHOICES, preferences: PAIRING_PREFERENCES,
+  mediaTypes: PROBLEM_IMAGE_MEDIA_TYPES,
+})
+
 export function parseRecord(raw: unknown): ProblemRecord {
   if (typeof raw !== 'object' || raw === null) throw new BankError('题目文件不是对象', 'invalid-record')
   const value = raw as Record<string, unknown>
   if (value.schema !== 2) throw new BankError('schema 必须是 2（v1 文件需要手工迁移）', 'invalid-record')
+  try {
+    validateRecord(value, '')
+  } catch (error) {
+    throw new BankError(error instanceof Error ? error.message : String(error), 'invalid-record')
+  }
   const status = asString(value.status, 'status')
   if (!isProblemStatus(status)) throw new BankError('未知状态 ' + status, 'invalid-record')
   const guide = value.guide
@@ -853,7 +865,12 @@ export async function updateProblem(directory: string, id: string, input: Update
     if (input.handoff !== undefined) events.push(...applyHandoff(record, input.handoff, at))
     if (input.handoffConsume !== undefined) events.push(...consumeHandoff(record, input.handoffConsume, at))
     if (input.patch !== undefined) {
+      if (typeof input.patch !== 'object' || input.patch === null || Array.isArray(input.patch)) {
+        throw new BankError('patch 必须是对象', 'invalid-input')
+      }
+      if (Object.hasOwn(input.patch, 'status')) throw new BankError('请使用 status 参数更新状态，不要通过 patch 绕过状态与复习逻辑', 'invalid-input')
       for (const [key, value] of Object.entries(input.patch)) {
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') throw new BankError('不允许的 patch 字段 ' + key, 'invalid-input')
         if (key === 'schema' || key === 'id' || key === 'history') continue
         ;(record as unknown as Record<string, unknown>)[key] = value
         events.push('patch ' + key)
@@ -861,6 +878,9 @@ export async function updateProblem(directory: string, id: string, input: Update
     }
     record.updatedAt = at
     for (const event of events.length > 0 ? events : ['updated']) record.history.push({ at, event })
+    // Validate the complete result before the atomic replacement; failed updates
+    // leave both the learner's record and its history byte-for-byte intact.
+    parseRecord(record)
     await writeFileAtomic(file, JSON.stringify(record, null, 2) + '\n', { mode: 0o600, dirMode: 0o700 })
     return record
   })

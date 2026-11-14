@@ -11,8 +11,10 @@ export type ResumeOutcome = 'opened' | 'opened-unconsumed' | 'failed'
 export interface HandoffCardProps {
   readonly phase: 'preparing' | 'start' | 'result'
   readonly block?: unknown
+  /** 工具槽位提供的当前会话目录，用于把新会话留在同一工作区。 */
+  readonly cwd?: string
   /** 注册时注入：开一个新会话，把这题填成学生这次要发的那句话。 */
-  readonly resume?: (view: HandoffView) => Promise<ResumeOutcome>
+  readonly resume?: (view: HandoffView, cwd?: string) => Promise<ResumeOutcome>
 }
 
 function textOf(block: unknown): string | undefined {
@@ -29,12 +31,12 @@ function textOf(block: unknown): string | undefined {
 }
 
 /** 交接卡片：在聊天里替模型把「上次停在哪」摊开，学生一眼看见就能接着做。 */
-export function HandoffCard({ phase, block, resume }: HandoffCardProps) {
+export function HandoffCard({ phase, block, cwd, resume }: HandoffCardProps) {
   if (phase !== 'result') return null
   const text = textOf(block)
   const view = text === undefined ? undefined : readHandoffView(text)
   if (view === undefined) return null
-  return <HandoffBody view={view} resume={resume} />
+  return <HandoffBody view={view} resume={resume} cwd={cwd} />
 }
 
 type CardState = 'idle' | 'busy' | ResumeOutcome | 'copied'
@@ -57,7 +59,7 @@ const LABEL: Record<CardState, string> = {
   copied: '已复制',
 }
 
-function HandoffBody({ view, resume }: { readonly view: HandoffView; readonly resume?: HandoffCardProps['resume'] }) {
+function HandoffBody({ view, resume, cwd }: { readonly view: HandoffView; readonly resume?: HandoffCardProps['resume']; readonly cwd?: string }) {
   const [state, setState] = useState<CardState>('idle')
   const copy = () => {
     void navigator.clipboard?.writeText(resumePrompt(view)).then(() => {
@@ -73,7 +75,7 @@ function HandoffBody({ view, resume }: { readonly view: HandoffView; readonly re
     }
     setState('busy')
     try {
-      setState(await resume(view))
+      setState(await resume(view, cwd))
     } catch {
       setState('failed')
     }

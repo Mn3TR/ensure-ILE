@@ -129,6 +129,32 @@ describe('update', () => {
     const record = await createProblem(dir, { statement: 'one', subject: 'math', suffix: '444444' })
     await expect(updateProblem(dir, record.id, { status: 'solved' })).rejects.toThrow(BankError)
   })
+  it.each([
+    { status: 'invalid-status' },
+    { tags: [1] },
+    { guide: { sessions: null } },
+    { work: { attempts: [{ at: 'x', answer: 7, verdict: 'ok', source: 'text' }] } },
+    { review: { count: -1, history: [] } },
+    { hrl: { pairings: [{ at: 'x', steps: [{ index: 1, match: 'unknown' }] }] } },
+    { attachments: [{ file: '../outside.png' }] },
+  ])('rejects malformed patch %j without changing the record or its history', async patch => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: 'one', subject: 'math' })
+    const before = readFileSync(problemPath(dir, record.id), 'utf8')
+    await expect(updateProblem(dir, record.id, { patch })).rejects.toThrow(BankError)
+    expect(readFileSync(problemPath(dir, record.id), 'utf8')).toBe(before)
+    expect(readProblem(dir, record.id)).toEqual(record)
+    expect(listProblems(dir).skipped).toEqual([])
+  })
+
+  it('requires the explicit status path even for an otherwise valid status', async () => {
+    const dir = bank()
+    const record = await createProblem(dir, { statement: 'one', subject: 'math' })
+    await expect(updateProblem(dir, record.id, { patch: { status: 'review' } })).rejects.toThrow(/status/u)
+    const reviewed = await updateProblem(dir, record.id, { status: 'review' })
+    expect(reviewed.review.nextAt).toBeDefined()
+  })
+
   it('keeps the record valid after a free patch', async () => {
     const dir = bank()
     const record = await createProblem(dir, { statement: 'one', subject: 'math', suffix: '555555' })

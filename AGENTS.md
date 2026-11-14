@@ -12,7 +12,7 @@
 
 | 路径 | 是什么 | 何时读 |
 | --- | --- | --- |
-| `dsh-plugin-desktop/` | 上游桌面壳 fork（现 `0.1.0-alpha9`）+ 我们的改动（数据根、OOBE 裁剪、预设、皮肤、打包） | 改外壳 / 窗口 / 设置 / 打包 |
+| `dsh-plugin-desktop/` | 上游桌面壳 fork（现 `0.1.0-alpha10`）+ 我们的改动（数据根、OOBE 裁剪、预设、皮肤、打包） | 改外壳 / 窗口 / 设置 / 打包 |
 | `dsh-plugin-teaching-commons/` | 各模式共用教学文字：安全边界、说话方式、题库规则 + `skills/` 学科备注 + `readNote` | 改「怎么说话」 |
 | `dsh-plugin-coreset/` | **会话的核**：唯一 `complete` 提示段、`ctx.ileModes`、`read_note`、`context_switch` + 历史折叠；预设 `work` / `chat` 也在这 | 改共享行为 / 加模式 / 改预设 |
 | `dsh-plugin-setup/` | 开学**人格** + `setup_read` / `setup_update` + 条件注册 `setup` 预设 | 改开学问话 |
@@ -45,7 +45,7 @@
 - **`seedProfile()` 只在文件不存在时复制**：改完 `profiles/ensure-ile/` 要删 `.ensure-ile/home/profiles/desktop` 再启动，然后手跑 `pnpm install --offline`（校验用 `COREPACK_ENABLE_PROJECT_SPEC=0 corepack pnpm install --offline --no-frozen-lockfile`；直接 `corepack pnpm` 会被根 `packageManager` 挡）。
 - 会话工作区也在数据根：`workspace-controller` 的 `documentsDirectory` patch 成 `!!js dshHomePath('..')`，落 `<数据根>/deepseek-harness/default-workspace`（上游叶子目录名写死，短不了）。
 - 打包：`corepack yarn workspace dsh-plugin-desktop dist:win` → `dsh-plugin-desktop/dist/`；**打包后数据根 = `%LOCALAPPDATA%\ensure-ILE-data`**（2026-11-01 起；开发跑仍是仓库根的 `.ensure-ile`，`ENSURE_ILE_DATA_ROOT` 优先级最高）。
-- 版本：`dsh-plugin-desktop/package.json` 的 `version` 是唯一来源，当前 `0.1.0-alpha9`（α 线，与上游 2.0.18 脱钩）。**每笔加功能 / 修 bug 的提交都递增这个号**（李 2026-11-01 定），顺带同步 `dsh-plugin-desktop/tests/package.spec.ts:810` 的断言——不同步单测直接红。
+- 版本：`dsh-plugin-desktop/package.json` 的 `version` 是唯一来源，当前 `0.1.0-alpha10`（α 线，与上游 2.0.18 脱钩）。**每笔加功能 / 修 bug 的提交都递增这个号**（李 2026-11-01 定），顺带同步 `dsh-plugin-desktop/tests/package.spec.ts:810` 的断言——不同步单测直接红。
 
 ### 门禁入口（都在仓库根跑）
 
@@ -58,7 +58,7 @@
 | 只改仓库根（图标 / vendor / 布局 / 补丁） | `corepack yarn check:repo` | inspector-compat、icons、vendored runtime、verify-layout，再串 `verify-patch-references`（补丁有没有施主） | ~45 s |
 | 只改插件包 | `corepack yarn check:plugins` | 先 `node scripts/verify-lib-sync.mjs`（逐包 build，证明提交的 `lib/` 与 `src/` 同步），再 10 包 typecheck + coreset/setup/bankmanager/memory/textbook/schedule 单测 | ~140 s |
 | 只改桌面壳 | `corepack yarn check:desktop` | = 桌面包 `check`：build + typecheck + 141 文件单测 + 六条 `verify:*` | ~6 min |
-| 只改界面 / 预设 | `corepack yarn workspace dsh-plugin-desktop test:ui` | 真 Electron 5 spec / 22 用例，先 build | ~2.5 min |
+| 只改界面 / 预设 | `corepack yarn workspace dsh-plugin-desktop test:ui` | 真 Electron 5 spec / 23 用例，先 build | ~2.5 min |
 
 ## 上游是谁、我们在哪一层改它（2026-10-29）
 
@@ -97,10 +97,10 @@
 ## 模式与交接（2026-10-25 定稿，事实都有代码出处）
 
 - **预设管组队，模式管姿态（2026-10-30 落成）**。预设两个加一个：`work`（起步 `guide`）、`chat`（起步 `chat`）、`setup`（办完条件不注册）。前两个**都挂** coreset + guide + work + hrl + `ile-time-context`，**只差起步模式**——模式清单是「这个预设里挂了哪些人格」的产物（`ileModes` 在 isolate 域里，一预设一份），少挂一个包就等于少一个可切模式；2026-11-01 真机踩过：chat 预设只挂核时 `context_switch({to:'work'})` 必报「没有「work」这个模式」，而 `prompts/chat.md` 恰恰让它一切到做题就切。换**预设** = 开新会话：`agentPresets.select` 只认空会话（`boundary.lastTurn > 0` 即锁，`deepseek-harness/packages/preset/agent-preset-registry/src/index.ts:351`），UI 只给空会话挂选择器（`client/ui-agent-preset/src/client/seat-store.ts:214`），resume 按 `meta.agentPreset` 还原，缺预设直接拒。
-- **会话内换人格，不换工具集**：`context_switch({ to, summary })` 只置待办意图（不改历史、不动工具表），**学生下次开口第一个 pre-step** 才落——把 `nodes[1] … nodes.at(-1)` 折成一条交接 `user/message`（`surfaceOp: replace`，node 0 不碰，runtime 随后原地归一 system），同时 append log-only `ile/mode` 事件（重启靠它恢复）。**原题的照片跟着走**：折叠前 `foldedImages()` 把被折段里的图片块捞出来（去重、最近 ≤4 张、跳过已 offload 的），接在同一条消息的正文后面——引用不复制，切之前拍的那张题图切之后照样看得见。`step !== 1` 一律放过，否则折掉进行中的 tool call、留下无 result 孤儿。
+- **会话内换人格，不换工具集**：`context_switch({ to, summary })` 先用 `appendPluginRecord` 记录 `plugin:ile/switch-requested` 待办意图（不改对话表面、不动工具表，重启也可恢复），**学生下次开口第一个 pre-step** 才落——把 `nodes[1] … nodes.at(-1)` 折成一条交接 `user/message`（`surfaceOp: replace`，node 0 不碰，runtime 随后原地归一 system），成功后追加 `plugin:ile/mode` 清除意图、记录模式。两种记录均为 `ignorable: true`，避免非白名单事件导致重启失败。**原题的照片跟着走**：折叠前 `foldedImages()` 把被折段里的图片块捞出来（去重、最近 ≤4 张、跳过已 offload 的），接在同一条消息的正文后面——引用不复制，切之前拍的那张题图切之后照样看得见。`step !== 1` 一律放过，否则折掉进行中的 tool call、留下无 result 孤儿。
 - **工具集只能加不能减**（flash `toolUpdate: 'addition-only'`），同预设里任何模式看到的工具都是并集；换模式只换 `complete` 段文本。**模型不自己切模式**：提示词与工具描述写死「学生没提不要切」，`setup` 更是 `switchable: false`。
 - **跨会话只靠 bank + memory，零注入**。新会话靠提示词让模型开场 `bank_list` 找 pending `handoff`，不用 `agent.inject()`（要额外 host 插件、时机含糊、永久占 user 位）。代价：模型可能忘记读。
-- **交接卡片**：模型写 `handoff` → 壳渲染卡片 → 学生点 → 客户端 `session.create` + `uiWorkspace.openSession` + `conversation.input.requestDraftInitialization` 把「接着上次那道题：<id>（<状态>）」填进输入框（学生自己回车，零注入不变）+ `/bank/api` 的 `handoff.consume`。幂等靠列表 + `localStorage`（Host `sessionId` 不能自命名）。`create` 拿已开始过的 sessionId 会静默新开（`api/session-controller/src/agent.ts:488`），点前先查列表。
+- **交接卡片**：模型写 `handoff` → 壳渲染卡片 → 学生点 → 客户端 `session.create`（从工具槽位 `cwd` 定位原 `workspaceId`，guide / work / hrl 统一用 `work` 预设）+ `uiWorkspace.openSession` + `conversation.input.requestDraftInitialization` 把「接着上次那道题：<id>（<状态>）」填进输入框（学生自己回车，零注入不变）+ `/bank/api` 的 `handoff.consume`（新会话未开始对话时先写 `plugin:ile/mode`，保证首轮就是目标人格；已有会话不覆盖模式）。幂等靠列表 + `localStorage`（Host `sessionId` 不能自命名）。`create` 拿已开始过的 sessionId 会静默新开（`api/session-controller/src/agent.ts:488`），点前先查列表。
 - **OOBE = 条件注册的 `setup` 预设**（`dsh-plugin-setup/presets`，`shouldRegisterSetup(stateFile)` 假就不注册——registry 没有 hidden 字段，「不注册」就是消失，重启生效），状态 `<DSH_HOME>/setup.json`，**字段级** `{ onboarding, got: { grade, schedule, rhythm, preference } }`，可中断续问；完成判据是「能给出下一步」不是「问够四样」。
 - **A/B（HRL）**：教师轨迹一次写全（按 memory 偏好）；学生轨迹是原文；逐小步 `student / teacher / merged`，`merged` 必须存学生自己重写的 `mergedText`；教师每步带 `improvement`（相对他原写法的**差异**，不是优劣），收尾写一次 `preference`（他整体更喜欢哪版）——过程用 `chosen`、标签用 `preference`，两层别混。每 3 步 flush，pairing 结束必 flush。
 - **收尾规矩**：每轮引导收尾必问一句「这题你自己做出来了吗」；做出来 → `status: review` + `guideOutcome: solved`，没做出来 → 保持 `guide` + `stuck`（写在 `guide.md`）。
@@ -108,6 +108,8 @@
 - **画像字段**：`guide.sessions[]` 带 `affect`（frustrated/neutral/excited）与 `effectiveHint`（confirm/position/feature/structure/result），`bank_update` 可直接写。**进题不进 memory**。
 
 ### bank schema 2（`dsh-plugin-bankmanager/src/store.ts`）
+
+写入边界：自由 `patch` 保留扩展字段浅合并，但不能改 `schema` / `id` / `history`，拒绝原型键；状态只允许通过 `status` 参数更新，保持复习调度一致。guide / work / HRL / handoff / review 的子记录递归校验，显式参数同样校验，整份记录通过后才原子落盘。非法更新不得污染原文件。
 
 ```jsonc
 {
@@ -160,18 +162,20 @@
 - **macOS 只剩两件原件**：`app-icon.icon/` 与 `app-icon.icns` 还是上游鲸鱼，须在 macOS 用 `ictool` 重导；**Windows 上改 `app-icon.icon/` 会让 `icons:check` 直接红**。
 - `app-icon-mac.png` **不是原件**：`dsh-plugin-desktop/scripts/generate-mac-app-icon.mjs` 从 `app-icon.png` 派生（824 居中 + 每边 100 透明内边距、RGBA16、**ICC 与源逐字节相同**，脚本自校验）。换源图后重跑并更新 `outputs.app-icon-mac.png` 的 sha256——漏掉就红（2026-10-30 踩过）。
 
-## 验证现状（2026-11-05，alpha6）
+## 验证记录
+
+- **2026-11-13，alpha10**：`corepack yarn check:full` `EXIT=0`（314 s）。桌面 141 文件 / 1797 用例（1769 通过、28 跳过），插件 383 用例通过，Electron UI 5 spec / 23 用例通过；9 个可复现构建插件的 `lib/` 重建逐字节一致。新增验证涵盖真实重启后恢复待切换意图、交接卡片保留工作区且首轮使用目标人格、非法补丁不改变原文件、已脏产物内容变化仍被门禁发现。
 
 - 桌面包 `corepack yarn workspace dsh-plugin-desktop test` `EXIT=0`（2026-11-05 复跑）：141 测试文件 / 1793 用例，1765 通过 / 28 跳过（21 原有 skip + 7 Linux 打包门在 Windows 整组 skip），103 s。皮肤 fork 成 workspace 包后（alpha6）同日再复跑仍 `EXIT=0`：同样 141 文件 / 1793 用例 / 1765 通过 / 28 跳过（87 s），`build` 与 `vitest run --config vitest.ui.config.ts tests/ui/shell.spec.ts`（10 用例）也都是 `EXIT=0`——皮肤换默认品牌图没有改动任何测试断言面。全量 `corepack yarn check` = 这一路 + `check:repo` + community-fabric + `check:plugins`（2026-11-06 起真的是全量）。
 - `corepack yarn check:plugins` `EXIT=0`（2026-11-05）：coreset 19 / setup 12 / bankmanager 67 / memory 189 / textbook 37 / schedule 40 = 364 全过；teaching-commons 与 guide / work / hrl 只 typecheck（无单测，`lib/` 要手跑 `yarn workspace <包> build`）。
-- `test:ui` 现在 5 spec / 22 用例（2026-11-06 加 `tests/ui/conversation.spec.ts` 4 条、拆掉 spike）。当次实测：`conversation.spec.ts` 4 用例 21.9–23.5 s、`shell.spec.ts` 10 用例 30.9 s，都 `EXIT=0`；surface / flows / onboarding 三个 spec 这次没重跑。
+- `test:ui` 在 2026-11-06 为 5 spec / 22 用例（当日加 `tests/ui/conversation.spec.ts` 4 条、拆掉 spike）。当次实测：`conversation.spec.ts` 4 用例 21.9–23.5 s、`shell.spec.ts` 10 用例 30.9 s，都 `EXIT=0`；surface / flows / onboarding 三个 spec 这次没重跑。
 - `check:repo`：icons 源与全平台资源一致 / vendored runtime 344 packages @1f81c047fc / verify-layout 与上游 1f81c047fc 一致；`verify:licenses` 585 production packages；`install --immutable` exit 0。（2026-11-01 双语门已拆，见坑·工具链 5）
 - `node scripts/verify-patch-references.mjs`（2026-11-08 起是 `check:repo` 的最后一腿）：29 补丁、28 有效、1 known-inert（`dsh-experimental-computer-use-cua-driver-native` 在白名单里，坑·profile 与打包 6）。pi-ai 那份 2026-10-28 已对准 1.2.0 并在 lock 里生效。
 - `dist:win` 2026-11-01 重打 `0.1.0-alpha1`（裁包之后，`compression: normal`）：构建 **550 s（9.2 min）**，产物 `dsh-plugin-desktop/dist/ensure-ILE-0.1.0-alpha1-x64-Setup.exe` **172 132 861 B ≈ 164 MiB**，`win-unpacked` 682 M，`resources/app` 208 M（其中 `node_modules` 188 M）；包内 `profiles/ensure-ile/vendor` 10 个本地包齐全，离线 `pnpm install` 能装出 10 个包，coreset 解析到 `lib/index.js`，产物无裸 `zod` import。**同日真机装通**（`D:\Apps\ensure-ILE`，716 M，品牌图与数据根就位，日志 `startup.run.completed` / `rendererStatus: healthy`）。开发迭代用 `dist:win:store`（215 s / 655 MiB），发布只用 `dist:win`。
 
 ## 自动化 UI 测试（2026-10-31 落地，李要求）
 
-- 入口 `corepack yarn workspace dsh-plugin-desktop test:ui`（先 `build` 再 `vitest --config vitest.ui.config.ts`），5 spec / 22 用例 / 约 2.5 min（shell 10、surface 4、flows 3、onboarding 1、conversation 4）。单测门 `yarn test` 用 `vitest.config.ts` 的 `exclude` 排掉 `tests/ui/**`——它要 `lib/` 且慢一个数量级，别接进 `check`。
+- 入口 `corepack yarn workspace dsh-plugin-desktop test:ui`（先 `build` 再 `vitest --config vitest.ui.config.ts`），5 spec / 23 用例 / 约 2.5 min（shell 10、surface 4、flows 3、onboarding 1、conversation 5）。单测门 `yarn test` 用 `vitest.config.ts` 的 `exclude` 排掉 `tests/ui/**`——它要 `lib/` 且慢一个数量级，别接进 `check`。
 - 选型 `playwright-core`（1.64.1，devDependency）+ vitest 做 runner，**不引 `@playwright/test`**：不下载 Chromium，驱动 Electron 自带内核，不多一个 runner。代价是没有自动重试 `expect`，用 `tests/ui/fixture.ts` 的 `expectVisible` / `expectHidden` 与 `expect.poll`。
 - `tests/ui/fixture.ts` 提供 `createRoot()` / `launchShell()` / `clientPage()` / `skipDesktopSetup()`：临时数据根在 `tmpdir()`，profile 目录照 `profiles/ensure-ile` 写 `package.json` / `cordis.patch.yml` / `pnpm-workspace.yaml`，再给每个 dependency 建 junction；`launchShell(dataRoot, { setup: 'full' })` 逐个覆盖 `ENSURE_ILE_DATA_ROOT` / `DSH_HOME` / `ENSURE_ILE_HOME` / `DSH_AGENTS_HOME` / `DSH_DESKTOP_USER_DATA`（继承的 `DSH_HOME` 会指向真实安装）。
 - **三个非显然前置**：① `createRoot()` 必须写 `node_modules/.modules.yaml`（`nodeLinker: hoisted` / `packageManager: pnpm@…` / `virtualStoreDirMaxLength: 60`）与 `pnpm-lock.yaml`（`settings: autoInstallPeers: false`），否则 `src/profile.ts` 的 `profileDependencyMigrationRequired()` 判成 legacy 布局，而开发启动没有打包 pnpm 可迁移 → 停在恢复页；② 跳过开学两步：点「跳过」后再点确认框「跳过设置」（`skipDesktopSetup()` 已封装）；③ `[data-desktop-onboarding-surface]` 遮罩在 Host 回执前**一直挂着吞点击**，等它 `detached`，别等 composer 可见。
@@ -192,7 +196,7 @@
 - **macOS 图标重导**：`docs/design/brand/mark/geometric-app.svg` 已定稿，但 `app-icon.icon/` 与 `app-icon.icns` 还是鲸鱼（`app-icon-mac.png` 已跟随新源）；要 macOS + Icon Composer 按 `NOTES.md` 落地表重导。
 - **图标真机验收**：`icons:check` 与 `check:repo` 绿了，但没人看过任务栏 / 托盘 / 开始菜单的小尺寸（16px 的 ∫ 只有 2px 笔画）。
 - **真机验收会话内切换**：折叠靠 `agent/pre-step` 在 turn 边界动手。线上形状 2026-11-06 在假端点上量到了（`tests/ui/conversation.spec.ts`）：`context_switch` 之后下一次开口，那一发请求里**只剩一条 user**——交接通知与学生这句在页面上相邻，序列化时并进同一条（实测是两段 text，共 104 字符），system 也已经换成人格 `work`。**还没验的是真模型那一侧**：切完它是否真按新人格说话、会不会又去翻已经折叠掉的旧记录；切之前拍的题图随交接带过去这件事也还没用真图看过。
-- **两个预设都没有压缩引擎**：host 平面 `compaction-basic` / `command-compact` 被 web-app 设 `disabled: true`（`deepseek-harness/packages/bundle/web-app/cordis.patch.yml:539-543`），跑实例的是预设内部隔离组（`presets/standard.patch.yml:66-82`），而 `work` / `chat` 里只有一个核 → **没有 `/compact`、没有自动压缩，长会话撞窗口硬失败**。补法二选一：预设里加 `cordis:group isolate compaction`，或把 billion-context 接进 profile。
+- **压缩引擎真机验收**：alpha10 的 `work` / `chat` 各自挂上游 `compaction-basic`（`auto: true`）/ `command-compact` / `tool-result-pruner`，放在独立 `compaction` / `toolResultPruner` realm；profile 显式声明三包，沿用现有离线 vendor。还要用真实长会话确认压力触发后的摘要质量。
 - **billion-context 没接**：0.1.208 装在 `~/.dsh/profiles/desktop`，**改请求不改历史**（全 dist 里 `CompactionEngine` / `compactRegion` / `surfaceOp` 各 0 次），bundle patch 只给 `preset-standard/ptc/minimal/cordis` 加 `inject`，我们两个预设不在名单（host 平面 hook 理论生效，需真机验）。接进来要连 `mysql2` + `zod` 一起 vendor 才能离线装。
 - **旧会话不可恢复**：四个静态预设 `guide` / `work` / `hrl` / `setup` 的声明都撤了（现在 `work` 是新做题预设，`guide`/`work`/`hrl` 只是会话内人格）。`meta.agentPreset` 指旧 id 的会话 resume 会被直接拒；要兼容得写一次旧 meta 迁移，暂不做。
 - **图片链路：代码已通，真机没验**（2026-11-04）。`bank_add` 把当前消息（及 10 分钟内紧邻带图消息）的图复制进 `<id>/images/`，`bank_image` 读回并回灌 `ctx.attachments.saveImage()` 给模型。**还没做的**：真机让学生拍一张真照片走完一轮，确认 deepseek-flash 的 Files API 上传（`llm-deepseek/src/files-api.ts`，7 天过期 / 单请求 20 MB）在真 key 下通得过——单测替不了这一段。
@@ -245,7 +249,7 @@
 8. CI 2026-10-25 剪到 Windows：只留 `changes`、`check`、`desktop-windows`、`upstream-command-windows`；macOS/Linux 打包整段删（学生只装 Windows）。2026-10-31 加 `release-windows.yml`：推 `v*` tag 才出 Release，tag 与 `package.json` 版本不一致直接失败。 **2026-11-08 `check` 从 ubuntu-latest 搬到 windows-latest**（李定）：`verify-lib-sync` 要在跑门的机器上重建 `lib/`，只有和产物同平台才谈得上逐字节一致；代价是 Windows runner 按 2 倍分钟计费，好处是 Windows 专属用例不再整组 skip（`tests/` 里 39 个文件按 `process.platform` 分支），第一次绿之前大概率会露出一直没真跑过的东西。`changes` 留在 ubuntu（只跑 `git diff` + node 脚本，便宜）。`desktop-windows` 里加了一步端到端 UI：`yarn workspace dsh-plugin-desktop vitest run --config vitest.ui.config.ts`——**直接调 vitest，不用 `test:ui`**，因为上一步 `check:win-package:platform` 已经 build 过了，`test:ui` 会再 clean+rebuild 一次。
 9. `.codegraph/` 是本机索引（索引整个仓库含上游子模块，740MB），进 `.gitignore`、不提交；它自带 `.gitignore` 只放行自己。
 10. Windows 上 `dsh-plugin-desktop/vitest.config.ts` 把 `testTimeout` 放到 60 s（其它平台 5 s）：三条起 `electron.exe` 的冷启动实测 22.4 s（Defender 冷扫 244 MB），5 s 默认会把机器成本当缺陷。历史上 `tests/desktop-runtime-environment.spec.ts:247` 偶发红就是这个原因。
-11. **十个插件包的 `lib/` 是提交进 git 的构建产物，忘重建 = 静默跑旧代码**（2026-11-06 踩到：`dsh-plugin-bankmanager/lib/index.js` 落后 `src/` 一天，新加的 `hrl.preference` / `improvement` 字段在 UI 测试里解析不到，症状看着像「测试写错了」）。只有 `dsh-plugin-memory`（esbuild 现打）与桌面壳（tsdown 现打）不提交 `lib/`；其余十个都提交，因为 profile 用 `link:` 挂包、Host 直接读 `lib/index.js`，没有构建步骤。所以**改 `src/` 必须跑 `corepack yarn workspace <包> build` 并连 `lib/` 一起提交**；`node scripts/verify-lib-sync.mjs` 是那道门（逐包 build 后 `git status --porcelain -- <包>/lib` 必须为空），已挂在 `check:plugins` 第一行——它红了就照它列的包重建。`dsh-plugin-skin` 故意跳过：它的 `lib/client.js` 是手改的 vendored 产物，从 src 复现不出来（见其 `UPSTREAM.md`）。
+11. **十个插件包的 `lib/` 是提交进 git 的构建产物，忘重建 = 静默跑旧代码**（2026-11-06 踩到：`dsh-plugin-bankmanager/lib/index.js` 落后 `src/` 一天，新加的 `hrl.preference` / `improvement` 字段在 UI 测试里解析不到，症状看着像「测试写错了」）。只有 `dsh-plugin-memory`（esbuild 现打）与桌面壳（tsdown 现打）不提交 `lib/`；其余十个都提交，因为 profile 用 `link:` 挂包、Host 直接读 `lib/index.js`，没有构建步骤。所以**改 `src/` 必须跑 `corepack yarn workspace <包> build` 并连 `lib/` 一起提交**；`node scripts/verify-lib-sync.mjs` 是那道门（逐包构建前后对全部 `lib/` 文件做路径 + SHA-256 比较，含未跟踪文件；有 `build:client` 的也构建。即使产物原本已是 `M`，内容再变化仍会失败），已挂在 `check:plugins` 第一行——它红了就照它列的包重建。`dsh-plugin-skin` 故意跳过：它的 `lib/client.js` 是手改的 vendored 产物，从 src 复现不出来（见其 `UPSTREAM.md`）。
 
 ### 插件机制
 
@@ -259,7 +263,8 @@
 8. 上游那条 `required` 的 cwd 快照压不掉，用**同名空 context** 遮蔽（只在 coreset 一处）。
 9. 兄弟包互相 import 只走 `exports` 子路径 + 对方出 `lib/types` 声明；`tsconfig paths` 指源码会撞 TS6059。
 10. 宿主侧「路由晚到、工具先有」：路由挂载要能缺席，工具注册不能受它牵连。
-11. **一个服务在一个 realm 只能有一份**（2026-10-30 首启踩的）：三个预设各 mount 一份核，核各 provide 一个 `ileModes` → 第二个核构造即抛 `service "ileModes" has been registered`，registry 又把「发布到 root realm 的服务」判成泄漏、整条预设被拒（`Preset services require isolate realms: ileModes`；判据 `agent-preset-registry/src/mount.ts` 的 `leakedServices`——impl 的 store symbol 等于 `rootIsolate[name]` 就算泄漏）。修法照 `bundle/web-app/presets/standard.patch.yml`：把 provider 与消费者包进**同一个** `{ name: 'cordis:group', group: true, isolate: { ileModes: true }, config: [...] }`——`isolate` 落 group 那行、子行继承同一 realm（符号按 entry 身份生成，每个预设各得一份），`systemPrompt` / `tools` / `sessionProjections` 仍解析到 Host 唯一实例。判据在 `dsh-plugin-coreset/src/presets.ts` 的 `ileRealm()` 与 `dsh-plugin-setup/src/presets.ts`，测试断言「顶层只有一行，且 `isolate.ileModes === true`」——别往顶层加裸行。
+11. **Session 运行时必须共享同一实例**：`appendPluginRecord` 使用原生私有字段，开发插件经 `link:` 加载自己的 `node_modules` 副本时，会报 `Receiver must be an instance of class Session`。桌面模块解析器让 profile 插件的 `@deepseek-ai/dsh-session` 跟随 Host 的 overlay 选择，ESM / CJS 都处理；不能靠强转类型或只测模拟对象绕过。
+12. **一个服务在一个 realm 只能有一份**（2026-10-30 首启踩的）：三个预设各 mount 一份核，核各 provide 一个 `ileModes` → 第二个核构造即抛 `service "ileModes" has been registered`，registry 又把「发布到 root realm 的服务」判成泄漏、整条预设被拒（`Preset services require isolate realms: ileModes`；判据 `agent-preset-registry/src/mount.ts` 的 `leakedServices`——impl 的 store symbol 等于 `rootIsolate[name]` 就算泄漏）。修法照 `bundle/web-app/presets/standard.patch.yml`：把 provider 与消费者包进**同一个** `{ name: 'cordis:group', group: true, isolate: { ileModes: true }, config: [...] }`——`isolate` 落 group 那行、子行继承同一 realm（符号按 entry 身份生成，每个预设各得一份），`systemPrompt` / `tools` / `sessionProjections` 仍解析到 Host 唯一实例。判据在 `dsh-plugin-coreset/src/presets.ts` 的 `ileRealm()` 与 `dsh-plugin-setup/src/presets.ts`，测试断言「顶层只有一行，且 `isolate.ileModes === true`」——别往顶层加裸行。
 
 ### 客户端与界面
 

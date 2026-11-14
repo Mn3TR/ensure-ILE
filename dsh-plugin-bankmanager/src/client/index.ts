@@ -7,13 +7,17 @@ import { installHandoffStyles } from './styles.ts'
 /** 浏览器半边需要的最小会话面：建会话、查目录、拿绑定。 */
 interface BankSessions {
   readonly list: { getSnapshot(): { byId: Record<string, unknown> } }
-  create(opts: { agentPreset?: string }): Promise<string>
+  create(opts: { agentPreset?: string; workspaceId: string }): Promise<string>
   binding(id: string): { readonly session?: unknown } | undefined
 }
 
 /** 导航面：把某个会话挂到主视图。 */
 interface BankUiWorkspace {
   openSession(id: string): void
+}
+
+interface BankWorkspaces {
+  readonly list: { getSnapshot(): { items: readonly { workspaceId: string; path: string }[] } }
 }
 
 /** 输入面：在会话发布前把草稿塞进去。 */
@@ -55,7 +59,7 @@ export interface BankClientContext {
 }
 
 /** Cordis 服务依赖：槽位表、会话、导航；输入面按可选服务取。 */
-export const inject = ['slots', 'sessions', 'uiWorkspace']
+export const inject = ['slots', 'sessions', 'uiWorkspace', 'workspaces']
 
 /** 记住「这道交接上一次开的是哪个会话」，让重复点击变成跳转而不是再开一个。 */
 const RESUME_MEMO_PREFIX = 'dsh-plugin-bankmanager:resume:'
@@ -97,7 +101,7 @@ async function bindingOf(sessions: BankSessions, id: string): Promise<{ readonly
  * @param view - 卡片上的交接。
  * @returns 三种结局，卡片按它选提示。
  */
-async function openResume(ctx: BankClientContext, view: HandoffView): Promise<ResumeOutcome> {
+async function openResume(ctx: BankClientContext, view: HandoffView, cwd?: string): Promise<ResumeOutcome> {
   const sessions = ctx.get('sessions') as BankSessions | undefined
   const uiWorkspace = ctx.get('uiWorkspace') as BankUiWorkspace | undefined
   if (sessions === undefined) return 'failed'
@@ -108,13 +112,19 @@ async function openResume(ctx: BankClientContext, view: HandoffView): Promise<Re
     return 'opened'
   }
 
+  const workspaces = ctx.get('workspaces') as BankWorkspaces | undefined
+  const workspace = cwd === undefined ? undefined : workspaces?.list.getSnapshot().items.find(item => item.path === cwd)
+  // An ungrouped Session has no active composer. Never consume a handoff into one.
+  if (workspace === undefined) return 'failed'
   const preset = presetForMode(view.to)
   let sessionId: string
   try {
-    sessionId = await sessions.create(preset === undefined ? {} : { agentPreset: preset })
+    sessionId = await sessions.create({ workspaceId: workspace.workspaceId, ...(preset === undefined ? {} : { agentPreset: preset }) })
   } catch {
     return 'failed'
   }
+  // Initialize the selected mode on the Host before the learner can send the draft.
+  const consumed = await consumeHandoff(view.id, sessionId)
   memoWrite(view.id, sessionId)
   uiWorkspace?.openSession(sessionId)
 
@@ -131,7 +141,7 @@ async function openResume(ctx: BankClientContext, view: HandoffView): Promise<Re
     }
   }
 
-  return await consumeHandoff(view.id, sessionId) ? 'opened' : 'opened-unconsumed'
+  return consumed ? 'opened' : 'opened-unconsumed'
 }
 
 /**
@@ -145,7 +155,7 @@ export function apply(ctx: BankClientContext): void {
       {
         name: 'tool.call.toolview',
         key: 'bank_resume',
-        inject: () => ({ resume: (view: HandoffView) => openResume(ctx, view) }),
+        inject: () => ({ resume: (view: HandoffView, cwd?: string) => openResume(ctx, view, cwd) }),
       },
       HandoffCard,
     )),

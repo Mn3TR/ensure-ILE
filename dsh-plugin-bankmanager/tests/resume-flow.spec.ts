@@ -56,13 +56,13 @@ interface Registration {
 interface HarnessOptions {
   store?: Store
   list?: Record<string, unknown>
-  create?: (opts: { agentPreset?: string }) => Promise<string>
+  create?: (opts: { agentPreset?: string; workspaceId: string }) => Promise<string>
   consumeOk?: boolean
 }
 
 function harness(options: HarnessOptions) {
   const store = options.store ?? {}
-  const calls = { create: [] as { agentPreset?: string }[], opened: [] as string[], drafts: [] as { prompt?: string }[], consumed: 0 }
+  const calls = { create: [] as { agentPreset?: string; workspaceId: string }[], opened: [] as string[], drafts: [] as { prompt?: string }[], consumed: 0 }
   const fetchImpl = vi.fn(async (url: string) => {
     if (options.consumeOk !== false && String(url).includes('handoff.consume')) calls.consumed += 1
     if (options.consumeOk === false && String(url).includes('handoff.consume')) {
@@ -78,7 +78,7 @@ function harness(options: HarnessOptions) {
       if (name === 'sessions') {
         return {
           list: { getSnapshot: () => ({ byId: options.list ?? {} }) },
-          create: async (opts: { agentPreset?: string }) => {
+          create: async (opts: { agentPreset?: string; workspaceId: string }) => {
             calls.create.push(opts)
             return await (options.create ?? (async () => 'session-new'))(opts)
           },
@@ -86,6 +86,10 @@ function harness(options: HarnessOptions) {
         }
       }
       if (name === 'uiWorkspace') return { openSession: (id: string) => calls.opened.push(id) }
+      if (name === 'workspaces') return { list: { getSnapshot: () => ({ items: [
+        { workspaceId: 'workspace-other', path: '/other' },
+        { workspaceId: 'workspace-course', path: '/course' },
+      ] }) } }
       if (name === 'conversation') {
         return {
           input: {
@@ -109,15 +113,15 @@ function harness(options: HarnessOptions) {
   apply(ctx as never)
   const card = registrations.find(entry => entry.name === 'tool.call.toolview')
   if (card === undefined || card.inject === undefined) throw new Error('card not registered')
-  const resume = card.inject().resume as (input: unknown) => Promise<string>
-  return { calls, resume }
+  const resume = card.inject().resume as (input: unknown, cwd?: string) => Promise<string>
+  return { calls, resume: (input: unknown, cwd = '/course') => resume(input, cwd) }
 }
 
 describe('bank resume flow', () => {
-  it('opens a session under the handoff preset and fills the composer', async () => {
+  it('opens the handoff preset in the original workspace and fills the composer', async () => {
     const { calls, resume } = harness({})
     await expect(resume(view)).resolves.toBe('opened')
-    expect(calls.create).toEqual([{ agentPreset: 'guide' }])
+    expect(calls.create).toEqual([{ agentPreset: 'work', workspaceId: 'workspace-course' }])
     expect(calls.opened).toEqual(['session-new'])
     expect(calls.drafts[0]?.prompt).toBe('接着上次那道题：20261025-math-2d1ed2（work）')
     expect(calls.consumed).toBe(1)
@@ -134,6 +138,14 @@ describe('bank resume flow', () => {
   it('reports a refused creation as failed', async () => {
     const { resume } = harness({ create: async () => { throw new Error('agent-preset/not-found') } })
     await expect(resume(view)).resolves.toBe('failed')
+  })
+
+  it('does not create or consume a handoff into a missing workspace', async () => {
+    const { calls, resume } = harness({})
+    await expect(resume(view, '/missing')).resolves.toBe('failed')
+    expect(calls.create).toEqual([])
+    expect(calls.opened).toEqual([])
+    expect(calls.consumed).toBe(0)
   })
 
   it('says so when the package could not be marked consumed', async () => {

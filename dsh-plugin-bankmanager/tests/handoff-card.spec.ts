@@ -57,10 +57,10 @@ describe('handoff card model', () => {
   })
 
   it('maps a handoff mode to its preset, Chinese display names included', () => {
-    expect(presetForMode('guide')).toBe('guide')
+    expect(presetForMode('guide')).toBe('work')
     expect(presetForMode(' 独立做题 ')).toBe('work')
-    expect(presetForMode('HRL')).toBe('hrl')
-    expect(presetForMode('答案优化')).toBe('hrl')
+    expect(presetForMode('HRL')).toBe('work')
+    expect(presetForMode('答案优化')).toBe('work')
     expect(presetForMode('schedule')).toBeUndefined()
     expect(presetForMode(undefined)).toBeUndefined()
   })

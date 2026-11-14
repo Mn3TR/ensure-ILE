@@ -1,6 +1,18 @@
-import { BankError, attachProblemImages, createProblem, defaultBankDirectory, indexIsCurrent, isReviewDue, listProblems, migrateLegacyProblems, pendingHandoffs, readBankIndex, readProblem, readProblemImage, rebuildIndex, resumeView, summarizeProblem, summarizeStats, updateProblem } from "./store.js";
+import { A as pendingHandoffs, F as readProblemImage, H as summarizeStats, I as rebuildIndex, L as resumeView, N as readBankIndex, O as migrateLegacyProblems, P as readProblem, T as listProblems, U as updateProblem, V as summarizeProblem, b as indexIsCurrent, g as defaultBankDirectory, h as createProblem, m as attachProblemImages, r as BankError, w as isReviewDue } from "./store-eQ67QWR2.js";
 import { defineTool } from "@deepseek-ai/dsh-tools";
 import z from "@deepseek-ai/schemastery";
+import { appendPluginRecord } from "@deepseek-ai/dsh-session";
+//#region src/handoff-target.ts
+/** A handoff selects a mode inside a preset; study modes all belong to Work. */
+function handoffMode(mode) {
+	const key = mode?.trim().toLowerCase();
+	if (key === "guide" || key === "引导模式") return "guide";
+	if (key === "work" || key === "独立做题") return "work";
+	if (key === "hrl" || key === "答案优化") return "hrl";
+	if (key === "chat" || key === "聊天") return "chat";
+	if (key === "setup" || key === "开学") return "setup";
+}
+//#endregion
 //#region src/api.ts
 /** Body size bound of one JSON request. */
 const MAX_BODY_BYTES = 65536;
@@ -127,6 +139,27 @@ function pendingRows(directory) {
 	}
 	return rows;
 }
+/** Only log the learner-selected mode in an idle, previously unused study session. */
+function initializeHandoffMode(host, record, sessionId) {
+	const mode = handoffMode(record.handoff?.to);
+	if (mode === void 0 || mode === "setup" || record.handoff?.consumerSessionId === sessionId) return;
+	const sessions = host.get?.("sessions", false);
+	const projections = host.get?.("sessionProjections", false);
+	const session = sessions?.get(sessionId);
+	if (session === void 0 || projections === void 0) throw new BankApiError("session-unavailable", "交接会话尚未就绪，请重试", 409);
+	const boundary = projections.stateOf(session, "turnBoundary");
+	if (boundary === void 0) throw new BankApiError("session-unavailable", "交接会话尚未就绪，请重试", 409);
+	if (boundary.lastTurn !== 0 || boundary.openTurnStartSeq !== null) return;
+	const preset = projections.stateOf(session, "agentPreset");
+	if (preset !== "work" && preset !== "chat") throw new BankApiError("invalid-preset", "请在 Work 或 Chat 中接着做题", 409);
+	const current = projections.stateOf(session, "ile");
+	if (current === void 0) throw new BankApiError("session-unavailable", "交接会话缺少模式服务，请重试", 409);
+	if (current.mode !== "") return;
+	appendPluginRecord(session, "plugin:ile/mode", {
+		mode,
+		summary: record.handoff?.state ?? null
+	});
+}
 /**
 * Mount the browser data channel.
 * @param ctx - profile-root context.
@@ -145,6 +178,7 @@ function mountBankApi(ctx, directory) {
 			const sessionId = typeof payload.sessionId === "string" ? payload.sessionId : "";
 			if (id === "") throw new BankApiError("bad-request", "missing or invalid \"id\"");
 			if (sessionId === "") throw new BankApiError("bad-request", "missing or invalid \"sessionId\"");
+			initializeHandoffMode(host, readProblem(directory, id), sessionId);
 			const record = await updateProblem(directory, id, { handoffConsume: sessionId });
 			return {
 				id: record.id,

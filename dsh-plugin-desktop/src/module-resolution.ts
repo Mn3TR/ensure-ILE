@@ -499,7 +499,10 @@ function resolveFilenameWithState(
     }
     return resolved
   }
-  if (boundary) {
+  // Session helpers close over native private brands. Linked plugins must use
+  // the same overlay-selected Session module as the live Host service, rather
+  // than a second copy from their development node_modules.
+  if (boundary || (parentSource === 'profile' && packageName === '@deepseek-ai/dsh-session')) {
     const selected = selectedOverlayCandidate(registration, packageName)
     const resolved = resolveCommonJsFromAnchor(state, registration, request, selected.source)
     if (selected.source === 'profile' && isObsoleteProfileFallbackPath(registration, resolved)) {
@@ -550,7 +553,9 @@ function resolveForRegistration(
   // Node may mutate the hook context while delegating to its default resolver;
   // retain the original module owner for Profile shared-dependency policy.
   const parentURL = context.parentURL
-  const packageName = boundary ? resolvablePackageName(specifier) : undefined
+  const packageName = boundary || (parentSource === 'profile' && packageNameFromSpecifier(specifier) === '@deepseek-ai/dsh-session')
+    ? resolvablePackageName(specifier)
+    : undefined
   if (packageName !== undefined) {
     const selected = selectedOverlayCandidate(registration, packageName)
     const source = selected.source

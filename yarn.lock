@@ -11179,6 +11179,7 @@ __metadata:
   peerDependencies:
     "@deepseek-ai/cordis": 4.0.5
     "@deepseek-ai/dsh-atomic-write": ^0.2.1-rc.3
+    "@deepseek-ai/dsh-session": ^0.2.1-rc.3
     "@deepseek-ai/dsh-tools": ^0.2.1-rc.3
     "@deepseek-ai/schemastery": ^3.18.5
   languageName: unknown
@@ -11216,6 +11217,7 @@ __metadata:
     "@deepseek-ai/dsh-agent": "npm:^0.2.1-rc.3"
     "@deepseek-ai/dsh-agent-preset-registry": "npm:^0.2.1-rc.3"
     "@deepseek-ai/dsh-llm": "npm:^0.2.1-rc.3"
+    "@deepseek-ai/dsh-scope": "npm:^0.2.1-rc.3"
     "@deepseek-ai/dsh-session": "npm:^0.2.1-rc.3"
     "@deepseek-ai/dsh-session-projection": "npm:^0.2.1-rc.3"
     "@deepseek-ai/dsh-system-prompt": "npm:^0.2.1-rc.3"

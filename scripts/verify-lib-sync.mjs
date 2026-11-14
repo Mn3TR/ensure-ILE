@@ -6,7 +6,8 @@
  * packages by path and the Host loads `lib/index.js` directly (only
  * dsh-plugin-memory and the Desktop shell build on demand). That makes a stale
  * `lib/` invisible: the tests of every consumer keep passing against the old
- * code. This gate rebuilds each package and fails when git sees a difference.
+ * code. This gate rebuilds each package and compares every artifact's path and
+ * SHA-256, including client bundles and files that were already dirty.
  *
  * Deliberately skipped:
  * - dsh-plugin-skin: its lib/client.js is a hand-edited vendored artifact, not
@@ -16,6 +17,7 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { changedArtifacts, snapshotArtifacts } from './lib-artifacts.mjs'
 
 const root = resolve(import.meta.dirname, '..')
 const SKIP = new Set(['dsh-plugin-skin'])
@@ -33,31 +35,29 @@ const packages = workspaces
 // `yarn` is a Corepack shim here, not a PATH entry of its own; run it through
 // Corepack so the gate behaves the same locally and on CI.
 const YARN = `corepack yarn`
-const status = (name) => (spawnSync('git', ['status', '--porcelain', '--', `${name}/lib`], { cwd: root, encoding: 'utf8' }).stdout ?? '').trim()
-
-// Compare the lib/ working-tree state before and after the rebuild instead of
-// demanding a clean tree: a branch that already carries matching src/lib edits
-// is in sync, and only a rebuild that changes files proves staleness.
+// Compare file names and bytes, not porcelain status: an already-dirty file
+// can change from one stale version to another while its status stays M.
 const dirty = []
 for (const name of packages) {
-  const before = status(name)
-  const build = spawnSync(`${YARN} workspace ${name} build`, { cwd: root, stdio: 'inherit', shell: true })
-  if (build.status !== 0) {
-    console.error(`verify-lib-sync: ${name}: build failed (exit ${build.status})`)
-    process.exit(1)
+  const directory = join(root, name, 'lib')
+  const before = snapshotArtifacts(directory)
+  const scripts = JSON.parse(readFileSync(join(root, name, 'package.json'), 'utf8')).scripts ?? {}
+  for (const script of ['build', 'build:client'].filter(script => typeof scripts[script] === 'string')) {
+    const build = spawnSync(`${YARN} workspace ${name} ${script}`, { cwd: root, stdio: 'inherit', shell: true })
+    if (build.status !== 0) {
+      console.error(`verify-lib-sync: ${name}: ${script} failed (exit ${build.status})`)
+      process.exit(1)
+    }
   }
-  const after = status(name)
-  if (after !== before) {
-    const introduced = after.split('\n').filter((line) => !before.split('\n').includes(line))
-    dirty.push({ name, changes: introduced.join('\n') })
-  }
+  const changes = changedArtifacts(before, snapshotArtifacts(directory))
+  if (changes.length > 0) dirty.push({ name, changes })
 }
 
 if (dirty.length > 0) {
   console.error('verify-lib-sync: committed lib/ does not match src/ for these packages:')
   for (const { name, changes } of dirty) {
     console.error(`  ${name}`)
-    for (const line of changes.split('\n')) console.error(`    ${line}`)
+    for (const line of changes) console.error(`    ${line}`)
   }
   console.error('Rebuild and commit those files (the profile loads lib/, not src/).')
   process.exit(1)
