@@ -24,6 +24,7 @@ function createPeakRate(ctx) {
   let loaded = false;
   let timer;
   let inFlight = null;
+  let disposed = false;
   let lastAskedAt = 0;
   const warn = (message) => ctx.logger?.warn?.(message);
   function shippedCatalog() {
@@ -62,6 +63,7 @@ function createPeakRate(ctx) {
   async function refresh() {
     let raw;
     for (const url of PEAKRATE_CATALOG_URLS) {
+      if (disposed) return false;
       try {
         const controller = new AbortController();
         inFlight = controller;
@@ -92,6 +94,7 @@ function createPeakRate(ctx) {
       warn(`${PACKAGE_NAME}: peak rate source answered a document this build does not understand; keeping the current catalog`);
       return false;
     }
+    if (disposed) return false;
     catalog = parsed;
     origin = "remote";
     fetchedAt = Date.now();
@@ -99,6 +102,7 @@ function createPeakRate(ctx) {
     return true;
   }
   function writeCache() {
+    if (disposed) return;
     const stored = { fetchedAt, document: catalog };
     writeJsonDocument(ctx, cacheFile, "peak rate cache", stored);
   }
@@ -134,6 +138,7 @@ function createPeakRate(ctx) {
     refresh,
     payload,
     dispose() {
+      disposed = true;
       stopTimer();
       if (inFlight !== null) {
         inFlight.abort();

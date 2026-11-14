@@ -48,6 +48,8 @@ export declare class IleModes extends Service {
     private readonly defaultMode;
     /** Modes this preset can be in, by id. Per instance: a preset owns its persona set. */
     private readonly modes;
+    private projection;
+    [Service.init](): Promise<void>;
     /** Read replayable intent instead of keeping acknowledged requests in memory. */
     private pendingIntent;
     constructor(ctx: Context, config?: CoreSetConfig);

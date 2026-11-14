@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import Storage from '@deepseek-ai/dsh-storage'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRegistry from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import * as plugin from '../src/index.ts'
 import { ANCHOR_KINDS } from '../src/anchors.ts'
 import type { MemoryConfig } from '../src/engine.ts'
@@ -17,6 +18,7 @@ async function setup(extra: MemoryConfig = {}) {
   await ctx.plugin(Storage)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRegistry)
+  await ctx.plugin(NativeToolExecutor)
   // 0.3.6：面板端点需要 webServer/webStartup（测试环境 mock）
   ctx.provide('webServer' as never, { register: () => () => {} } as never)
   ctx.provide('webStartup' as never, { trustedHosts: [] } as never)
@@ -24,7 +26,7 @@ async function setup(extra: MemoryConfig = {}) {
   // 0.3.4：project 记忆按工作区 cwd 路由——临时目录充当两个工作区
   const workspaceA = await mkdtemp(join(tmpdir(), 'dsh-memory-ws-a-'))
   const workspaceB = await mkdtemp(join(tmpdir(), 'dsh-memory-ws-b-'))
-  const fiber = await ctx.plugin(plugin, { globalRoot, ...extra })
+  const fiber = await ctx.plugin(plugin, { globalRoot, backup: { enabled: false }, ...extra })
   return { ctx, fiber, globalRoot, workspaceA, workspaceB }
 }
 
@@ -43,10 +45,12 @@ describe('dsh-memory plugin', () => {
     const self = assembly.contexts.find(context => context.name === 'memory:self')
     expect(self?.text).toContain('dsh-memory v')
     expect(self?.text).toContain('memory_update')
-    // 工具清单漏列的守卫（0.10.0 曾漏掉 prompt_* 系列、0.12.0 补了 memory_sweep）：
-    // 自述是模型行为的实际控制器，清单陈旧等于它按一份不存在的工具面行事。
+    // 工具清单漏列的守卫（0.10.0 曾漏掉 prompt_* 系列、0.12.0 补了 memory_sweep、
+    // 0.19.0 补 diary_*）：自述是模型行为的实际控制器，清单陈旧等于它按一份不存在的工具面行事。
+    // 数字对比登记表而非写死——写死的数字每加一个工具就要改一次，改的时候又容易顺手
+    // 把断言调成「通过」而不是「正确」。
     expect(self?.text).toContain('memory_sweep')
-    expect(self?.text).toContain('14 个工具')
+    expect(self?.text).toContain(`${plugin.registeredToolNames.length} 个工具`)
 
     await fiber.dispose()
     expect(ctx.tools.get('memory_save')).toBeUndefined()
@@ -1401,5 +1405,42 @@ describe('dsh-memory plugin', () => {
     const after = Object.fromEntries((await ctx.memory.sourceStats()).map(stat => [stat.source, stat]))
     expect(after.unknown?.writes).toBe(1)
     expect(after.agent?.writes).toBe(2)
+  })
+
+  it('0.20.0: topic 随记录持久化，list/search 可按主题切片', async () => {
+    const { ctx, fiber } = await setup()
+    expect(fiber).toBeDefined()
+
+    const seen = await ctx.memory.remember({
+      content: '在 B 站看到有人把 dsh 插件刷成鱼灾',
+      keywords: ['鱼灾', 'bilibili'],
+      topic: '见闻',
+    })
+    expect(seen.topic).toBe('见闻')
+
+    // 省略 topic = 未分类，不写空串
+    const plain = await ctx.memory.remember({ content: 'no topic here', keywords: ['plain'] })
+    expect(plain.topic).toBeUndefined()
+
+    // 空白串按「未分类」处理，不落一个看不见的空主题
+    const blank = await ctx.memory.remember({ content: 'blank topic', keywords: ['blank'], topic: '   ' })
+    expect(blank.topic).toBeUndefined()
+
+    await ctx.memory.remember({ content: '约定：升级思灵要跟插件', keywords: ['约定'], topic: '约定' })
+
+    const onlySeen = await ctx.memory.list({ topic: '见闻' })
+    expect(onlySeen).toHaveLength(1)
+    expect(onlySeen[0]?.content).toContain('鱼灾')
+
+    const all = await ctx.memory.list()
+    expect(all).toHaveLength(4)
+
+    // 检索侧同一条判据
+    const hits = await ctx.memory.search('鱼灾', { topic: '见闻' })
+    expect(hits.length).toBeGreaterThan(0)
+    expect(hits.every(hit => hit.record.topic === '见闻')).toBe(true)
+
+    // 主题不匹配时检索不到
+    expect(await ctx.memory.search('鱼灾', { topic: '约定' })).toHaveLength(0)
   })
 })

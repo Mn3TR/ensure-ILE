@@ -21,6 +21,10 @@ var BRAND_WORDMARK_PATH = `${ROUTE_PREFIX}/brand/wordmark`;
 var PEAKRATE_PATH = `${ROUTE_PREFIX}/peakrate`;
 var PRICES_PATH = `${ROUTE_PREFIX}/prices`;
 var SESSION_COST_PATH = `${ROUTE_PREFIX}/session-cost`;
+var FONT_FILES_PATH = `${ROUTE_PREFIX}/fonts/`;
+var WEBFONTS_PATH = `${ROUTE_PREFIX}/webfonts`;
+var SOUND_PATH = `${ROUTE_PREFIX}/sound`;
+var SESSION_PANEL_PATH = `${ROUTE_PREFIX}/session-panel`;
 
 // packages/host/src/brand.ts
 import { mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";

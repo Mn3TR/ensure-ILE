@@ -221,12 +221,13 @@ describe('pictures from the prompt', () => {
 describe('bank_image', () => {
   const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 9])
   function sessionWithPhoto() {
+    const time = Date.now()
     return {
       surface: { nodes: [0] },
       eventAt: () => ({
         type: 'user/message',
         seq: 0,
-        time: Date.now(),
+        time,
         data: { content: [{ type: 'image', attachment: { attachmentId: 'sha-x', mediaType: 'image/png', bytes: 5, width: 2, height: 2 } }] },
       }),
     }
@@ -236,6 +237,7 @@ describe('bank_image', () => {
     const tool = toolsFor(dir, { 'sha-x': png })
     const exec = { signal: new AbortController().signal, agent: { session: sessionWithPhoto() } }
     const added = await tool('bank_add').execute({ statement: '看图', subject: 'math' }, exec)
+    expect(added).toContain('图片：1 张已存进题目文件夹')
     const id = /已建题：([a-z0-9-]+)/u.exec(added)?.[1] as string
     const toolDef = tool('bank_image') as unknown as { execute: (a: unknown, e: unknown) => Promise<{ text: string; images: { attachmentId: string }[] }>; output: { render: (a: unknown, v: unknown) => { type: string }[] } }
     const value = await toolDef.execute({ id }, exec)

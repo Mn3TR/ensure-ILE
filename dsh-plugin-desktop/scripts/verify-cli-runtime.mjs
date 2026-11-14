@@ -14,6 +14,7 @@ const dshAppBootPackage = fileURLToPath(new URL('node_modules/@deepseek-ai/dsh-a
 const dshAtomicWritePackage = fileURLToPath(new URL('node_modules/@deepseek-ai/dsh-atomic-write/', packageRoot))
 const cordisPluginLoaderPackage = fileURLToPath(new URL('node_modules/@deepseek-ai/cordis-plugin-loader/', packageRoot))
 const dshHomePathsPackage = fileURLToPath(new URL('node_modules/@deepseek-ai/dsh-home-paths/', packageRoot))
+const dshOfficialBundlesPackage = fileURLToPath(new URL('node_modules/@deepseek-ai/dsh-official-bundles/', packageRoot))
 const dshPackage = fileURLToPath(new URL('node_modules/@deepseek-ai/dsh/', packageRoot))
 const semverPackage = fileURLToPath(new URL('node_modules/semver/', packageRoot))
 const pnpmCli = fileURLToPath(new URL('node_modules/pnpm/bin/pnpm.mjs', packageRoot))
@@ -170,6 +171,7 @@ function runFlatProfileDshEntry() {
   const linkedAtomicWritePackage = join(root, 'node_modules', '@deepseek-ai', 'dsh-atomic-write')
   const linkedCordisPluginLoaderPackage = join(root, 'node_modules', '@deepseek-ai', 'cordis-plugin-loader')
   const linkedDshHomePathsPackage = join(root, 'node_modules', '@deepseek-ai', 'dsh-home-paths')
+  const linkedDshOfficialBundlesPackage = join(root, 'node_modules', '@deepseek-ai', 'dsh-official-bundles')
   const linkedDshPackage = join(root, 'node_modules', '@deepseek-ai', 'dsh')
   const linkedSemverPackage = join(root, 'node_modules', 'semver')
   try {
@@ -180,6 +182,7 @@ function runFlatProfileDshEntry() {
     symlinkSync(dshAtomicWritePackage, linkedAtomicWritePackage, process.platform === 'win32' ? 'junction' : 'dir')
     symlinkSync(cordisPluginLoaderPackage, linkedCordisPluginLoaderPackage, process.platform === 'win32' ? 'junction' : 'dir')
     symlinkSync(dshHomePathsPackage, linkedDshHomePathsPackage, process.platform === 'win32' ? 'junction' : 'dir')
+    symlinkSync(dshOfficialBundlesPackage, linkedDshOfficialBundlesPackage, process.platform === 'win32' ? 'junction' : 'dir')
     symlinkSync(dshPackage, linkedDshPackage, process.platform === 'win32' ? 'junction' : 'dir')
     symlinkSync(semverPackage, linkedSemverPackage, process.platform === 'win32' ? 'junction' : 'dir')
     // dsh 0.2.0-rc.2 only manages the reserved Desktop Profile after Desktop

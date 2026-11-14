@@ -6,6 +6,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-cmdline'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-client-connection'
+import type {} from '@deepseek-ai/dsh-deepseek-account'
 import {
   handleRendererBootRequest,
   RENDERER_BOOT_REPORT_PATH,
@@ -59,7 +60,7 @@ import {
   type DesktopWindowMaterial,
 } from './window-material.ts'
 import { DESKTOP_PRODUCT_NAME } from './product-identity.ts'
-import { watchPlatformLogin, type PlatformLoginAccount } from './platform-login.ts'
+import { watchPlatformLogin } from './platform-login.ts'
 import type { DesktopSetupWizardSettings } from './setup-wizard-settings.ts'
 import {
   createDesktopSettingsPort,
@@ -396,7 +397,7 @@ export function apply(ctx: Context, config: DesktopShellConfig): void {
   // sign-in page to a native subscriber; older cores never activate this row.
   ctx.inject(['deepseekAccount'], (accountCtx) => {
     accountCtx.effect(() => {
-      const account = accountCtx.get('deepseekAccount') as PlatformLoginAccount
+      const account = accountCtx.get('deepseekAccount')!
       const lifetime = new AbortController()
       // A broken watcher only loses the automatic hand-off; the sign-in dialog still offers the link.
       void watchPlatformLogin(

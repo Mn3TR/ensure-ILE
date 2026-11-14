@@ -2,6 +2,7 @@
 var PACKAGE_NAME = "dsh-claude-style";
 
 // packages/host/src/search.ts
+import { createHash } from "node:crypto";
 import { cachePath, readJsonDocument, writeJsonDocument } from "./cache-file.js";
 
 // packages/engine/node/session-events.ts
@@ -51,6 +52,7 @@ var QUERY_MAX = 200;
 var CACHE_WRITE_INTERVAL_MS = 5e3;
 var LIST_INTERVAL_MS = 2e3;
 var CACHE_VERSION = 1;
+var LOWER_CACHE_CHARS = 4e6;
 function compileQuery(query) {
   const pattern = query.trim().split(/\s+/u).map((part) => part.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("\\s+");
   return new RegExp(pattern, "iu");
@@ -98,13 +100,15 @@ function isStoredMessage(value) {
 function createSessionSearch(ctx) {
   const cache = /* @__PURE__ */ new Map();
   const lower = /* @__PURE__ */ new Map();
+  let lowerChars = 0;
   const writtenAt = /* @__PURE__ */ new Map();
   let refreshing = null;
   let refreshingStore = false;
   let stored = null;
   let listedAt = 0;
+  let disposed = false;
   function cacheFile(sessionId) {
-    return cachePath(ctx, "search", `${sessionId}.json`);
+    return cachePath(ctx, "search", `${createHash("sha256").update(sessionId).digest("hex")}.json`);
   }
   function readCached(sessionId) {
     const parsed = readJsonDocument(ctx, cacheFile(sessionId), "session search cache");
@@ -121,8 +125,9 @@ function createSessionSearch(ctx) {
     return { revision: document.revision, lastSeq: Number(document.lastSeq), messages };
   }
   function adopt(sessionId, entry, force) {
+    if (disposed) return;
     cache.set(sessionId, entry);
-    lower.set(sessionId, entry.messages.map((message) => message.text.toLowerCase()));
+    forgetLower(sessionId);
     const now = Date.now();
     if (!force && now - (writtenAt.get(sessionId) ?? 0) < CACHE_WRITE_INTERVAL_MS) return;
     writtenAt.set(sessionId, now);
@@ -133,18 +138,46 @@ function createSessionSearch(ctx) {
       messages: entry.messages
     });
   }
-  function forget(sessionId) {
-    cache.delete(sessionId);
+  function forgetLower(sessionId) {
+    const held = lower.get(sessionId);
+    if (held === void 0) return;
+    for (const text of held) lowerChars -= text.length;
     lower.delete(sessionId);
+  }
+  function loweredFor(sessionId, entry) {
+    const held = lower.get(sessionId);
+    if (held !== void 0) {
+      lower.delete(sessionId);
+      lower.set(sessionId, held);
+      return held;
+    }
+    const texts = entry.messages.map((message) => message.text.toLowerCase());
+    let size = 0;
+    for (const text of texts) size += text.length;
+    if (size > LOWER_CACHE_CHARS) return texts;
+    while (lowerChars + size > LOWER_CACHE_CHARS && lower.size > 0) {
+      const oldest = lower.keys().next().value;
+      if (oldest === void 0) break;
+      forgetLower(oldest);
+    }
+    lower.set(sessionId, texts);
+    lowerChars += size;
+    return texts;
+  }
+  function forget(sessionId) {
+    if (disposed) return;
+    cache.delete(sessionId);
+    forgetLower(sessionId);
     writtenAt.delete(sessionId);
     writeJsonDocument(ctx, cacheFile(sessionId), "session search cache", null);
   }
   async function rebuild(sessionId, revision) {
     const events = await readEvents(ctx, PACKAGE_NAME, sessionId, "content search");
-    const messages = events === null ? [] : messagesOf(events);
-    const last = events === null ? void 0 : events[events.length - 1];
+    if (disposed) return;
+    if (events === null) return;
+    const last = events[events.length - 1];
     const lastSeq = typeof last?.seq === "number" ? last.seq + 1 : 0;
-    adopt(sessionId, { revision, lastSeq, messages }, false);
+    adopt(sessionId, { revision, lastSeq, messages: messagesOf(events) }, false);
   }
   async function refresh(store) {
     const persistence = ctx.get("sessionPersistence");
@@ -183,7 +216,6 @@ function createSessionSearch(ctx) {
         continue;
       }
       cache.set(id, entry);
-      if (!lower.has(id)) lower.set(id, entry.messages.map((message) => message.text.toLowerCase()));
       if (want.live !== null) {
         if (entry.lastSeq > want.live.seq) stale.push(id);
         else if (entry.lastSeq < want.live.seq) {
@@ -229,7 +261,7 @@ function createSessionSearch(ctx) {
     const pattern = single === "" ? compileQuery(query) : null;
     const hits = [];
     for (const [sessionId, entry] of cache) {
-      const lowered = lower.get(sessionId) ?? [];
+      const lowered = single === "" ? [] : loweredFor(sessionId, entry);
       for (let i = entry.messages.length - 1; i >= 0; i--) {
         const message = entry.messages[i];
         const found = single === "" ? pattern.exec(message.text) : null;
@@ -244,8 +276,10 @@ function createSessionSearch(ctx) {
     return { sessions: hits.slice(0, SESSION_LIMIT), scanned: cache.size };
   }
   function dispose() {
+    disposed = true;
     cache.clear();
     lower.clear();
+    lowerChars = 0;
     writtenAt.clear();
     stored = null;
     refreshing = null;

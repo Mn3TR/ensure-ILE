@@ -104,51 +104,17 @@ function brainIcon() {
     strokeLinejoin: "round"
   }, BRAIN_PATHS.map((d, index) => (0, import_react.createElement)("path", { key: index, d })));
 }
-var SETTINGS_NAV_MARKER = "data-dsh-memory-settings-nav";
-var BRAIN_MASK_SVG = `%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z'/%3E%3Cpath d='M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z'/%3E%3C/svg%3E`;
-var NAV_ICON_CSS = `
-[data-dsh-memory-settings-nav] > svg:first-child { display: none; }
-[data-dsh-memory-settings-nav]::before {
-  content: '';
-  flex: none;
-  width: 16px;
-  height: 16px;
-  background: currentColor;
-  -webkit-mask: url("data:image/svg+xml,${BRAIN_MASK_SVG}") center / contain no-repeat;
-  mask: url("data:image/svg+xml,${BRAIN_MASK_SVG}") center / contain no-repeat;
-}
-`;
-var navCssInjected = false;
-function injectNavCss() {
-  if (navCssInjected || typeof document === "undefined") return;
-  navCssInjected = true;
-  const style = document.createElement("style");
-  style.setAttribute("data-plugin", "dsh-plugin-memory");
-  style.textContent = NAV_ICON_CSS;
-  document.head.append(style);
-}
-function registerSettingsNavIcon(label) {
-  let disposed = false;
-  const sync = () => {
-    if (disposed) return;
-    const currentLabel = label().trim();
-    const buttons = document.querySelectorAll('[role="dialog"] nav button');
-    for (const button of buttons) {
-      const matches = currentLabel.length > 0 && button.textContent?.trim() === currentLabel;
-      if (matches) button.setAttribute(SETTINGS_NAV_MARKER, "");
-      else button.removeAttribute(SETTINGS_NAV_MARKER);
-    }
-  };
-  sync();
-  const observer = new MutationObserver(sync);
-  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-  return () => {
-    disposed = true;
-    observer.disconnect();
-    document.querySelectorAll(`[${SETTINGS_NAV_MARKER}]`).forEach((element) => {
-      element.removeAttribute(SETTINGS_NAV_MARKER);
-    });
-  };
+function navIcon(size) {
+  return (0, import_react.createElement)("svg", {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, BRAIN_PATHS.map((d, index) => (0, import_react.createElement)("path", { key: index, d })));
 }
 var STRINGS = {
   zh: {
@@ -1031,6 +997,413 @@ function SettingsMemoryView(props) {
     cwd: currentSessionCwd(props.ctx)
   });
 }
+function SwitchRow(props) {
+  const { label, hint, enabled, ariaLabel, onToggle, divided } = props;
+  return (0, import_react.createElement)(
+    "div",
+    {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        padding: "12px 0",
+        ...divided ? { borderTop: "1px solid var(--dsw-alias-border-l2, #1e2836)" } : {}
+      }
+    },
+    (0, import_react.createElement)(
+      "div",
+      { style: { minWidth: 0 } },
+      (0, import_react.createElement)("div", { style: { fontSize: 13, fontWeight: 600, color: "var(--dsw-alias-label-primary, #d8e0ea)" } }, label),
+      (0, import_react.createElement)("div", { style: { fontSize: 11.5, color: "var(--dsw-alias-label-secondary, #67748a)", marginTop: 3, lineHeight: 1.5 } }, hint)
+    ),
+    (0, import_react.createElement)(
+      "button",
+      {
+        type: "button",
+        role: "switch",
+        "aria-checked": enabled,
+        "aria-label": ariaLabel,
+        onClick: onToggle,
+        style: {
+          flex: "none",
+          width: 40,
+          height: 22,
+          borderRadius: 11,
+          border: "none",
+          cursor: "pointer",
+          position: "relative",
+          transition: "background 120ms",
+          background: enabled ? "var(--dsw-alias-state-business-primary, #4FC3F7)" : "var(--dsw-alias-border-l2, #1e2836)"
+        }
+      },
+      (0, import_react.createElement)("span", {
+        style: {
+          position: "absolute",
+          top: 3,
+          left: enabled ? 21 : 3,
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          background: "#fff",
+          transition: "left 120ms"
+        }
+      })
+    )
+  );
+}
+function SyncField(props) {
+  const { label, hint, value, placeholder, ariaLabel, onCommit } = props;
+  const [draft, setDraft] = (0, import_react.useState)(value);
+  (0, import_react.useEffect)(() => {
+    setDraft(value);
+  }, [value]);
+  const commit = () => {
+    const next = draft.trim();
+    if (next !== value) onCommit(next);
+  };
+  return (0, import_react.createElement)(
+    "div",
+    { style: { padding: "8px 0 6px" } },
+    (0, import_react.createElement)("div", {
+      style: { fontSize: 12, fontWeight: 600, color: "var(--dsw-alias-label-primary, #d8e0ea)" }
+    }, label),
+    (0, import_react.createElement)("input", {
+      type: "text",
+      value: draft,
+      placeholder,
+      "aria-label": ariaLabel,
+      onChange: (event) => {
+        setDraft(event.target.value);
+      },
+      onBlur: commit,
+      onKeyDown: (event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+      },
+      style: {
+        width: "100%",
+        marginTop: 4,
+        padding: "6px 10px",
+        fontSize: 12.5,
+        boxSizing: "border-box",
+        // 半透明中性底色跟随主题：插件页这张卡片在浅色主题下是白底，写死深色兜底会变成黑框
+        // （2026-11-13 用户指出「输入框咋是黑的」）。深色主题下它自然变暗，不需要两套值。
+        background: "rgba(127, 127, 127, 0.07)",
+        border: "1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.3))",
+        borderRadius: 8,
+        color: "var(--dsw-alias-label-primary, #d8e0ea)",
+        outline: "none"
+      }
+    }),
+    (0, import_react.createElement)("div", {
+      style: { fontSize: 11, color: "var(--dsw-alias-label-secondary, #67748a)", marginTop: 3, lineHeight: 1.45 }
+    }, hint)
+  );
+}
+function SyncTokenField() {
+  const [saved, setSaved] = (0, import_react.useState)(void 0);
+  const [draft, setDraft] = (0, import_react.useState)("");
+  const [note, setNote] = (0, import_react.useState)("");
+  (0, import_react.useEffect)(() => {
+    let alive = true;
+    void api("syncToken", { action: "status" }).then((value) => {
+      if (!alive) return;
+      setSaved(value?.set === true);
+    }).catch((error) => {
+      if (alive) setNote(`\u8BFB\u53D6\u72B6\u6001\u5931\u8D25\uFF1A${String(error)}`);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const commit = () => {
+    const token = draft.trim();
+    if (token === "") return;
+    void api("syncToken", { action: "set", token }).then(() => {
+      setSaved(true);
+      setDraft("");
+      setNote("\u5DF2\u4FDD\u5B58");
+    }).catch((error) => {
+      setNote(`\u4FDD\u5B58\u5931\u8D25\uFF1A${String(error)}`);
+    });
+  };
+  const clear = () => {
+    void api("syncToken", { action: "clear" }).then(() => {
+      setSaved(false);
+      setNote("\u5DF2\u6E05\u9664");
+    }).catch((error) => {
+      setNote(`\u6E05\u9664\u5931\u8D25\uFF1A${String(error)}`);
+    });
+  };
+  return (0, import_react.createElement)(
+    "div",
+    { style: { padding: "8px 0 6px" } },
+    (0, import_react.createElement)(
+      "div",
+      { style: { display: "flex", alignItems: "center", gap: 8 } },
+      (0, import_react.createElement)("div", {
+        style: { fontSize: 12, fontWeight: 600, color: "var(--dsw-alias-label-primary, #d8e0ea)" }
+      }, "\u8BBF\u95EE\u4EE4\u724C\uFF08PAT\uFF09"),
+      (0, import_react.createElement)("span", {
+        style: { fontSize: 11, color: "var(--dsw-alias-label-secondary, #67748a)" }
+      }, saved === void 0 ? "\u8BFB\u53D6\u4E2D\u2026" : saved ? "\u5DF2\u8BBE\u7F6E" : "\u672A\u8BBE\u7F6E"),
+      saved === true ? (0, import_react.createElement)("button", {
+        type: "button",
+        "aria-label": "\u6E05\u9664\u4E91\u540C\u6B65\u8BBF\u95EE\u4EE4\u724C",
+        onClick: clear,
+        style: {
+          marginLeft: "auto",
+          padding: 0,
+          border: "none",
+          background: "none",
+          cursor: "pointer",
+          fontSize: 11,
+          color: "var(--dsw-alias-label-secondary, #67748a)",
+          textDecoration: "underline"
+        }
+      }, "\u6E05\u9664") : null
+    ),
+    (0, import_react.createElement)("input", {
+      type: "password",
+      value: draft,
+      autoComplete: "off",
+      "aria-label": "\u4E91\u540C\u6B65\u8BBF\u95EE\u4EE4\u724C",
+      placeholder: saved === true ? "\u5DF2\u8BBE\u7F6E\uFF0C\u8F93\u5165\u65B0\u503C\u53EF\u8986\u76D6" : "ghp_... \u6216 github_pat_...",
+      onChange: (event) => {
+        setDraft(event.target.value);
+      },
+      onBlur: commit,
+      onKeyDown: (event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+      },
+      style: {
+        width: "100%",
+        marginTop: 4,
+        padding: "6px 10px",
+        fontSize: 12.5,
+        boxSizing: "border-box",
+        // 半透明中性底色跟随主题：插件页这张卡片在浅色主题下是白底，写死深色兜底会变成黑框
+        // （2026-11-13 用户指出「输入框咋是黑的」）。深色主题下它自然变暗，不需要两套值。
+        background: "rgba(127, 127, 127, 0.07)",
+        border: "1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.3))",
+        borderRadius: 8,
+        color: "var(--dsw-alias-label-primary, #d8e0ea)",
+        outline: "none"
+      }
+    }),
+    (0, import_react.createElement)("div", {
+      style: { fontSize: 11, color: "var(--dsw-alias-label-secondary, #67748a)", marginTop: 3, lineHeight: 1.45 }
+    }, "\u4EE4\u724C\u53EA\u5B58\u5728\u4F60\u8FD9\u53F0\u7535\u8111\u4E0A\uFF0C\u4E0D\u4F1A\u5199\u8FDB\u63D2\u4EF6\u914D\u7F6E\uFF0C\u4E5F\u4E0D\u4F1A\u8DDF\u7740\u914D\u7F6E\u88AB\u5206\u4EAB\u51FA\u53BB\u3002"),
+    note === "" ? null : (0, import_react.createElement)("div", {
+      style: { fontSize: 11, color: "var(--dsw-alias-label-secondary, #67748a)", marginTop: 2 }
+    }, note)
+  );
+}
+var SYNC_GUIDE_PROMPT = "\u6211\u8981\u7528 dsh-memory \u7684\u4E91\u540C\u6B65\u529F\u80FD\uFF0C\u8BF7\u5F15\u5BFC\u6211\u5B8C\u6210\u914D\u7F6E\uFF1A\n1. \u5728\u4E00\u4E2A\u4EE3\u7801\u6258\u7BA1\u5E73\u53F0\uFF08GitHub / Gitee \u7B49\uFF09\u65B0\u5EFA\u4E00\u4E2A\u79C1\u6709\u4ED3\u5E93\uFF0C\u4E13\u95E8\u653E\u8BB0\u5FC6\uFF0C\u4E0D\u8981\u7528\u516C\u5F00\u4ED3\u5E93\uFF1B\n2. \u521B\u5EFA\u4E00\u4E2A\u8BBF\u95EE\u4EE4\u724C\uFF08PAT\uFF09\uFF0C\u53EA\u7ED9\u5B83\u8FD9\u4E00\u4E2A\u4ED3\u5E93\u7684\u8BFB\u5199\u6743\u9650\uFF1B\n3. \u5E2E\u6211\u786E\u8BA4\u4ED3\u5E93\u5730\u5740\uFF08\u5F62\u5982 https://github.com/\u6211/\u4ED3\u5E93.git\uFF09\uFF1B\n4. \u6211\u81EA\u5DF1\u628A\u4EE4\u724C\u586B\u8FDB\u63D2\u4EF6\u8BBE\u7F6E\u91CC\u7684\u300C\u8BBF\u95EE\u4EE4\u724C\u300D\u6846\u2014\u2014\u4E0D\u8981\u8BA9\u6211\u628A\u4EE4\u724C\u8D34\u8FDB\u5BF9\u8BDD\uFF0C\u4E5F\u4E0D\u8981\u8BFB\u53D6\u6216\u6253\u5370\u5B83\uFF1B\n5. \u91CD\u542F\u601D\u7075\u540E\u5E2E\u6211\u9A8C\u8BC1\u540C\u6B65\u53EF\u7528\uFF08\u5148\u53EA\u8DD1 status\uFF0C\u522B\u6025\u7740 push\uFF09\u3002\n\u4F60\u80FD\u7528 gh \u547D\u4EE4\u5E2E\u6211\u5EFA\u4ED3\u5E93\u7684\u8BDD\u5C31\u5EFA\uFF0C\u5EFA\u4E0D\u4E86\u5C31\u544A\u8BC9\u6211\u8BE5\u70B9\u54EA\u91CC\u3002";
+var LINK_BUTTON = {
+  padding: 0,
+  border: "none",
+  background: "none",
+  cursor: "pointer",
+  fontSize: 11,
+  color: "var(--dsw-alias-state-business-primary, #4FC3F7)",
+  textDecoration: "underline"
+};
+function SyncGuide() {
+  const [open, setOpen] = (0, import_react.useState)(false);
+  const [note, setNote] = (0, import_react.useState)("");
+  const copy = () => {
+    const clipboard = typeof navigator === "undefined" ? void 0 : navigator.clipboard;
+    if (clipboard === void 0 || typeof clipboard.writeText !== "function") {
+      setNote("\u8FD9\u4E2A\u73AF\u5883\u4E0D\u8BA9\u81EA\u52A8\u590D\u5236\uFF0C\u8BF7\u624B\u52A8\u9009\u4E2D\u4E0A\u9762\u7684\u8BF4\u660E");
+      return;
+    }
+    void Promise.resolve(clipboard.writeText(SYNC_GUIDE_PROMPT)).then(() => setNote("\u5DF2\u590D\u5236\uFF0C\u7C98\u8D34\u5230\u4EFB\u610F\u65B0\u4F1A\u8BDD\u5373\u53EF")).catch(() => setNote("\u590D\u5236\u5931\u8D25\uFF0C\u8BF7\u624B\u52A8\u9009\u4E2D"));
+  };
+  return (0, import_react.createElement)(
+    "div",
+    { style: { padding: "2px 0 8px" } },
+    (0, import_react.createElement)(
+      "div",
+      { style: { display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" } },
+      (0, import_react.createElement)("button", {
+        type: "button",
+        "aria-label": "\u5C55\u5F00\u4E91\u540C\u6B65\u914D\u7F6E\u8BF4\u660E",
+        onClick: () => setOpen((value) => !value),
+        style: LINK_BUTTON
+      }, open ? "\u6536\u8D77\u8BF4\u660E" : "\u7B2C\u4E00\u6B21\u7528\uFF1F\u770B\u770B\u600E\u4E48\u914D"),
+      (0, import_react.createElement)("button", {
+        type: "button",
+        "aria-label": "\u590D\u5236\u8BA9 DSH \u5E2E\u6211\u914D\u7684\u63D0\u793A\u8BCD",
+        onClick: copy,
+        style: LINK_BUTTON
+      }, "\u590D\u5236\u300C\u8BA9 DSH \u5E2E\u6211\u914D\u300D"),
+      note === "" ? null : (0, import_react.createElement)("span", {
+        style: { fontSize: 11, color: "var(--dsw-alias-label-secondary, #67748a)" }
+      }, note)
+    ),
+    open ? (0, import_react.createElement)(
+      "div",
+      {
+        style: {
+          marginTop: 6,
+          padding: "8px 10px",
+          borderRadius: 8,
+          lineHeight: 1.65,
+          fontSize: 11.5,
+          color: "var(--dsw-alias-label-secondary, #67748a)",
+          background: "rgba(127, 127, 127, 0.06)"
+        }
+      },
+      (0, import_react.createElement)("div", null, "1. \u5728\u4E00\u4E2A\u4EE3\u7801\u6258\u7BA1\u5E73\u53F0\uFF08GitHub / Gitee \u7B49\uFF09\u65B0\u5EFA\u4E00\u4E2A\u79C1\u6709\u4ED3\u5E93\uFF0C\u4E13\u95E8\u653E\u8BB0\u5FC6\u3002"),
+      (0, import_react.createElement)("div", null, "2. \u521B\u5EFA\u4E00\u4E2A\u8BBF\u95EE\u4EE4\u724C\uFF08PAT\uFF09\uFF0C\u53EA\u7ED9\u5B83\u8FD9\u4E00\u4E2A\u4ED3\u5E93\u7684\u8BFB\u5199\u6743\u9650\u3002"),
+      (0, import_react.createElement)("div", null, "3. \u4ED3\u5E93\u5730\u5740\u586B\u8FDB\u4E0A\u9762\u7684\u300C\u8FDC\u7AEF\u5730\u5740\u300D\uFF0C\u4EE4\u724C\u586B\u8FDB\u300C\u8BBF\u95EE\u4EE4\u724C\u300D\u3002"),
+      (0, import_react.createElement)("div", null, "4. \u91CD\u542F\u601D\u7075\uFF0C\u7136\u540E\u5728\u4F1A\u8BDD\u91CC\u8BA9\u6211\u6267\u884C memory_sync \u7684 push / pull\u3002"),
+      (0, import_react.createElement)(
+        "div",
+        { style: { marginTop: 4 } },
+        "\u4E0D\u60F3\u81EA\u5DF1\u5F04\uFF1F\u70B9\u300C\u590D\u5236\u300C\u8BA9 DSH \u5E2E\u6211\u914D\u300D\u300D\uFF0C\u628A\u90A3\u6BB5\u8BDD\u7C98\u8D34\u5230\u4EFB\u610F\u65B0\u4F1A\u8BDD\u91CC\uFF0C\u6211\u5E26\u4F60\u4E00\u6B65\u6B65\u505A\u3002"
+      )
+    ) : null
+  );
+}
+function MemorySettingsCard(props) {
+  const { form } = props;
+  const [diary, setDiary] = (0, import_react.useState)(true);
+  const [sync, setSync] = (0, import_react.useState)(false);
+  const [remote, setRemote] = (0, import_react.useState)("");
+  const [mirrorDir, setMirrorDir] = (0, import_react.useState)("");
+  const [branch, setBranch] = (0, import_react.useState)("");
+  const [proxy, setProxy] = (0, import_react.useState)("");
+  const [testNote, setTestNote] = (0, import_react.useState)("");
+  const [testing, setTesting] = (0, import_react.useState)(false);
+  (0, import_react.useEffect)(() => {
+    const read = () => {
+      const value = form.getSnapshot()?.value;
+      setDiary(value?.diary?.enabled ?? true);
+      setSync(value?.sync?.enabled ?? false);
+      setRemote(value?.sync?.remote ?? "");
+      setMirrorDir(value?.sync?.mirrorDir ?? "");
+      setBranch(value?.sync?.branch ?? "");
+      setProxy(value?.sync?.proxy ?? "");
+    };
+    read();
+    const off = form.subscribe(read);
+    return () => {
+      if (typeof off === "function") off();
+    };
+  }, [form]);
+  const write = (path, value, what) => {
+    try {
+      const pending = form.mutate([{ op: "set", path, value }]);
+      void Promise.resolve(pending).catch((error) => {
+        console.warn(`dsh-memory: ${what}\u5199\u5165\u5931\u8D25`, error);
+      });
+    } catch (error) {
+      console.warn(`dsh-memory: ${what}\u5199\u5165\u629B\u9519`, error);
+    }
+  };
+  return (0, import_react.createElement)(
+    "div",
+    null,
+    (0, import_react.createElement)(SwitchRow, {
+      label: "\u65E5\u8BB0",
+      hint: "\u672C\u673A\u5199\u65E5\u8BB0\u3002\u5173\u6389\u540E\u65E5\u8BB0\u5DE5\u5177\u62D2\u7EDD\u6267\u884C\u3001\u4E0D\u518D\u6CE8\u5165\u6307\u9488\uFF1B\u5DF2\u6709\u65E5\u8BB0\u6587\u4EF6\u539F\u6837\u4FDD\u7559\uFF0C\u4E0D\u4F1A\u88AB\u5220\u3002",
+      enabled: diary,
+      ariaLabel: "\u65E5\u8BB0\u5F00\u5173",
+      onToggle: () => write(["diary", "enabled"], !diary, "\u65E5\u8BB0\u5F00\u5173"),
+      divided: false
+    }),
+    (0, import_react.createElement)(SwitchRow, {
+      label: "\u4E91\u540C\u6B65",
+      hint: "\u628A\u672C\u673A\u8BB0\u5FC6\u5907\u4EFD\u5230\u4F60\u81EA\u5DF1\u7684\u4E00\u4E2A git \u4ED3\u5E93\uFF0C\u51E0\u53F0\u7535\u8111\u4E4B\u95F4\u5171\u7528\u540C\u4E00\u4EFD\u8BB0\u5FC6\u3002\u5173\u7740\u65F6\u540C\u6B65\u5DE5\u5177\u6839\u672C\u4E0D\u4F1A\u51FA\u73B0\u3002\u6253\u5F00\u540E\u586B\u4E0A\u4ED3\u5E93\u5730\u5740\u548C\u8BBF\u95EE\u4EE4\u724C\uFF1B\u8BBF\u95EE GitHub \u9700\u8981\u4EE3\u7406\u7684\u8BDD\u628A\u4EE3\u7406\u4E5F\u586B\u4E0A\uFF0C\u7136\u540E\u70B9\u300C\u6D4B\u8BD5\u8FDE\u63A5\u300D\u786E\u8BA4\u901A\u4E86\u3002\u4E0D\u77E5\u9053\u586B\u4EC0\u4E48\u5C31\u7559\u7A7A\u2014\u2014\u90A3\u53EA\u4F1A\u5728\u8FD9\u53F0\u7535\u8111\u4E0A\u5B58\u4E00\u4EFD\u955C\u50CF\uFF0C\u4E0D\u4F1A\u4F20\u5230\u4EFB\u4F55\u5730\u65B9\u3002",
+      enabled: sync,
+      ariaLabel: "\u4E91\u540C\u6B65\u5F00\u5173",
+      onToggle: () => write(["sync", "enabled"], !sync, "\u4E91\u540C\u6B65\u5F00\u5173"),
+      divided: true
+    }),
+    // 连接配置只在开关打开时出现：关着的时候填地址没有任何意义，只会让人以为在生效。
+    sync ? (0, import_react.createElement)(
+      "div",
+      { style: { padding: "2px 0 10px" } },
+      (0, import_react.createElement)(SyncField, {
+        label: "\u8FDC\u7AEF\u5730\u5740",
+        hint: "\u4F60\u7684\u4ED3\u5E93\u5730\u5740\uFF08https \u5F00\u5934\uFF09\u3002\u7559\u7A7A\u5C31\u662F\u53EA\u5728\u672C\u673A\u5B58\u4E00\u4EFD\uFF0C\u4E0D\u5916\u4F20\u3002",
+        ariaLabel: "\u4E91\u540C\u6B65\u8FDC\u7AEF\u5730\u5740",
+        value: remote,
+        placeholder: "https://github.com/<\u4F60>/<\u4ED3\u5E93>.git",
+        onCommit: (next) => write(["sync", "remote"], next, "\u4E91\u540C\u6B65\u8FDC\u7AEF\u5730\u5740")
+      }),
+      (0, import_react.createElement)(SyncField, {
+        label: "\u955C\u50CF\u76EE\u5F55",
+        hint: "\u955C\u50CF\u5B58\u5728\u54EA\u3002\u7559\u7A7A\u5C31\u7528\u9ED8\u8BA4\u4F4D\u7F6E\u3002",
+        ariaLabel: "\u4E91\u540C\u6B65\u955C\u50CF\u76EE\u5F55",
+        value: mirrorDir,
+        placeholder: "\u7559\u7A7A = \u9ED8\u8BA4\u4F4D\u7F6E",
+        onCommit: (next) => write(["sync", "mirrorDir"], next, "\u4E91\u540C\u6B65\u955C\u50CF\u76EE\u5F55")
+      }),
+      (0, import_react.createElement)(SyncField, {
+        label: "\u5206\u652F",
+        hint: "\u4E00\u822C\u7559\u7A7A\u5373\u53EF\u3002",
+        ariaLabel: "\u4E91\u540C\u6B65\u5206\u652F",
+        value: branch,
+        placeholder: "main",
+        onCommit: (next) => write(["sync", "branch"], next, "\u4E91\u540C\u6B65\u5206\u652F")
+      }),
+      (0, import_react.createElement)(SyncField, {
+        label: "\u4EE3\u7406",
+        hint: "\u5982\u679C\u8BBF\u95EE GitHub \u9700\u8981\u4EE3\u7406\u624D\u586B\uFF0C\u4F8B\u5982 http://127.0.0.1:7897\uFF1B\u4E0D\u586B\u5C31\u662F\u76F4\u8FDE\u3002",
+        ariaLabel: "\u4E91\u540C\u6B65\u4EE3\u7406",
+        value: proxy,
+        placeholder: "http://127.0.0.1:7897\uFF08\u53EF\u9009\uFF09",
+        onCommit: (next) => write(["sync", "proxy"], next, "\u4E91\u540C\u6B65\u4EE3\u7406")
+      }),
+      (0, import_react.createElement)(SyncTokenField),
+      (0, import_react.createElement)(
+        "div",
+        { style: { display: "flex", gap: 12, alignItems: "center", padding: "2px 0 6px" } },
+        (0, import_react.createElement)("button", {
+          type: "button",
+          "aria-label": "\u6D4B\u8BD5\u4E91\u540C\u6B65\u8FDE\u63A5",
+          disabled: testing,
+          onClick: () => {
+            setTesting(true);
+            setTestNote("\u6D4B\u8BD5\u4E2D\u2026");
+            void api("syncTest", {}).then((value) => {
+              const result = value;
+              if (result.ok === true) {
+                setTestNote(`\u8FDE\u4E0A\u4E86\uFF0C\u8FDC\u7AEF\u6709 ${result.branches?.length ?? 0} \u4E2A\u5206\u652F`);
+                return;
+              }
+              const reason = result.kind === "auth" ? "\u8BA4\u8BC1\u5931\u8D25\uFF1A\u4EE4\u724C\u4E0D\u5BF9\u6216\u6CA1\u6709\u8FD9\u4E2A\u4ED3\u5E93\u7684\u6743\u9650" : result.kind === "network" ? "\u8FDE\u4E0D\u4E0A\uFF1A\u68C0\u67E5\u7F51\u7EDC\uFF0C\u9700\u8981\u4EE3\u7406\u7684\u8BDD\u586B\u4E0A\u9762\u7684\u4EE3\u7406\u5730\u5740" : "\u8FDE\u63A5\u5931\u8D25";
+              setTestNote(`${reason}${result.error === void 0 ? "" : `\uFF08${result.error}\uFF09`}`);
+            }).catch((error) => {
+              setTestNote(`\u6D4B\u8BD5\u5931\u8D25\uFF1A${String(error)}`);
+            }).finally(() => {
+              setTesting(false);
+            });
+          },
+          style: {
+            padding: "5px 12px",
+            fontSize: 11.5,
+            cursor: testing ? "default" : "pointer",
+            borderRadius: 7,
+            border: "1px solid var(--dsw-alias-border-l2, rgba(127,127,127,0.3))",
+            background: testing ? "transparent" : "rgba(127, 127, 127, 0.07)",
+            color: "var(--dsw-alias-label-primary, #d8e0ea)"
+          }
+        }, testing ? "\u6D4B\u8BD5\u4E2D\u2026" : "\u6D4B\u8BD5\u8FDE\u63A5"),
+        testNote === "" ? null : (0, import_react.createElement)("span", {
+          style: { fontSize: 11, color: "var(--dsw-alias-label-secondary, #67748a)" }
+        }, testNote)
+      ),
+      (0, import_react.createElement)(SyncGuide),
+      (0, import_react.createElement)("div", {
+        style: { fontSize: 11, color: "var(--dsw-alias-label-secondary, #67748a)", lineHeight: 1.5, marginTop: 2 }
+      }, "\u586B\u597D\u540E\u91CD\u542F\u601D\u7075\u751F\u6548\u3002\u6CA1\u6709\u4ED3\u5E93\u5730\u5740\u5C31\u7559\u7A7A\uFF0C\u53EA\u5728\u672C\u673A\u5B58\u4E00\u4EFD\u955C\u50CF\u3002")
+    ) : null
+  );
+}
 function apply(ctx) {
   const face = ctx;
   const locale = face.get?.("locale");
@@ -1041,7 +1414,6 @@ function apply(ctx) {
   });
   const slots = ctx.slots;
   if (slots?.inject !== void 0) {
-    injectNavCss();
     slots.inject("settings.section", () => slots.register({
       name: "settings.section",
       id: "dsh-memory",
@@ -1051,7 +1423,25 @@ function apply(ctx) {
     }, () => (0, import_react.createElement)(SettingsMemoryView, {
       ctx
     })));
-    face.effect?.(() => registerSettingsNavIcon(() => STRINGS[localeId].tabMemory), "dsh-memory: settings navigation icon");
+    slots.inject("settings.section.icon", () => slots.register({
+      name: "settings.section.icon",
+      id: "dsh-memory",
+      order: 60,
+      label: () => STRINGS[localeId].tabMemory
+    }, (props) => navIcon(props?.size ?? 16)));
+  }
+  try {
+    const configForms = face.get?.("configForms");
+    const settingsForm = configForms?.get?.("memory");
+    if (slots?.inject !== void 0 && settingsForm !== void 0) {
+      slots.inject("plugins.bundle.config", () => slots.register({
+        name: "plugins.bundle.config",
+        key: "@max-null/dsh-memory",
+        inject: () => ({})
+      }, () => (0, import_react.createElement)(MemorySettingsCard, { form: settingsForm })));
+    }
+  } catch (error) {
+    console.warn("dsh-memory: \u8BBE\u7F6E\u5361\u7247\u672A\u6CE8\u518C\uFF08\u4E0D\u5F71\u54CD\u8BB0\u5FC6\u4E0E\u65E5\u8BB0\u5DE5\u5177\uFF09", error);
   }
   const root = ctx;
   if (root.inject === void 0) return;

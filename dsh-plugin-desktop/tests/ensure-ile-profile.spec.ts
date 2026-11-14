@@ -1,10 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { composeEntries } from '@deepseek-ai/dsh-app-boot'
 import { prepareDesktopProfile } from '../src/profile.ts'
+import { packagedDependencyPath } from '../src/packaged-runtime-path.ts'
 
 /**
  * The seeded profile template of this fork, composed the way `seedProfile()`
@@ -67,6 +69,33 @@ describe('the ensure-ILE profile template', () => {
     const ids = composedIds(prepared.patches as { insert?: { id?: string }[] }[])
     expect(ids.filter((id, index) => ids.indexOf(id) !== index)).toEqual([])
   })
+
+  it('installs the packaged profile offline with an empty package store', () => {
+    const packageRoot = join(repo, 'dsh-plugin-desktop')
+    execFileSync(process.execPath, [join(packageRoot, 'scripts', 'prepare-profile.mjs')], {
+      cwd: packageRoot,
+      stdio: 'pipe',
+    })
+    const dir = home()
+    const profileDir = join(dir, 'profiles', 'desktop')
+    cpSync(join(packageRoot, 'profiles', 'ensure-ile'), profileDir, { recursive: true })
+    const manifest = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8')) as {
+      dependencies: Record<string, string>
+    }
+    expect(Object.keys(manifest.dependencies)).toHaveLength(11)
+    expect(Object.values(manifest.dependencies).every(spec => spec.startsWith('file:./vendor/'))).toBe(true)
+    const pnpm = packagedDependencyPath(import.meta.url, 'pnpm/bin/pnpm.mjs')
+    execFileSync(process.execPath, [pnpm, 'install', '--offline', '--no-frozen-lockfile', '--store-dir', join(dir, 'empty-store')], {
+      cwd: profileDir,
+      env: { ...process.env, CI: 'true' },
+      stdio: 'pipe',
+      timeout: 30_000,
+    })
+    for (const name of Object.keys(manifest.dependencies)) {
+      expect(existsSync(join(profileDir, 'node_modules', name, 'package.json'))).toBe(true)
+    }
+    expect(() => prepareDesktopProfile('1', dir, 'win32')).not.toThrow()
+  }, 30_000)
 
   it('keeps our own row ids beside the upstream ones they resemble', () => {
     const dir = home()

@@ -25,12 +25,14 @@
     "dsh-plugin-teaching-commons": "link:../dsh-plugin-teaching-commons"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "4.0.5",
-    "@deepseek-ai/schemastery": "^3.18.5"
+    "@deepseek-ai/cordis": "4.1.0",
+    "@deepseek-ai/schemastery": "^3.19.0"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "4.0.5",
-    "@deepseek-ai/schemastery": "^3.18.5",
+    "@deepseek-ai/cordis": "4.1.0",
+    "@deepseek-ai/cordis-plugin-include": "1.1.0",
+    "@deepseek-ai/cordis-plugin-loader": "1.1.0",
+    "@deepseek-ai/schemastery": "^3.19.0",
     "@types/node": "^22.20.0",
     "dsh-plugin-coreset": "link:../dsh-plugin-coreset",
     "tsdown": "0.22.2",

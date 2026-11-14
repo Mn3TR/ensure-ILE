@@ -1,6 +1,10 @@
+// packages/contracts/src/package.ts
+var PACKAGE_NAME = "dsh-claude-style";
+
 // packages/host/src/usage-ledger.ts
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { sessionDirectoryName } from "./session-name.js";
 var LEDGER_VERSION = 1;
 function isDayKey(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -21,14 +25,14 @@ function addBuckets(target, buckets, sign) {
   }
   target.calls += sign * (Number.isFinite(Number(buckets?.calls)) ? Number(buckets.calls) : 0);
 }
-function readLedger(home) {
+function readLedger(home, logger) {
   const file = join(home, "storages", "cost-meter", "ledger.json");
   if (!existsSync(file)) return null;
-  const raw = readFileSync(file, "utf8");
   let parsed;
   try {
-    parsed = JSON.parse(raw);
-  } catch {
+    parsed = JSON.parse(readFileSync(file, "utf8"));
+  } catch (error) {
+    logger?.warn?.(`${PACKAGE_NAME}: cost-meter ledger unreadable, folding the session logs alone: ${error.message}`);
     return null;
   }
   if (parsed === null || typeof parsed !== "object") return null;
@@ -49,7 +53,7 @@ function readLedger(home) {
       cacheWrite: bucket.cacheWrite,
       calls: bucket.calls
     }, 1);
-    clean.sessionIds = Array.isArray(bucket.sessions) ? bucket.sessions.map((entry) => entry !== null && typeof entry === "object" && typeof entry.id === "string" ? entry.id : null).filter((id) => id !== null) : [];
+    clean.sessionIds = Array.isArray(bucket.sessions) ? bucket.sessions.map((entry) => entry !== null && typeof entry === "object" && typeof entry.id === "string" ? sessionDirectoryName(entry.id) : null).filter((id) => id !== null) : [];
     clean.sessions = clean.sessionIds.length;
     const byProviderModel = bucket.byProviderModel;
     if (byProviderModel !== null && typeof byProviderModel === "object" && !Array.isArray(byProviderModel)) {

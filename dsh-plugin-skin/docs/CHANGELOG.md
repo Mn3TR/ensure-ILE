@@ -2,6 +2,836 @@
 
 All notable changes to `dsh-claude-style` are documented here, newest first.
 
+## [0.21.0] - 2026-11-12
+
+[中文](#cn-0.21.0) | [English](#en-0.21.0)
+
+<h3 id="cn-0.21.0">新增功能</h3>
+
+- 「对话统计信息位置」新增「跟随详情栏」，会话详情栏展开时隐藏输入区下方的统计行，详情栏收起或退避时照「独立成行」显示
+- 在对话右侧提供会自动开合的详情栏，列出工作目录与仓库、上下文占用、会话统计（模型与工具用时、首 token 平均、输出速度、费用、缓存命中与 token 分项）、产出、变更请求和后台任务；全部行按最新在前排列、不设条数上限；读数按会话隔离，费用跟随计费币种；头部按钮可收起或手动打开，窄窗口自动退避，收起后停止取数
+- 会话总览面板中的子智能体显示实际用时与用量、点击打开对应会话，后台任务可展开查看留存输出
+- 详情栏展开时，标题栏的子智能体与后台任务入口让位给详情栏的后台任务一节
+- 详情栏展开时，对话与轨迹切换器站到标题所在的一行，标题按剩余宽度截断
+- 会话总览的输出、变更与每类后台任务超过两条时折叠其余行，按剩余条数展开
+- 会话总览的后台任务按进程、子智能体与团队分组，各组只在有行时出现，并在超过两条时各自折叠
+- 首页模型图使用随模型稳定的十色分类色板，热力图扩为五档，并可按活跃会话、当前工作区或全部记录统计
+- 新增行内代码字色选择，可恢复 Claude 0.19.7 的经典暖色且保留自定义颜色卡优先级
+- 模型选择器新增「启用智能体团队协作」开关，适配 DSH 0.2.2-rc.2 模型菜单里的智能体团队入口，关闭已发过请求的会话时先弹出确认
+
+### 体验优化
+
+- 顶栏控件统一为 28px 方底板与 16px 图标，工具与面板开关之间加一条分隔线，打开方式去掉描边并只保留一块悬停底板
+- 会话详情栏统一为一种字号与行距，每一行只占一行，行尾状态改为不带边框的文字；会话统计拆成「会话统计」与「Token 用量」两节并默认收起，收起时分别显示输出速度与费用；上下文分项不再逐个标注估算记号；详情栏展开时标题栏的预设标签让位给环境一节
+- 会话详情栏收起的节改为 36px 一行并保留自己那条分隔线，整栏不再收滚动条，内容超出时照常滚动，右边缘只留一条与对话之间的分界线
+- 会话详情栏的产出、进程与子智能体只展示最新用户轮次，跨轮仍运行的任务继续保留，后台通知与自动续行不清空本轮内容
+- 会话详情栏收起时只占标题一行，展开的节静止时隐去箭头，节标题成为全栏唯一的加粗文字；产出行的图标改为单色线形，后台任务与子智能体的完成状态不再写状态字，只留停住的时钟
+- 会话详情栏的进出与对话的收放合成一段 300ms 的位移，栏从对话右边缘长出来又收回去，两条边始终重合；与宿主右侧栏交接时按外框写下的归属当场开始，不再等右栏宽度归零后跳一帧
+- 手动收起会话详情栏后，所有会话与重启之后都保持收起，直到再次按下标题栏的详情按钮
+- 会话详情栏为运行中的进程与可继续子智能体提供独立停止按钮，支持再次点击确认、停止中反馈与失败重试
+- 会话统计按左侧标签、右侧数值逐行显示，会话读数与 token 用量分组排列
+- 状态标记放在行首时，折叠工作区的运行标记改为跟在名字之后，标记出现或消失时工作区名称不再左右移动
+- 会话详情栏改从会话头部下面开始，头部连同标题与按钮保持整列宽度、落在栏的上方，只有转录与输入框让出宽度
+- 侧栏开合、拖拽分栏与窗口缩放期间，对话行等宽度停止变化后整体重排一次，长会话不再按动画帧数重复重排
+- 发送消息的过渡不再每帧读布局，连发两条时不再留下重复的气泡
+- 将随包等宽可变字体转为体积更小的 woff2 格式，收窄流式观察回调与常驻监听并清理可替代的结构选择器
+- 侧栏条目的固定状态改用 DSH 0.2.2-rc.2 自带的固定列表，编辑侧栏对话框、行上的取消固定按钮与 More 菜单共用一份状态，取消固定的条目仍会跨重启保存
+
+### 问题修复
+
+- 详情栏各节支持独立折叠并显示简要读数，整栏开合统一使用标题栏按钮，预设说明移入环境区域；上下文采用 Claude 配色，细分系统工具、MCP 工具、指令文件、技能与运行上下文，并显示估算数量和窗口占比
+- 会话详情栏改用独立的一层（24），标题栏挂出的菜单不再被它盖住
+- 会话详情栏的下缘停在底部面板的上缘，不再压住底部面板
+- 会话详情栏的产出文件可直接在宿主预览中打开，支持 Windows 路径与包含空格的文件名
+- 写文件调用和执行结果跨两次详情栏轮询到达时，成功写入的文件仍会完整列入产出
+- 修复某一轮运行失败后上下文计量环读到 0% 的问题，失败尝试的零用量样本不再顶掉提供方上一次报告的读数
+- 修复账号菜单把插件卡片压成一行截断文字、并把卡片副本收窄到账号行宽度导致标签折行与撑高的问题
+- 修复提问卡片点过「其他」之后再点回原来选中的选项，选中圆圈不再出现的问题
+- 修复宿主右栏打开时详情栏仍按自身宽度挤压对话、把对话压成窄条的问题，并让详情按钮先收起右栏再让出这一侧
+- 修复详情栏的统计读数与底部读数措辞不一致、并且落后一个轮询周期的问题，token 计数改为带分隔符的精确数字，时长与首 token 平均按宿主写法印出，宿主落下统计帧时立即刷新
+- 修复工作目录不是 Git 仓库时环境一节列出目录下所有仓库的问题，环境只显示本机与工作目录，工作目录在仓库里时才加仓库名与分支
+- 修复与工作区树插件同时启用时运行中会话排序跨越工作区或分组标题边界的问题
+- 修复侧栏固定入口选中与悬停时底板被行间距撑高、叠出第二层的问题
+- 修复非 Windows 桌面壳误判标题栏、标签被遮挡后无法回退及详情栏打开时控制栏偏右的问题
+- 合并流式统计的数字重绘并复用宽度探针，减少长会话中的强制同步布局
+- 修复对话运行期间通过拖动滚动条、按上方向键或翻页回看前文时被新消息与工具调用拉回底部的问题
+- 输入区结构与尺寸不变时不再重复排队空测量，真实尺寸变化仍自动重排
+- 修复长思考展开状态下流式输出时顶部吸顶的思考标题随消息列位移上下跳动的问题
+- 为随包拉丁字体补充字符范围声明，移除中文字体前的西文衬线回退并恢复中日韩标题的自然字距
+- 第三方供应商的会话不再显示、也不再扣减 DeepSeek 账号余额
+- 对话正文里的选中配色覆盖到粗体、行内代码与语法高亮等嵌套文本，全部 Markdown 形态在聚焦与失焦下都取同一个底色
+- 承载非 portal 提示气泡的对话行不再跳过排版，消息操作条的悬停提示恢复原位与可见
+- 皮肤窄屏断点与宿主抽屉阈值 768 对齐，收起侧栏、抽屉与页面窄屏布局在同一宽度切换，页面缩放下不再由皮肤改写抽屉态的列宽
+- 新建会话页的输入卡在 420 像素以上保持单行控件，过长的模型名以省略号截断，400 像素以下只在第二行放右侧控件
+- 顶栏文件资源管理器图标在任何状态下保持应用自身的颜色
+
+<h3 id="en-0.21.0">New Features</h3>
+
+- Add a Follow the details rail choice to the conversation statistics position, hiding the line under the composer while the session details rail is open and showing it as its own line when the rail closes or steps back
+- Add a width-driven details rail beside the conversation with the working directory and its repositories, context occupancy, session stats (model and tool time, first token, output speed, cost, cache hit and token buckets), outputs, change requests and background work, listing every row newest first, scoped per session and priced in the chosen billing currency, with a header control to close or reopen it; it retreats under a narrow frame and stops asking once closed
+- Show each subagent's real time and usage in the session overview, open its conversation from the row, and expand a background job's retained output
+- Let the details rail's Background tasks section take over the title bar's subagent and background job entries while the rail is open
+- Place the conversation and trajectory switch on the title's own line while the details rail is open, with the title truncating to the remaining width
+- Fold the rows past the second in the session overview's Outputs and Changes sections and in each background category, behind a control naming the count left
+- File the session overview's background rows under commands, subagents and team, each group shown only with rows and folded past its second row
+- Give home models stable categorical colours, widen the heat grid to five levels and add active, current-workspace and all-record session scopes
+- Add an inline-code colour choice restoring Claude 0.19.7's warm ink while preserving the custom colour card's precedence
+- Add the agent teamwork switch to the model picker, matching the entry DSH 0.2.2-rc.2 puts in its model menu, with a confirmation before turning it off in a session that has sent requests
+
+### Improvements
+
+- Unify the header's controls on one 28px plate with 16px glyphs, divide the session actions from the panel switches with a hairline, and drop the open-with control's outline so the whole control takes one hover plate
+- Set the session details rail in one type size and row rhythm with single-line rows and unboxed trailing states; split session statistics into Session stats and Token usage, both folded by default with the output speed and the cost beside their headings; drop the per-figure estimate marks from the context parts; and let the Environment section take over the title bar's preset label while the rail is open
+- Give the session details rail's folded sections a 36px row that keeps its own hairline, and hide the rail's scrollbar while the column keeps scrolling, leaving one hairline between it and the chat
+- Limit outputs, jobs and subagents in the session details rail to the latest human-prompted round while keeping older running work visible and preserving the round through background notices and automatic continuations
+- Fold the session details rail's folded sections onto their heading line, hide an open section's chevron at rest, keep bold for section titles alone, draw output rows with single-stroke marks, and let finished jobs and subagents keep their clock instead of a status word
+- Make the session details rail's arrival and exit one 300ms move with the chat's own inset, growing the rail out of the conversation's right edge so the two edges stay together, and start the handover with the host's right column on the frame the frame states the side's owner rather than a frame after that column finishes closing
+- Keep the session details rail closed across sessions and restarts once it is closed by hand, until the header's details button is pressed again
+- Add independent stop controls for running jobs and continuable subagents in the session details rail with click-again confirmation, stopping feedback and retry after failure
+- Display session statistics in compact rows with labels on the left and values on the right, grouping session figures and token usage
+- Move a collapsed workspace's running mark behind its name when the mark stands on the leading side, so the name stays where it stood while the mark appears and goes
+- Start the session details rail under the conversation header, which keeps the column's whole width so its title and controls stand above the rail, with only the transcript and the composer giving the width up
+- Relay conversation rows once the column's width stands still, so a sidebar toggle, a dragged divider or a window resize lays a long conversation out once instead of once per frame
+- Stop the send transition from reading layout every frame, so a second send no longer leaves a duplicate bubble behind
+- Ship JetBrains Mono variable faces as WOFF2, narrow streaming mutation and timer work, consolidate fold listeners, and replace avoidable structural selectors
+- Sidebar entries now share the pin list DSH 0.2.2-rc.2 keeps, so the Edit sidebar dialog, the unpin button on each row and the More menu act on one state, and the entries taken off are still stored across restarts
+
+### Bug Fixes
+
+- Give each details section independent folding and a compact reading, control the rail from the conversation header and place its preset in Environment; split context into system tools, MCP tools, instruction files, skills and runtime context with Claude colours, estimated counts and window shares
+- Give the session details rail its own layer (24) so menus the header hangs no longer open under it
+- Stop the session details rail at the bottom panel's top edge so it never covers that panel
+- Open output files from the session details rail in the host preview, including Windows paths and filenames containing spaces
+- Keep successfully written files in Outputs when a write call and its result arrive in separate details-rail polls
+- Fix the context meter reading 0 % after a round fails, where a failed attempt's zero usage sample displaced the reading the provider last reported
+- Fix the account menu collapsing a plugin's footer card into one truncated line and pinning its copy to the account row's width, which folded the card's labels and made it taller
+- Fix the question card's chosen option losing its ring after the custom answer is chosen and that option is picked again
+- Fix the details rail keeping its own width and squeezing the conversation to a narrow strip while the host's right panel is open, and have the details control close that panel before handing the side over
+- Fix the details rail's figures reading differently from the composer's readout and trailing it by one polling cycle, printing exact grouped token counts and the host's own duration wording, and refreshing as soon as the host lands a figure frame
+- Fix the environment section listing every repository under a working directory that is not itself a checkout, showing the machine and the working directory alone and adding the checkout's name and branch only when the directory sits in one
+- Keep running-session sorting inside each contiguous session segment so rows never cross workspace or group headers in shared flat lists
+- Keep the sidebar's pinned entries to one plate when active or hovered, without the row's foot stretching it below the row
+- Keep view tabs out of unsupported desktop caption bands, restore them when covered and centre the control while the details rail is open
+- Coalesce streaming statistic writes and retain the measurement probe, reducing forced synchronous layout in long conversations
+- Preserve the reader's scrollback position across scrollbar drags, upward keys, content clicks and host growth pins while a turn runs
+- Skip redundant composer measurements while preserving automatic reflow when its structure or dimensions change
+- Counter-slide top-pinned thinking disclosure headers during streamed growth so the sticky header stays stationary
+- Declare Unicode ranges on bundled Latin faces, drop Georgia and Times fallbacks ahead of CJK fonts, and restore normal heading letter-spacing in CJK locales
+- A session on a third-party provider no longer shows or draws down the DeepSeek account balance
+- Paint the selection of nested Markdown runs — bold text, inline code, syntax tokens — so every shape in a conversation takes the one selection colour, focused and blurred
+- Keep the conversation row holding a non-portal tooltip laid out, restoring the message actions' hover labels in place and in view
+- Align the skin's narrow breakpoint with the host's 768 px drawer threshold, so the rail, the drawer and the narrow page layout switch at one width and the skin leaves a drawer frame's columns to the host
+- Keep the new-conversation composer on one control line from 420 px up, truncate an over-long model name with an ellipsis, and give the trailing controls their own second line below 400 px
+- Keep the header's file explorer icon in its own app colour in every state
+
+## [0.20.3] - 2026-11-10
+
+[中文](#cn-0.20.3) | [English](#en-0.20.3)
+
+<h3 id="cn-0.20.3">新增功能</h3>
+
+- 新增折叠工作区的运行标记，标记样式与位置跟随进行中动效设置
+
+### 体验优化
+
+- 顶栏落位改为一次算完，标题按文字所需的宽度参与判定，旁边的控件簇在同一趟里跟到标题末尾，不再等下一趟落位
+- 把动效滑块、折叠重排、上下文环与光标在写阶段里的布局读取挪回读阶段，交互时不再触发整页样式重算
+
+### 问题修复
+
+- 修复账号菜单预热期间侧栏「更多」与设置页下拉被一并隐藏、按下没有反应的问题
+- 修复中文输入法组词时自定义用户名的字母重复，编辑期间输入框保留读者自己的文本，放弃编辑回到编辑前的用户名
+- 修复插件挂在侧栏页脚的整块区块（企业应用）随账户区接管一并消失的问题，区块留在账号行上方，侧栏收成细轨时由账户弹层承载它的副本
+- 修复推理等级滑块在顶档拖动、停驻与松手时的掉帧，顶档的点阵改由一块画布逐块绘制
+- 修复进行中会话的标题扫光与 IM 渠道标题重叠的问题；由伪元素绘制的标题保留原生运行标记，接管或释放后自动更新
+
+### 其他变更
+
+- 整理开发目录与验证入口，功能清单统一登记测试覆盖，替身页面检查共用一个运行器
+
+<h3 id="en-0.20.3">New Features</h3>
+
+- Add the running mark to a collapsed workspace row, following the ongoing animation and side settings
+
+### Improvements
+
+- Place the caption row in one pass, judging the title by the width its words need and moving the cluster beside it to the title's end in that same pass instead of a pass later
+- Move the layout reads of the motion slider, the fold reposition, the context meter and the caret out of the write phase, so an interaction no longer forces a whole-page style recalculation
+
+### Bug Fixes
+
+- Fix the sidebar's More card and the settings page's dropdowns staying unpainted while the account menu warms up, so a press on them appears to do nothing
+- Fix duplicated letters in the custom username while a Chinese input method composes it, keeping the reader's own text in the field until the edit commits and restoring the username an abandoned edit replaced
+- Fix a plugin's footer block — the enterprise apps section — vanishing with the footer the takeover gathers, so the block keeps its place above the account row and the account menu carries its copy while the sidebar stands as the rail
+- Fix the reasoning slider dropping frames while the reader drags, holds or releases at the strongest level by drawing the top rung's dot field on one canvas
+- Fix running-title shimmer overlapping IM channel titles; titles drawn by pseudo-elements retain the native running marker and update when taken over or released
+
+### Chores
+
+- Reorganize the development directories and verification entry points, declare feature coverage in the manifests and run the stand-in page checks through one runner
+
+## [0.20.2] - 2026-11-09
+
+[中文](#cn-0.20.2) | [English](#en-0.20.2)
+
+<h3 id="cn-0.20.2">体验优化</h3>
+
+- 把回答行里的重跑与删除移到用量与时间之前，与宿主的动作按钮同处一簇
+- 改善模型选择器一级列表的收尾，所选快捷供应商已列全时不再显示「更多模型」
+- 降低超长回答流式输出时的扫描与渐显开销
+- 改善长会话之间切换时的页面响应
+- 看过的消息按上次高度跳过离屏排版，长会话之间切换更流畅
+- 降低内容搜索的内存占用，小写文本只为查过的会话保留，并设固定上限
+- 改善长会话的每帧开销，流式跟随、进程分组与等待行不再按整栏或整页扫描，归档列表只移动真正换位的行
+- 同一颜色只回读一次画布，输入区的根标记经缓存的座位读取，页面不再为每帧的颜色与座位付一次查询
+- 改善助手流式输出时的折叠调度，用户消息的新增、替换和尺寸变化仍会触发完整检查
+
+### 问题修复
+
+- 修复新会话首页切到「模型」标签页时的卡顿
+- 修复侧栏「展开其余 N 个会话」的文字起点比会话标题靠右一截，两者现在同一起点
+- 修复状态标记放在行首时，行首位带着其他插件内容的会话行，时间比其他行往左缩进一截
+- 修复侧栏悬停展开后鼠标移开时收起动作播放两遍，现在只滑出一次
+- 修复会话标题进入顶栏后缩成「论…」，标题宽度不再按上一个名字裁切后的宽度锁定，改名或换到标题更长的会话后重新占满可用宽度
+- 释放页面已移除的消息的尺寸观察，长会话里这份订阅不再随消息累积
+- 修复长会话性能测试两轮采样的仪器一致性和倍率门槛说明
+- 修复会话头那簇控件在顶栏边界处被压窄的问题，宽度不够时它退回会话头那一行而不是截断或折行
+- 修复会话切换后旧对话仍被滚动位置与等待行文案持有的问题，切换后不再保留上一段对话的页面内容
+- 修复关闭再打开标题栏功能时重复注册右侧栏控件的问题
+- 修复统计面板绑定在会话切换后留住旧对话，长会话反复切换时页面不再逐次增长
+- 修复提问卡片中被选中的单选圆环在深色主题下显示为白色圆心的问题
+- 修复页面缩放在 101% 时右侧栏列宽可能晚一帧换算的问题
+- 修复连续思考增长时上方正文可能整段跳变的问题
+
+<h3 id="en-0.20.2">Improvements</h3>
+
+- Move rerun and delete on an answer's control row ahead of its usage and time, beside the host's own action buttons
+- Improve the model picker's first level so More models is not drawn once the chosen quick providers already list the whole catalog
+- Reduce streaming scan and reveal cost on very long answers
+- Improve page responsiveness when switching between long conversations
+- Skip off-screen layout of seen messages at their kept height, so switching between long conversations stays responsive
+- Hold the lowercased search text only for the sessions a query reached, within a fixed budget
+- Reduce the per-frame cost of a long conversation, where the stream follow, the process groups and the waiting line stop scanning whole columns and the archive moves only the rows that changed place
+- Read each painted colour from the canvas once, and read the composer's root through the cached seat instead of a document query on every frame
+- Improve streaming performance by skipping user-message folding for assistant-only growth while structural and size changes still refresh the fold
+
+### Bug Fixes
+
+- Fix the stall when switching to the Models tab on the new-conversation page
+- Fix the sidebar's overflow row (“Show N more sessions”) starting its words further in than the session titles above it; the two now share one start
+- Fix a session row whose leading seat carries another plugin's content showing its time a seat's width short of the others' when the mark stands on the leading side
+- Fix the sidebar's hover peek retracting twice when the pointer leaves; it now slides away once
+- Fix the session title shrinking to its first character in the caption row, with its width no longer locked to the ellipsized width of the name before, so a rename or a longer name takes the room again
+- Release the size observation of a message the page removes, so the subscriptions stop accumulating across a long conversation
+- Fix instrumentation consistency and growth-bound descriptions across the two long-session performance samples
+- Fix the header's control cluster being squeezed at the caption row's boundary, so it returns to the header's own row instead of truncating when its width no longer fits
+- Release the old conversation's page content on a session switch, where the scroll hold and the waiting line's wording no longer keep a transcript the page removed
+- Release the right-panel control's slot registration when the header band is switched off, so a later switch-on registers it once
+- Fix the statistics panel bindings keeping a switched-away conversation, so repeated long-session switches stop growing the page
+- Fix the question card's chosen radio showing a white centre under the dark theme
+- Fix delayed column scaling when the right sidebar is toggled at 101% page zoom
+- Fix whole-step jumps in earlier reasoning text as continuous reasoning grows
+
+## [0.20.1] - 2026-11-08
+
+[中文](#cn-0.20.1) | [English](#en-0.20.1)
+
+<h3 id="cn-0.20.1">新增功能</h3>
+
+- 新增「提示音效」设置，任务完成或受阻时播放提示音，可选关闭、轻柔、清晰，默认关闭
+
+### 体验优化
+
+- 改善对话区宽度手柄的亮线，等指针停住后再出现，不再被掠过的指针闪出
+- 改善侧栏「更多」菜单的外观，使其在启动按钮右侧弹出、宽度随内容收缩、图标与文字同色、投影更深，并把侧栏顶部的图标改为更大的无底色图标
+- 把「进行中对话」标记位置的默认值改到左侧
+- 改善轮次导航卡片对指针的跟随，指针的高度即列表位置，移到横线左侧即停住以便点选
+
+### 问题修复
+
+- 修复日期视图开着时从视图菜单改的分组被按回单列表
+- 修复皮肤浮层卡片内的宿主提示气泡被卡片盖住，只露出卡片边缘外的一截
+- 修复图片预览蒙版被全局对话框尺寸上限缩小、右侧与底部各留出 48px
+- 修复窄屏输入框工具栏随模型名长度折行，长模型名在原地省略
+- 修复输入框底行右侧上下文圆环比左侧权限控件多缩进一层、两端视觉边界不对称
+- 修复第三方插件插入的标签与宿主标签不垂直居中，标签栏按一个 segment 排它的每一个直接子元素
+- 修复紧凑底栏的统计浮层下方仍保留空白统计行
+- 修复「标题进入顶栏」把模式与智能体芯片留在标题下方另起一行，顶栏因此高出一整行、分割线随之下沉
+- 修复关闭「对话 / 轨迹标签条」后宿主标签条仍被皮肤的悬停淡出、下划线隐藏与内边距接管
+- 修复模型列表的每一行在分钟切换后多出一个峰谷电价表
+- 修复顶栏接管标题后头部按宿主最小高度撑开、标签下划线与分割线之间多出一段空白
+
+<h3 id="en-0.20.1">New Features</h3>
+
+- Add a Sound cue setting that plays a cue when a task finishes or is blocked, choosing Off, Soft or Clear, off by default
+
+### Improvements
+
+- Improve the conversation width handle's bar to appear once the pointer rests, no longer flashing at a pointer passing over
+- Improve the sidebar More menu so it opens beside its launcher, fits its rows, draws icons in the text colour and casts a deeper shadow, and give the sidebar's top rows larger icons without a backing disc
+- Move the Ongoing conversations marker side's default to the left
+- Improve the turn card's pointer steering, whose height over the rail's lines is the list's place, standing still once the pointer leaves the lines for a row to be pressed
+
+### Bug Fixes
+
+- Fix a grouping picked from the view menu being forced back to one list while the date view is on
+- Fix a host tooltip opened inside a skin card being painted under the card, leaving only a strip past the card's edge
+- Fix the image preview backdrop being shrunk by the global dialog size cap, leaving a 48px gap at its right and bottom edges
+- Fix the narrow composer toolbar wrapping with model name length, truncating long model names in place
+- Fix the context ring at the composer row's right end sitting a layer further in than the permission control at its left
+- Fix a third-party plugin's tab in the conversation strip sitting off the host tabs' centre line, by stating one segment box for every child of the tablist
+- Fix the compact statistics footer leaving a blank dock below its overlaid figures
+- Fix the preset picker and the session chips standing on a second row under the lifted title, leaving the caption a row taller with its divider sunk below that row
+- Fix the host's own conversation tabs staying under the skin's hover fade, hidden underline and padding after the Chat / Trajectory tabs switch is turned off
+- Fix a second peak rate meter appearing on every model row after a minute rollover
+- Fix the header keeping the host's minimum height once the caption row holds the title, which left a gap between the tab underline and the divider
+
+## [0.20.0] - 2026-11-07
+
+[中文](#cn-0.20.0) | [English](#en-0.20.0)
+
+<h3 id="cn-0.20.0">新增功能</h3>
+
+- 新增吉祥物悬停气泡，以像素字体显示含赠金、随会话花费实时扣减的账号余额与当前会话的花费
+- 新增思考内容显示选择，默认两行步进并可改为逐字跟随
+- 新增模型选择器的供应商分组折叠，悬停时才出现两段线箭头，展开状态不跨会话保留；分组之间拉开间距，供应商分隔线画得更清楚
+- 新增模型回复所在轮次的重跑与删除，通过新分岔保留原会话
+- 新增 System sans 字体选择，统一界面与 Markdown 的系统无衬线回退
+- 新增独立界面字号调节，覆盖侧栏、输入区与设置等普通文字
+
+### 体验优化
+
+- 调整「思考内容显示」在设置页的位置，排到「动效」页末尾
+- 改善模型弹层改换尺寸时的观感，折叠供应商分组走 Card resize 过渡，展开时底边始终贴在触发区上方
+- 改善侧栏「工作区」标题行铃铛的墨色，与同一行里宿主的图标共用同一级墨色令牌
+- 改善侧栏「工作区」标题行铃铛的操作反馈，悬停底色与宿主的图标一致，指针停稳后给出进入或离开日期视图的提示
+
+### 问题修复
+
+- 修复未安装 Anthropic 字体时页面向这三个字体文件发出的 404 请求
+- 修复充值页的全窗口遮罩被对话框尺寸上限缩小、在窗口右侧和底部露出主界面的问题
+- 修复英文界面下权限档位的说明仍显示中文
+- 修复长间隔之后输出加快时聊天滚动位移逐渐累积、最新一行被推出可视区的问题
+- 修复读者上滑浏览时流式增长仍改变其滚动位置的问题
+- 修复流式输出收尾时消息列回弹与底部统计行跳动的问题
+- 修复侧栏工作区分组标题与会话标题在暗色下层级相近的问题
+- 修复移动端软键盘改变可视视口时输入区的跟随与底距
+- 修复移动端首页用量面板与热力图左右不居中的问题
+- 修复 Windows 顶栏高度与标题控件的垂直位置
+- 修复日期视图默认开启的问题，侧栏默认按宿主自己的分组排列，按下铃铛才排成日期段落，刷新后回到宿主分组
+- 修复账号余额对第三方供应商的会话也实时扣减的问题，平台余额只为官方供应商的会话变化
+- 修复界面重载后价格目录晚到导致模型行整张重画、费率徽标闪烁的问题
+
+<h3 id="en-0.20.0">New Features</h3>
+
+- Add a hover bubble over the mascot that shows, in a pixel font, the account balance with gifted credit drawn down live by the conversation's cost, and that cost
+- Add a reasoning display choice that steps the text two lines at a time by default, with continuous text as the option
+- Add collapsible provider groups to the model picker, with the two-stroke caret shown on hover and the fold never kept across sessions; provider groups sit further apart and their rule is drawn clearer
+- Add rerun and delete-turn actions for model answers, preserving the source session through a new branch
+- Add a System sans choice with one system fallback stack across the interface and Markdown
+- Add an independent font-size control for ordinary text in the sidebar, composer and settings
+
+### Improvements
+
+- Move the reasoning display row to the end of the Motion tab in settings
+- Improve the model picker's card when it changes size: a folded provider group travels over Card resize, and the card keeps its bottom edge above the trigger while a group opens
+- Improve the sidebar workspace header bell's ink to share the level the host's own icons in that row use
+- Improve the sidebar workspace header bell's feedback with the host's own hover wash and a tooltip naming the date view it switches to or from
+
+### Bug Fixes
+
+- Fix the 404 requests the page sent for the three Anthropic font files when they are not installed
+- Fix the recharge page's full-window overlay shrinking under the dialog size cap and leaving the main window showing at its right and bottom edges
+- Fix the permission tiers' descriptions staying Chinese on an English interface
+- Fix the chat scroll offset building up after a long pause in a faster stream and pushing the newest line out of view
+- Keep the reader's chosen scroll position steady while a streamed answer grows
+- Fix the message column rebound and footer statistics jump as a streamed answer settles
+- Separate sidebar workspace labels from session titles in the dark scheme
+- Keep the composer following the visible viewport as the mobile keyboard opens, moves and closes
+- Center the home usage panel and heat grid within the available column on mobile
+- Fix Windows caption height and vertical alignment of the title and header controls
+- Fix the date view opening by default; the sidebar follows the host's own grouping until the bell is pressed, and a reload returns to the host grouping
+- Stop the account balance deducting third-party provider sessions; the platform figure now moves only with the official providers' sessions
+- Stop the rate badges flashing when a reload's price catalog arrives after the model rows are painted
+
+## [0.19.10] - 2026-11-06
+
+[中文](#cn-0.19.10) | [English](#en-0.19.10)
+
+<h3 id="cn-0.19.10">新增功能</h3>
+
+- 新增读者消息的撤回与编辑，两者都从消息前分岔，撤回把原文放回新会话的输入框，编辑把改过的文字直接发出
+- 新增「重绘提问卡片」开关，关闭后提问卡片保留宿主原样
+- 新增会话菜单的持久化手动未读标记与再次访问清除
+- 新增进行中标记的左右位置选择，默认在行尾，左侧一档让标记回到行首插槽并保留真前导占位，第三方行首星标不再压住标题首字
+
+### 体验优化
+
+- 减少一批页面变化里主题自身写入的重复判定
+- 读者消息下面的时间与复制按钮改为指针落上去才显现，与 Claude Code 一致
+- 改善提问卡片宽度，与对话输入框上下对齐，问题标题换行更均衡
+- 皮肤自己绘制的按钮与标题改用宿主的提示气泡，不再使用浏览器原生提示
+- 背景不透明度一行只在壁纸插件生效时出现
+
+### 问题修复
+
+- 修复回答首行定位在流式输出期间不生效
+- 修复已归档列表隐藏当前打开的空白会话
+- 修复浏览历史消息时输入框尺寸变化或提问卡片出现将会话拉回底部
+- 修复快速流式输出时消息列在末尾下方越积越远、最新一行落到可视区之外，滑动时长改为跟着输出到达的节奏
+
+### 移除
+
+- 移除对 dsh 0.2.2-rc.1 之前版本的支持，升级本插件前请先把 DeepSeek Harness 升级到 0.2.2-rc.1 或更新版本
+- 移除侧栏的「会话按日期排列」开关，日期分段成为默认排法，顶行的铃铛随手换回宿主的按工作区分组
+
+<h3 id="en-0.19.10">New Features</h3>
+
+- Add retract and edit to a message the reader sent, each forking ahead of the message, retract putting its text back in the new session's composer and edit sending the amended text
+- Add a Question card restyle switch that keeps the host's own question card when off
+- Add persistent manual unread marks in session menus with clearing on a later visit
+- Add a side choice for the running marker, at the trailing end by default, with the left side returning it to the host's leading slot and keeping that band reserved so a third-party leading star no longer covers the title's first glyph
+
+### Improvements
+
+- Judge a batch of page changes once for all of its subscribers
+- Show the clock and copy buttons under a message the reader sent only while the pointer is on it, as Claude Code does
+- Improve the question card to match the composer's width and balance its title lines
+- Show the skin's own buttons and titles with the host's tooltip bubble instead of the browser's native one
+- Show the background opacity row only while a wallpaper plugin is active
+
+### Bug Fixes
+
+- Fix the answer first-line anchor doing nothing while an answer streams
+- Fix the archived list hiding the blank conversation that is open
+- Fix composer resizing or question cards pulling the conversation to the bottom while reading earlier messages
+- Fix the message column piling up below the tail during a fast stream until the newest line sat off screen, with the slide now timed to the pace the answer arrives
+
+### Removals
+
+- Remove support for dsh before 0.2.2-rc.1; upgrade DeepSeek Harness to 0.2.2-rc.1 or later before updating this plugin
+- Remove the Group sessions by date switch; the date grouping is the default order and the top row's bell still returns to the host's workspace grouping
+
+## [0.19.9] - 2026-11-05
+
+[中文](#cn-0.19.9) | [English](#en-0.19.9)
+
+<h3 id="cn-0.19.9">体验优化</h3>
+
+- 降低会话较多时侧栏状态同步的观察开销
+- 新增独立的会话标题扫光选项与同步预览，统一未读和待操作状态颜色并保留无障碍回退
+- 改善设置页选项描述文案与代码注释，清理无关交互机制与内部实现细节
+- 减少流式输出与输入过程中的整页查询
+- 将等待尾部判定和会话导航索引测量合并到共享帧读阶段，减少流式输出中的重复样式计算
+
+### 问题修复
+
+- 修复多插件同时占用输入区工具栏时模型名称被压缩消失的问题，并保留现有 Claude 输入框布局
+- 修复侧栏首行与新建会话之间的间距比其余行距更宽、面板行图标不再落在新建会话圆片那一列的问题
+- 修复已归档会话的取消归档与删除按钮在部分宿主版本上只显出悬停底色、图标不显示的问题
+- 修复文本输入框的自绘光标接管与位置测量
+- 卸载时取消提问卡待执行的帧任务，避免卸载后继续刷新或移动焦点
+
+<h3 id="en-0.19.9">Improvements</h3>
+
+- Reduce sidebar status observation overhead with many conversations
+- Add an independent running-title shimmer with matching previews, semantic unread and pending colors, and accessible fallbacks
+- Improve settings descriptions and code comments by removing irrelevant interaction mechanisms and internal implementation details
+- Reduce whole-document queries during streaming and typing
+- Batch waiting-tail and conversation-navigation measurements in the shared frame read phase to reduce repeated style calculation while streaming
+
+### Bug Fixes
+
+- Keep the model selector readable when plugins crowd the composer toolbar while preserving the existing Claude composer layout
+- Fix the sidebar's first row standing further from the New session plate than the rows under it and the panel rows' glyphs leaving the New session chip's column
+- Fix the archived conversations' unarchive and delete buttons showing only their hover wash on some host versions, with no glyph
+- Restore drawn-caret takeover and geometry for plain-text inputs
+- Cancel pending question-card frames on teardown so released cards cannot refresh or move focus
+
+## [0.19.8] - 2026-11-04
+
+[中文](#cn-0.19.8) | [English](#en-0.19.8)
+
+<h3 id="cn-0.19.8">新增功能</h3>
+
+- 新增全局背景不透明度调节，以便与壁纸插件组合使用
+- 新增侧栏品牌标志的显示开关
+- 新增鲸娘像素吉祥物
+- 新增可选的回答首行定位开关，正式回答开始时把第一行带到对话区顶部并停下
+
+### 体验优化
+
+- 会话状态指示移到行右侧，支持右键和菜单键打开原生会话菜单，悬停时状态与时间让位给行内归档、置顶按钮
+- 日期视图的会话行在悬停或打开行菜单时隐藏行上的工作区标签，让位给行内操作
+- 改善螃蟹的思考动画，改为举着泡泡棒吹泡泡
+- 改善提问卡布局与选项样式，将卡片移到对话末尾并采用蓝色圆形单选标记
+- 改善螃蟹吹泡泡、指挥、听音乐、睡觉与被挠痒时的动画，改为侧身朝向
+- 将侧栏搜索框改为通过宿主面板列表注册的按钮，点击时保持当前页面并打开搜索面板，搜索样式保留图标与独立两项，已有的覆盖品牌设置迁移到独立
+- 降低流式输出期间上下文估算的扫描频率，并延后加载账户头像
+- 改善归档会话列表的分页加载与大量历史会话下的渲染性能
+- 将 Markdown 正文链接在悬停与聚焦时保持链接蓝，不再变为强调色
+- 将 Markdown 中的文件链接改为与网页链接一致的蓝色、正文字体与下划线
+- 将 Claude 配色的行内代码字色改为中性黑，与正文墨色一致
+- 改善会话头部在标题抬入标题栏后留下的空白，会话内容紧接控件行
+
+### 问题修复
+
+- 修复螃蟹指挥时指挥棒悬空、被挠痒时抬起的腿与壳分开
+- 修复宿主给每个面板行加了一层包装后，编辑侧栏里勾掉的入口不再从侧栏消失的问题
+- 修复新建会话与插件列表之间多出一段间距、侧栏第一行比其后的行距更疏的问题
+- 修复统计信息收进上下文时输入卡片下方仍留着一条空白的问题
+- 修复 ds-bot 已登录时“代码”切换会误选中登出菜单项的问题
+- 修复阅读视图下输入区被隐藏的问题
+- 修复已归档列表无法滚动、无法加载下一页的问题
+- 修复新会话与插件列表因负边距而相互重叠的问题
+- 修复触屏设备上流式输出时无法通过触摸停止自动跟随的问题
+- 修复已归档列表行的取消归档与删除图标与宿主行内图标不一致的问题
+- 修复全屏启动动画被弹窗尺寸上限裁切的问题
+- 修复第三方模型选择器被皮肤隐藏而无法使用 Codex 速度档位的问题
+- 修复侧栏视图菜单里选择「单列表」后立即被改回工作区、单列表模式无法使用的问题
+- 修复日期视图把所有会话都归入「更早」、行上也不标出所属工作区的问题
+- 修复输入卡片同时显示宿主与主题模型选择器的问题
+- 修复触屏上按住对话区时流式输出仍把阅读位置推走的问题
+- 修复手指在对话区底部抬起后自动跟随不再恢复的问题
+- 修复子代理运行时停止键被发送键盖住的问题
+- 修复子智能体侧栏输入框缺少皮肤权限控件的问题
+- 修复子智能体侧栏的权限选择写入主对话会话的问题
+- 修复子智能体侧栏的上下文圆环掉到卡片下方单独一行的问题
+- 修复子智能体侧栏的上下文面板在主对话圆环上方打开的问题
+- 修复子智能体侧栏输入卡片抢走主对话模型座位的问题
+- 修复子智能体侧栏输入区工具行在宽度足够时仍换成两行的问题
+- 修复状态行遮挡后排入的提问卡与用户消息的问题
+- 修复插件拆卸后异步回调仍申请页面刷新的问题
+
+### 移除
+
+- 移除右侧栏的卡片布局与其设置项，面板改回宿主自己的底色并贴着栏边
+
+<h3 id="en-0.19.8">New Features</h3>
+
+- Add global background opacity control for use with wallpaper plugins
+- Add a switch for showing the sidebar brand mark
+- Add the whale girl pixel mascot
+- Add an optional switch that brings the formal answer's first line to the top of the conversation as it starts and stays there
+
+### Improvements
+
+- Place native session status at the trailing edge, open native menus with right-click or menu keys, and let the status and time step aside for the inline archive and pin buttons on hover
+- Hide the workspace label on a date-view session row while it is hovered or its menu is open, leaving the room to the inline actions
+- Improve the crab's thinking animation so it blows bubbles from a bubble wand
+- Improve the question card by moving it to the end of the conversation and drawing circular blue radio marks
+- Improve the crab's bubble-blowing, conducting, music, sleeping and tickle animations so it turns to one side
+- Register the sidebar search button through the host panel list, keep the current page when opening the search palette, retain Icon and Standalone as the two styles, and migrate a stored Cover the brand choice to Standalone
+- Reduce context-estimate scanning during streaming and defer account avatar loading
+- Improve archived-session pagination and rendering with large conversation histories
+- Keep Markdown links in the link blue under hover and focus instead of the accent ink
+- Style Markdown file links like web links, in the link blue with the prose face and underline
+- Paint inline code in the Claude palette with the neutral ink instead of the warm red
+- Improve the blank the conversation header kept once the title moved into the window title bar, the conversation now starting right under its controls
+
+### Bug Fixes
+
+- Fix the crab's baton floating clear of its claw while conducting and its lifted legs parting from the shell while tickled
+- Fix the entries unchecked in the edit-sidebar dialog staying on the sidebar list after the host began wrapping every panel row in a box of its own
+- Fix the extra space between New session and the panel list that left the sidebar's first row further from the plate than the rows below stand from each other
+- Fix the blank row left under the composer card while the statistics position keeps the numbers in the context popover
+- Fix the Code switch selecting ds-bot’s sign-out item when its account menu is signed in
+- Fix the composer disappearing in the reader view
+- Fix the archived list not scrolling or loading its next page
+- Fix New session and the panel list overlapping because of a negative margin
+- Fix streaming output ignoring a touch gesture meant to stop automatic following on touchscreens
+- Fix the archived rows' unarchive and delete icons differing from the host's own row icons
+- Fix the dialog size cap clipping a full-window boot animation
+- Fix the skin hiding third-party model selectors and their Codex speed controls
+- Fix the sidebar's Single list grouping snapping back to Workspace right after it is picked, which made the single-list mode unusable
+- Fix the date view filing every conversation under Earlier and leaving the workspace label off its rows
+- Fix the composer showing both the host and skin model selectors
+- Fix streaming output still pushing the reading position away while a touchscreen reader holds the conversation
+- Fix automatic following not resuming after a finger is lifted at the bottom of the conversation
+- Fix the stop button over a running subagent being covered by the send one
+- Fix the missing skin permission control in a subagent sidebar's composer
+- Fix a subagent sidebar's permission pick being written to the main conversation's session
+- Fix a subagent sidebar's context ring dropping onto a line below its card
+- Fix a subagent sidebar's context panel opening over the main conversation's ring
+- Fix a docked subagent composer taking the model seat from the main conversation
+- Fix a subagent sidebar's composer toolbar wrapping onto a second line with room to spare
+- Fix the status line covering question cards and reader messages mounted after it
+- Fix asynchronous callbacks scheduling page passes after teardown
+
+### Removals
+
+- Remove the right sidebar's card layout and its setting, leaving panels in the host's own fill flush with the column
+
+## [0.19.7] - 2026-11-03
+
+[中文](#cn-0.19.7) | [English](#en-0.19.7)
+
+<h3 id="cn-0.19.7">新增功能</h3>
+
+- 新增侧栏的日期视图，会话按今天、昨天、星期几与更早分段，每行右手标出所属工作区，按顶行的铃铛在两种排法之间切换
+
+### 体验优化
+
+- 新增模型选择器第一层的输入即搜索，并在分组多于一个时保留“更多模型”一栏
+- 新增按控件标识注册的外部挂载接口，允许其他插件在独立区域引用模型选择器等控件
+- 侧栏「工作区」标题行右端多出一枚铃铛，按下去在宿主的工作区分组与按日期排列之间切换
+- 页面缩放改成一个输入框，可输入 60 到 200 的任意百分比，悬停输入框可按滑条拖动，旁边的「恢复默认」回到默认值，旧设置里的固定档位自动换算过来
+- 改绘提问卡片与已作答的回复气泡，采用与输入框一致的卡片外观
+- 读者自己发出的消息气泡改用宿主写下的标记来认，不再靠背景色猜是哪一块
+- 侧栏里正在运行的会话排到所属列表的最前面，运行标记消失后行回到宿主排定的位置
+- 新建工作树控件改放在模式座位旁边，不再停在输入框上方那一行的右端
+
+### 问题修复
+
+- 修复宿主改写间距规则后对话流不再按宿主原有的间距排布的问题
+- 修复过程组收起后它的答案行被跳过排版、展开时页面跳位的问题
+- 修复侧栏收起成图标栏时面板行比新建会话按钮窄一像素的问题
+- 修复侧栏页脚里插件以固定定位挂载的面板打开后立刻消失的问题
+- 修复页脚里的插件卡片在按下瞬间被重建而丢掉这次点击的问题
+- 修复侧栏插件浮层被页脚收拢隐藏及浮层文字行高塌缩的问题
+- 修复 macOS 桌面端侧栏的 Claude 图标与名称无法跟随标志颜色设置的问题
+- 修复从账号菜单打开的设置面板在鼠标离开后自行关闭的问题
+- 修复安装 dsh-cost-meter 后首页概览的会话数与 Token 总量偏低的问题
+- 修复切换会话时输入框先画在宿主自己的样式上、随后跳回皮肤样式的一帧闪动
+- 修复思考块内的段落间距被正文 Markdown 规则放大的问题
+- 修复鼠标滑过首页用量面板热力图时面板高度抽动的问题
+- 修复侧栏收起成图标栏后各面板图标偏小、与下方添加文件夹和搜索图标大小不一的问题
+- 修复页面残留隐藏的模态框或菜单时，悬停展开的侧栏移开鼠标后不收起的问题
+- 修复 Windows 桌面端会话标题在系统标题栏不显示的问题
+- 修复流式输出时状态行随每段新内容落位上下跳动的问题
+
+<h3 id="en-0.19.7">New Features</h3>
+
+- Add a date view to the sidebar that groups sessions under Today, Yesterday, each weekday and Earlier, tags every row with the workspace it belongs to, and switches between the two orders from the top row's bell
+
+### Improvements
+
+- Add type-to-search on the model picker's first level, and keep the More models row with more than one provider
+- Add a control-id registry for external mounts so other plugins can reference controls such as the model picker in independent regions
+- Draw a bell at the right end of the sidebar's workspace heading that switches the list between the host's workspace grouping and the date view
+- Page zoom is one field that takes any percentage from 60 to 200, dragged on the seekbar its hover opens and reset by the label beside it, with the fixed steps stored by an earlier version converted as they are read
+- Draw the question card and the settled reply in the same card look the composer keeps
+- Read the reader's own message bubble from the mark the host writes on it, instead of guessing which block it is by its background colour
+- Stand a session that is running at the head of the list it belongs to, and let the row return to the host's own order once the running mark goes away
+- Place the new-worktree control beside the mode seat instead of the far end of the row above the composer
+
+### Bug Fixes
+
+- Fix the conversation flow no longer spacing itself by the host's own gap rules after the host rewrote them
+- Fix a process group's answer row being skipped for layout, so opening a folded group no longer shifts the page
+- Fix the sidebar's panel rows being one pixel narrower than the new-session button while the sidebar stands as an icon rail
+- Fix a plugin's fixed-position panel mounted in the sidebar footer vanishing as soon as it opens
+- Fix a plugin's footer card losing the press when the takeover rebuilt it mid-click
+- Fix sidebar plugin overlays being collapsed by the footer takeover and their text line height collapsing
+- Fix the Claude mark and wordmark in the macOS desktop sidebar ignoring the mark colour setting
+- Fix the settings panel opened from the account menu closing itself once the pointer leaves
+- Fix the home overview undercounting sessions and tokens whenever dsh-cost-meter is installed
+- Fix the composer drawing at the host's own style for a frame after a session switch, then jumping to where the skin keeps it
+- Fix the paragraph spacing inside a thinking block being widened by the prose Markdown rule
+- Fix the usage panel's height jittering as the pointer crosses the heat grid on the home page
+- Fix the sidebar rail's panel icons standing smaller than the add-folder and search icons below them
+- Fix the hover-opened sidebar staying up after the pointer leaves when a hidden modal or menu stands in the page
+- Fix the session title missing from the window caption row on the Windows desktop
+- Fix the status row bouncing as each burst of streamed content lands
+
+## [0.19.6] - 2026-10-30
+
+[中文](#cn-0.19.6) | [English](#en-0.19.6)
+
+<h3 id="cn-0.19.6">新增功能</h3>
+
+- 新增独立的「推理等级滑块」开关，关闭后把推理等级的座位交还宿主，让第三方推理强度插件注入到模型座位的滑块重新可见
+
+### 体验优化
+
+- 改善模型用量图表的柱子与日期轴，使柱子自基线生长，日期标签按可用宽度抽稀并保留最新一天
+- 收紧编辑侧栏对话框的卡片圆角，并在勾选时沿路径描绘对钩
+
+### 问题修复
+
+- 回合结束后宿主留下的占位状态行不再被画上第二条等待行，加载点不再出现两套。
+- 修复中文输入法上屏后皮肤光标停在第一个分词结果后面的问题
+- 修复未配置 API Key 时 DeepSeek 账号的模型不出现在模型选择器一级列表的问题
+- 修复侧栏会话行的操作按钮在 DSH 新版下相互重叠的问题
+- 修复切换会话时视图标签条先画在宿主自己的位置上、随后跳回皮肤位置的一帧闪动
+- 修复开启页脚接管后宿主的版本更新入口被隐藏的问题
+- 修复过程行的单列布局去掉宿主限高、过程越多卡片越高的问题
+- 修复安装 dsh-cost-meter 后首页概览的高峰时段恒显示「—」的问题
+- 修复切换对话与轨迹视图时观察者在换树过程中反复强制样式重算造成的卡顿
+
+<h3 id="en-0.19.6">New Features</h3>
+
+- Add a separate Reasoning effort slider switch that hands the reasoning-effort seat back to the host when off, so a third-party effort slider injected into the model seat shows again
+
+### Improvements
+
+- Improve the model usage chart's columns and date axis so the columns grow from the baseline and the labels thin to the width available while keeping the newest day
+- Tighten the Edit sidebar dialog's card corner and draw the tick along its path when an item is checked
+
+### Bug Fixes
+
+- The slot the host keeps after a turn stops no longer gets a second waiting line drawn into it, so the loader no longer shows twice.
+- Fix the skin's caret stopping after the first segment when a Chinese input method commits English letters
+- Fix the DeepSeek Account models missing from the model picker's first level when no API key is configured
+- Fix the sidebar session row action buttons overlapping under the new DSH release
+- Fix the view tab strip drawing at the host's own place for a frame after a session switch, then jumping to where the skin keeps it
+- Fix the host's version-update control disappearing once the footer takeover is on
+- Fix the column process rows growing the group card with every step instead of scrolling it inside the card
+- Fix the peak hour reading as a dash on the home overview whenever dsh-cost-meter is installed
+- Fix the repeated forced style recalculation by observers during a conversation-trajectory view switch
+
+## [0.19.5] - 2026-10-27
+
+[中文](#cn-0.19.5) | [English](#en-0.19.5)
+
+<h3 id="cn-0.19.5">新增功能</h3>
+
+- 新增过程行的单列风格
+- 新增侧栏「更多」菜单里的「编辑侧栏…」
+- 设置页标签栏的每个标签前新增一枚线性图标
+- 新增「首页版面」的「关闭」选项
+
+### 体验优化
+
+- 改善设置页「首页版面」的预览卡
+- 改善设置页的分组与控件
+- 改善设置页标题行的仓库入口
+
+### 问题修复
+
+- 修复窄窗口下指针停在侧栏开关上时整窗被压暗的问题
+- 修复切换会话后正文行距与表格宽度再次变化
+- 修复 macOS 上标签条上抬后标题栏按钮间歇点不动
+- 修复工作台版面上输入卡片跑到问候语下面、不再贴窗口底边
+
+<h3 id="en-0.19.5">New Features</h3>
+
+- Add a column style for process rows
+- Add Edit sidebar… to the sidebar's More menu
+- Add a line mark before each tab in the settings tab strip
+- Add an Off choice to Home layout
+
+### Improvements
+
+- Improve the Home layout previews in settings
+- Improve the settings page's grouping and controls
+- Improve the repository link in the settings heading
+
+### Bug Fixes
+
+- Fix the whole window dimming while the pointer rests on the sidebar toggle in a narrow window
+- Fix the prose's line height and table widths changing again after a session switch
+- Fix the titlebar buttons on macOS intermittently ignoring a press once the view-tab strip rises
+- Fix the composer card landing under the greeting instead of the window's bottom edge on the dashboard home
+
+## [0.19.4] - 2026-10-26
+
+[中文](#cn-0.19.4) | [English](#en-0.19.4)
+
+<h3 id="cn-0.19.4">新增功能</h3>
+
+- 新增看板用量能力：已折好的会话用量（每天的四类 token 分桶、按小时的结算次数与各模型总量）经 `dsh-claude-style:usage` 交给看板组件，与工作台首页那块用量面板读同一份缓存；能力注册可以带自己的调用时长上限。
+- 新增对 `dsh-better-sidebar` 底部面板的页面像素适配：面板的左右边取两侧栏的实际位置、上边取输入区座位的下沿、下边取窗口底，全部按页面缩放因子换算；拖拽侧栏期间暂停写入，缩放回到 1 倍时把插件自己的值写回。
+- 新增自定义计费表（#170）：设置页「计费币种」下面多一行「编辑」，打开一张按模型填写单价的表（模型 / 缓存读 / 输入 / 输出，每百万 token）。填过的桶覆盖官方价格表，留空的桶仍按表格计价；表格里查不到的模型只按这张表计价。价格表跟会话一起送到宿主，正在流式估算的那一段也按同一张表算。窄屏时每一行折成一张卡片，模型在上、三个单价各带标签。
+
+### 体验优化
+
+- 改善用量面板热力图的日提示：提示改为网格里常驻的一个元素，指针从一天移到另一天时在两天之间移动与缩放，不再为每一格生成一个再销毁，指针移过格间空隙时也不再消失；出现前有一小段停顿，离开时随即淡出。
+- 改善颜色涂装的开销：等待行与设置预览卡上，色相与漂移两条常驻动画从连续插值改为按二十四步推进，`filter` 与八层背景位置从每帧重绘降为每周期二十四次（约每秒五次）；四到五秒的周期下，漂移仍读作流动而不是跳动。
+- 改善折叠摘要测算文案宽度的开销：测量所依赖的字体签名按隐藏的测量元素缓存，字体加载完成时整体失效，`getComputedStyle` 不再每个分组每趟重算；宽度表超过五百条时重新开始，长会话里每个不同的计数不再各占一条永久记录。
+
+### 问题修复
+
+- 修复宿主的语音输入展开输入行活动格时，主题认不出这一格、挂载其中的麦克风入口随之失去座位排版的问题。
+- 修复页面缩放下页面横向滚动、内容越出窗口右边界（#166）：缩放只写在 `<body>` 上，`<html>` 的内边距与 `<body>` 的外边距先按窗口排版、再被倍数放大，越过窗口的那几像素又没有哪个 `overflow` 收得住。缩放时两者一并归零，纵向滚动交给文档元素，页面宽度不再随倍数多出几像素。
+- 修复中文输入法的合成被皮肤打断：输入框处于合成期间时，空闲提示不再写入输入卡片，合成落地后再补写一次，微软拼音等输入法可以完整输入一个词。
+- 修复模型选择器的峰谷徽章在分钟刷新后仍使用旧的悬停提示与读屏文字，使两级菜单的倍率、倒计时与完整说明同步更新，跨分钟打开二级菜单时也会刷新已有行。
+- 修复窗口不可见时皮肤动画仍在运行：页面隐藏时 `<body>` 带上 `data-dsh-claude-asleep`，样式表把页面上的动画停在当下位置，首页涟漪的帧与字符定时器一并停摆，回到前台从当下继续，不再追赶积压的合成帧。
+- 修复比窗口还高的皮肤弹层把下半截画到页面外：落位之后统一夹进窗口，卡片从窗口上沿开始，底部的行不再落到看不见的地方。
+- 修复选择「减弱」动画后骨架脉冲仍在循环：上下文统计面板与首页用量面板的占位条各有一处声明压过全局兜底把循环次数定成一次的规则，一处是带 `!important` 的动画简写，一处是更高的选择器权重；两处改为从兜底网读循环次数。
+- 修复会话视图页签的按钮盒相互重叠的问题，使各页签的点击区域与选中底板保持独立。
+- 修复侧栏页脚的更新入口在接管后消失（#167）：插件挂在 `sidebar.footer.action` 里的更新控件带 `data-dsh-plugin="update"` 与 `data-dsh-part="entry"`，皮肤按这两个名字认出它，把它留在侧栏——原节点留在槽位里不显示，账号行右端立一份它的副本，文案、图标、进度与点击都跟着插件自己走；侧栏收成细轨时副本收起。
+- 修复三处随使用累积的残留：模型按钮重建时，标签交换的尺寸订阅没有随旧标签释放；模型子菜单的悬停定时器与光标焦点结算的定时器在功能拆卸后仍会触发。
+- 修复账号行显示登录用的账号号码而不是设置里的用户名：桌面端有账号行时那一行由宿主自己渲染，皮肤只重绘了它的盒子与头像，文字从未被替换；而设置页明确写着「用户名显示在欢迎语与账号行里」。现在宿主那行的标签换成解析出的名字，交还页脚时把宿主原文放回。
+- 修复关闭「重绘模型选择器」后上下文圆环掉到工具栏下方单独一行（#162）：圆环原本以模型座位的盒子为落点，关闭重绘后座位不存在，于是皮肤既没有画圆环、也没有把宿主自己的圆环收起来，宿主那个更宽的圆环占住这一行，中段空档被判为放不下，整行让到下方。圆环回答的是上下文用量，与模型选择器是否重绘无关：没有座位时它落在座位的槽本身，宿主圆环照旧收起。
+
+<h3 id="en-0.19.4">New Features</h3>
+
+- Add a widget-board usage capability: the folded session usage (four token buckets per day, settlements per hour and per-model totals) reaches widget cards as `dsh-claude-style:usage`, reading the same cache as the studio home panel; a capability registration can now carry its own call timeout.
+- Add page-pixel fitting for `dsh-better-sidebar`'s bottom panel: its left and right edges follow the two side columns, its top edge follows the composer seat's bottom, and its height reaches the window's bottom, all divided by the page-zoom factor; writes pause while a column is dragged, and every value the plugin wrote is restored at scale 1.
+- Add the custom price table (#170): a "Edit" row under the billing currency opens a per-model table of rates (model / cache read / input / output, per million tokens). A filled bucket overrides the official tables and a blank one keeps their rate; a model the tables do not carry is priced from this table alone. The rows travel with the session to the host, so the answer still streaming is priced the same way. Under 760px each row folds into a card with the model above three labelled rates.
+
+### Improvements
+
+- Improve the usage panel's day tip: the tip is one element the grid keeps, so it travels and resizes between two days instead of being built and dropped for each cell, and crossing the gutters between cells no longer makes it disappear; it rests a moment before appearing and fades at once on the way out.
+- Improve the cost of the colour wash: on the waiting line and the settings preview cards, the hue turn and the drift advance in twenty-four steps instead of interpolating continuously, taking the `filter` and the eight background positions from a repaint per frame to twenty-four a cycle (about five a second); over a four-to-five-second cycle the drift still reads as drifting rather than stepping.
+- Improve the cost of measuring a folded summary's wording: the face a measurement depends on is kept per hidden measuring span and dropped when a face arrives, so `getComputedStyle` is no longer recalculated per group per pass, and the table starts over past five hundred entries instead of keeping a permanent record for every count a long session rolls.
+
+### Bug Fixes
+
+- Fix the theme not recognising the composer's activity seat while the host expands it for voice input, which took the seat's layout away from the microphone entry mounted inside it.
+- Fix the page scrolling sideways and content running past the window's right edge at a page zoom (#166): the scale was written on `<body>` alone, so the document element's padding and the body's margin were laid out against the window and then drawn through the factor, and no `overflow` could clip the few pixels that reached past it. Both go to zero while the page is drawn at a factor and the document element takes the vertical scroll, so the page no longer grows a few pixels wider with every step.
+- Fix the skin breaking an input-method composition: the idle hint is no longer written into the composer card while the field is composing, and settles once the composition lands, so CJK input methods can finish a word.
+- Fix model picker rate badges retaining stale tooltips and accessible names after a minute refresh, keeping the rate, countdown and full judgement together in both menu levels and refreshing existing rows when the second level opens in a new minute.
+- Fix the skin's animations running while the window is hidden: a hidden page marks `<body>` with `data-dsh-claude-asleep`, the stylesheet holds every animation on the page where it stands, and the home ripple's frame and character clocks stop with it, so a return carries on from there instead of catching up on queued frames.
+- Fix a skin popover taller than the window drawing its lower rows off the page: every card is held inside the window after it is placed, so it begins at the window's top edge instead of ending below its bottom.
+- Fix the skeleton pulses still cycling under the Reduced animation choice: the placeholders of the context statistics panel and of the home page's usage panel each overrode the theme-wide net's single iteration — one through a shorthand carrying `!important`, the other through a heavier selector — and both now take their iteration count from that net.
+- Fix overlapping conversation view-tab buttons so each tab keeps its own hit area and active pill.
+- Fix the update control vanishing from the sidebar footer once the skin takes the footer over (#167): the control a plugin mounts into `sidebar.footer.action` names itself with `data-dsh-plugin="update"` and `data-dsh-part="entry"`, and the skin recognises it by those names and keeps it in the sidebar — the plugin's own node stays hidden in its slot while a copy of it stands at the right end of the account row, carrying the plugin's words, mark, progress and press; the rail folds the copy away.
+- Fix three leftovers that accumulate with use: a rebuilt model button left its label's swap subscription behind with the old label, and the model sub-menu's hover timer and the caret's focus-settle timer still fired after their feature was torn down.
+- Fix the account row showing the account number the host signs in with instead of the name from the settings: on a host that renders that row itself the skin repainted its box and picture but never its words, while the settings page promises the name shows on the account row too. The host row's label now carries the resolved name, and the host's own label is put back when the footer is handed over.
+- Fix the context ring dropping to a line of its own under the toolbar when "Redraw the model picker" is off (#162): the ring stood behind the model seat's box, and with the picker's redraw off there is no seat — so the skin drew no ring and left the host's own meter uncovered, whose wider box took the row and made the middle gap read as too narrow, moving the whole line below. The ring answers the context reading, not the picker's switch: with no seat it closes the slot itself, and the host's meter stays covered.
+
+## [0.19.3] - 2026-10-25
+
+[中文](#cn-0.19.3) | [English](#en-0.19.3)
+
+<h3 id="cn-0.19.3">体验优化</h3>
+
+- 改善 DeepSeek 配色的浅色层次：画布改为 #FBFCFF、侧栏为 #F7F9FF，表面、表头、悬停底、边框与文字色从画布种子派生，不再继承 Claude 的纯白卡片。
+- 改善模型选择器在千级模型目录下的开销：开卡不再整卡重建，峰谷徽章按行原位刷新，价目表匹配与目录签名按代缓存。
+- 改善主题风格切换的反馈：配色固定在某张颜色卡时，切换主题会提示「配色已被固定为…」，并可直接改为跟随品牌。
+
+### 问题修复
+
+- 修复其他插件的输入框被套上整页焦点描边：键盘焦点环改由宿主自己的 `:focus-visible` 规则画出、皮肤只提供墨色，兜底环以零权重写在 `:where()` 里，插件声明的 `outline: none` 重新生效。
+- 修复从独立成行切换到紧凑底栏时统计信息的详情与位置适配，使不同切换路径得到一致布局。
+- 修复「进行中」分段仍显示已归档会话的问题：切换分段会同步宿主的筛选与分组，已归档改用宿主自己的列表，归档行保留删除按钮。
+- 修复用量面板丢失账本安装前的历史、以及插件生成的会话不计入用量的问题：用量折叠按宿主认的逻辑会话 id 读取日志，账本没有记录的日子由本地折叠补齐。
+- 修复内容搜索对含冒号或斜杠的会话 id 写不进缓存、以及一次读取失败让该会话从结果中消失的问题：缓存文件按 id 的哈希命名，读取失败的会话保留上一份语料并在下一轮重试。
+- 修复单个特性的失败牵连整页的问题：设置写入被拒绝时重新读取存储值，事件分发与滚动缓动逐个隔离，measure 与 sync 分别累计连续失败次数。
+- 修复关闭工作区开关后归档删除按钮仍在渲染、占位文案不随特性退出还原、折叠动画期间的第二次点击被丢弃，以及等待徽章退场定时器不随特性停止的问题。
+- 修复延后加载的功能块一次失败后再也不重试、以及反复开关功能累积页面观察的问题：失败的块加载会被遗忘并在下次启用时重试，宿主查找共用一条页面观察；分块脚本超时也会失败而不是无限挂起。
+- 修复独立成行时统计行比输入区底部那一行更高的问题：统计行现在与那一行同高，紧凑底栏仍占工具栏的一行。
+- 修复独立成行时费用数字与前后数字之间的间距比其他数字之间更宽的问题，各数字现在按行自身的间距等距排布。
+
+### 安全
+
+- 修复模型文案、字体与构建资源路由缺少同源栅栏的问题：这三个入口与其余私有路由共用同一道校验，非本机页面不能再借它们探测用户自置的字体。
+
+<h3 id="en-0.19.3">Improvements</h3>
+
+- Improve the DeepSeek palette's light steps: the canvas is #FBFCFF and the sidebar #F7F9FF, with surfaces, table heads, hover plates, borders and inks derived from that canvas instead of inheriting Claude's white card.
+- Improve the model picker's cost on a four-digit model catalog: an open stops rebuilding the card, rate badges refresh row by row in place, and the price-table match and the catalog signature are cached per generation.
+- Improve the feedback when switching theme style while the colours are pinned to a card: a toast names the pinned colours and offers to follow the brand again.
+
+### Bug Fixes
+
+- Fix another plugin's inputs gaining a page-wide focus outline: the keyboard ring is now drawn by the host's own `:focus-visible` rules from the skin's ink, and the fallback ring weighs nothing inside `:where()`, so a plugin's own `outline: none` stands.
+- Fix statistics detail and placement when switching from On its own line to Compact footer so different switching paths produce the same layout.
+- Fix the In progress section still listing archived conversations: switching the segment now drives the host's filter and grouping, the archived view uses the host's own list, and its rows keep the delete button.
+- Fix the usage panel losing history from before the cost ledger existed and sessions with plugin-generated ids never reaching the totals: the fold now reads logs by the host's logical session id, and days the ledger never recorded are filled from the local fold.
+- Fix content search failing to cache sessions whose ids carry a colon or a slash, and a session disappearing from results after one unreadable pass: cache files are named by a hash of the id, and a session that cannot be read keeps its previous corpus and is retried on the next pass.
+- Fix one feature's failure spreading across the page: a rejected settings write reads the stored value back, event dispatch and scroll easing are isolated per feature, and measure and sync count consecutive failures apart.
+- Fix the archived-row delete action staying mounted after the workspace switch is turned off, placeholder text not being restored when the feature stands down, a second fold click dropped during the closing animation, and the wait badge's exit timer outliving its feature.
+- Fix deferred feature chunks never retrying after one failed load and feature switches accumulating page observers: a failed chunk is forgotten and retried on the next enable, host lookups share one page observation, and a chunk whose script never arrives now times out instead of hanging.
+- Fix the statistics standing taller than the composer's bottom row when they have a line of their own: the line now matches that row's height, while the compact footer keeps the toolbar row's.
+- Fix the cost figure standing farther from the figures around it than they stand from each other when the statistics have a line of their own: every figure now keeps the line's own gap.
+
+### Security
+
+- Fix the model copy, font and built-asset routes missing the same-origin fence every other private route carries: all three now pass the same check, so a page outside this machine can no longer probe the fonts a reader dropped in.
+
 ## [0.19.2] - 2026-10-24
 
 [中文](#cn-0.19.2) | [English](#en-0.19.2)

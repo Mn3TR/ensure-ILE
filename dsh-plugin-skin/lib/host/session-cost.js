@@ -100,8 +100,8 @@ function priceFor(document, modelId, currency) {
   const parts = (published ?? document.catalog?.[catalogId] ?? "").split(" ").map(Number);
   if (parts.length !== 3 || !parts.every((value) => Number.isFinite(value) && value >= 0)) return void 0;
   if (parts[0] === 0 && parts[2] === 0) return void 0;
-  const rate = published !== void 0 ? 1 : currency === "CNY" ? document.usdToCny ?? 7.2 : 1;
-  const tier = { cacheHit: parts[1] * rate, cacheMiss: parts[0] * rate, output: parts[2] * rate };
+  const rate2 = published !== void 0 ? 1 : currency === "CNY" ? document.usdToCny ?? 7.2 : 1;
+  const tier = { cacheHit: parts[1] * rate2, cacheMiss: parts[0] * rate2, output: parts[2] * rate2 };
   return { offPeak: tier, peak: tier };
 }
 function priceTierAt(price, atMs, schedule) {
@@ -111,6 +111,55 @@ function costMicro(usage, tier) {
   const count2 = (value) => Number.isFinite(value) && value > 0 ? value : 0;
   const cost = count2(usage.input) * tier.cacheMiss + count2(usage.cacheRead) * tier.cacheHit + count2(usage.cacheWrite) * tier.cacheHit + count2(usage.output) * tier.output;
   return Number.isFinite(cost) && cost > 0 ? cost : 0;
+}
+
+// packages/contracts/src/billing-table.ts
+function splitBillingRow(entry) {
+  const parts = entry.split("|");
+  return [parts[0] ?? "", parts[1] ?? "", parts[2] ?? "", parts[3] ?? ""].map((part) => part.trim());
+}
+function parseBillingRow(entry) {
+  const [model, input, cacheRead, output] = splitBillingRow(entry);
+  if (model === "") return null;
+  return { model, cacheMiss: rate(input), cacheHit: rate(cacheRead), output: rate(output) };
+}
+function rate(text) {
+  if (text === "") return null;
+  const value = Number(text);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
+function parseBillingTable(entries) {
+  const rows = [];
+  for (const entry of entries) {
+    const row = parseBillingRow(entry);
+    if (row !== null) rows.push(row);
+  }
+  return rows;
+}
+function billingModelKey(modelId) {
+  const raw = modelId.trim().toLowerCase();
+  if (raw === "") return null;
+  return raw.includes("/") ? raw.slice(raw.lastIndexOf("/") + 1) : raw;
+}
+function billingRowFor(rows, modelId) {
+  const key = billingModelKey(modelId);
+  if (key === null) return null;
+  for (const row of rows) {
+    if (billingModelKey(row.model) === key) return row;
+  }
+  return null;
+}
+function overlayBilling(rows, modelId, table) {
+  const row = billingRowFor(rows, modelId);
+  if (row === null) return table;
+  const base = table ?? { cacheHit: 0, cacheMiss: 0, output: 0 };
+  const tier = {
+    cacheMiss: row.cacheMiss ?? base.cacheMiss,
+    cacheHit: row.cacheHit ?? base.cacheHit,
+    output: row.output ?? base.output
+  };
+  if (tier.cacheMiss === 0 && tier.cacheHit === 0 && tier.output === 0) return void 0;
+  return tier;
 }
 
 // packages/engine/node/session-events.ts
@@ -154,6 +203,11 @@ async function readEvents(ctx, packageName, sessionId, label) {
 // packages/host/src/session-cost.ts
 import { modelOf, usageOf } from "./usage-fold.js";
 var KEPT_SESSIONS = 128;
+var NO_BILLING = { rows: [], currency: null };
+function billingRowsOf(entries, currency) {
+  const rows = parseBillingTable(entries);
+  return rows.length === 0 ? NO_BILLING : { rows, currency };
+}
 function count(value) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : 0;
@@ -171,7 +225,7 @@ function usageOfSample(event) {
 function sameUsage(settlement, usage) {
   return settlement.input === usage.input && settlement.output === usage.output && settlement.cacheRead === usage.cacheRead && settlement.cacheWrite === usage.cacheWrite;
 }
-function applyCostEvent(state, event, document) {
+function applyCostEvent(state, event, document, billing = NO_BILLING) {
   const type = event?.type;
   if (type === "llm/retry-started") {
     const turn2 = event.data?.turn;
@@ -195,8 +249,10 @@ function applyCostEvent(state, event, document) {
   let partial = state.partial;
   const priced = (currency) => {
     const price = model === null ? void 0 : priceFor(document, model, currency);
-    if (price === void 0) return null;
-    return costMicro(usage, priceTierAt(price, time, document.schedule));
+    const tier = price === void 0 ? void 0 : priceTierAt(price, time, document.schedule);
+    const overlaid = model === null || billing.currency !== null && billing.currency !== currency ? tier : overlayBilling(billing.rows, model, tier);
+    if (overlaid === void 0) return null;
+    return costMicro(usage, overlaid);
   };
   const cnyCost = priced("CNY");
   const usdCost = priced("USD");
@@ -223,14 +279,16 @@ function applyCostEvent(state, event, document) {
     model: modelOf(event) ?? state.model
   };
 }
-function foldSessionCost(events, document) {
+function foldSessionCost(events, document, billing = NO_BILLING) {
   let state = { cny: 0, usd: 0, partial: false, last: null, model: null };
-  for (let i = 0; i < events.length; i++) state = applyCostEvent(state, events[i], document);
+  for (let i = 0; i < events.length; i++) state = applyCostEvent(state, events[i], document, billing);
   return state;
 }
 var STALE_MS = 1e4;
 function createSessionCost(ctx, prices) {
   const states = /* @__PURE__ */ new Map();
+  let liveBilling = NO_BILLING;
+  let billingSignature = "";
   const touchedAt = /* @__PURE__ */ new Map();
   const pending = /* @__PURE__ */ new Map();
   const offPriceChange = prices.onChange(() => {
@@ -253,7 +311,7 @@ function createSessionCost(ctx, prices) {
     if (state === void 0) return;
     const document = prices.document();
     if (document === null) return;
-    const next = applyCostEvent(state, event, document);
+    const next = applyCostEvent(state, event, document, liveBilling);
     if (next !== state) states.set(sessionId, next);
     touchedAt.set(sessionId, Date.now());
   }
@@ -264,8 +322,16 @@ function createSessionCost(ctx, prices) {
       if (id !== "") observe(id, event);
     });
   }
-  async function get(sessionId) {
+  async function get(sessionId, billing = NO_BILLING) {
     prices.ensure();
+    const signature = billing.currency === null ? "" : billing.rows.map((row) => `${row.model}|${row.cacheMiss}|${row.cacheHit}|${row.output}`).join(";");
+    if (signature !== billingSignature) {
+      billingSignature = signature;
+      liveBilling = billing;
+      states.clear();
+      touchedAt.clear();
+      pending.clear();
+    }
     const held = states.get(sessionId);
     const touched = touchedAt.get(sessionId);
     if (held !== void 0 && touched !== void 0 && Date.now() - touched < STALE_MS) return answer(held);
@@ -276,7 +342,7 @@ function createSessionCost(ctx, prices) {
     const work = readEvents(ctx, PACKAGE_NAME, sessionId, "the session cost").then((events) => {
       pending.delete(sessionId);
       if (events === null) return null;
-      const state = foldSessionCost(events, document);
+      const state = foldSessionCost(events, document, liveBilling);
       states.set(sessionId, state);
       touchedAt.set(sessionId, Date.now());
       trim();
@@ -300,7 +366,9 @@ function createSessionCost(ctx, prices) {
   };
 }
 export {
+  NO_BILLING,
   applyCostEvent,
+  billingRowsOf,
   createSessionCost,
   foldSessionCost
 };

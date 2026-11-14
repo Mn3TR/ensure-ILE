@@ -20,6 +20,7 @@ import { join } from 'node:path'
 import Storage from '@deepseek-ai/dsh-storage'
 import SystemPrompt, { renderContextSections } from '@deepseek-ai/dsh-system-prompt'
 import ToolRegistry from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import * as plugin from '../src/index.ts'
 
 async function setup(extra: { injectionBudget?: number } = {}) {
@@ -27,10 +28,11 @@ async function setup(extra: { injectionBudget?: number } = {}) {
   await ctx.plugin(Storage)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRegistry)
+  await ctx.plugin(NativeToolExecutor)
   ctx.provide('webServer' as never, { register: () => () => {} } as never)
   ctx.provide('webStartup' as never, { trustedHosts: [] } as never)
   const globalRoot = await mkdtemp(join(tmpdir(), 'dsh-memory-assembly-'))
-  await ctx.plugin(plugin, { globalRoot, ...extra })
+  await ctx.plugin(plugin, { globalRoot, backup: { enabled: false }, ...extra })
   return { ctx }
 }
 

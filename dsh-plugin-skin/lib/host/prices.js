@@ -24,6 +24,7 @@ function createPrices(ctx) {
   let loaded = false;
   let timer;
   let inFlight = null;
+  let disposed = false;
   let lastAskedAt = 0;
   const listeners = /* @__PURE__ */ new Set();
   const warn = (message) => ctx.logger?.warn?.(message);
@@ -78,6 +79,7 @@ function createPrices(ctx) {
   async function refresh() {
     let next = null;
     for (const url of PRICES_URLS) {
+      if (disposed) return false;
       try {
         next = await fetchOne(url);
       } catch (error) {
@@ -89,6 +91,7 @@ function createPrices(ctx) {
       warn(`${PACKAGE_NAME}: no price source answered a document this build understands; keeping the current one`);
       return false;
     }
+    if (disposed) return false;
     document = next;
     origin = "remote";
     fetchedAt = Date.now();
@@ -135,6 +138,7 @@ function createPrices(ctx) {
       return () => listeners.delete(listener);
     },
     dispose() {
+      disposed = true;
       stopTimer();
       listeners.clear();
       if (inFlight !== null) {

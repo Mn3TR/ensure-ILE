@@ -1,5 +1,7 @@
 # dsh-memory
 
+ensure-ILE fork，当前基线为上游 `v0.23.0`。本包名为 `dsh-plugin-memory`，通过本地 profile 加载；离线构建与学生档案定制见 [UPSTREAM.md](UPSTREAM.md)。
+
 本插件属于 **`@max-null/*` 插件系列**——这一系列共同构成 **[SSID（思灵 · Seek Soul in Darkness）](https://github.com/Max-Null/seek-soul-in-darkness)** 桌面体验。SSID 是整合它们的盒：`dsh-capture` · `dsh-chat-rail` · `dsh-chinese-thinking` · `dsh-draft-polish` · `dsh-guardian` · `dsh-habit` · `dsh-memory` · `dsh-node-appearance` · `dsh-plugin-center` · `dsh-quick-toolbar` · `dsh-skill-mcp-center` · `dsh-ssid-panels` · `dsh-ssid-zh-ui` · `dsh-achievements`。
 
 This plugin belongs to the **`@max-null/*` family** — a set of plugins that together form the **[SSID (思灵 · Seek Soul in Darkness)](https://github.com/Max-Null/seek-soul-in-darkness)** desktop experience.
@@ -19,9 +21,11 @@ This plugin belongs to the **`@max-null/*` family** — a set of plugins that to
 
 **入口：** 设置 → 记忆
 
-| 设置入口与面板 |
-|---|
-| ![设置 → 记忆](docs/shots/memory-settings-1.png) |
+| 设置入口与面板 | 云同步配置（开关打开后） |
+|---|---|
+| ![设置 → 记忆](docs/shots/memory-settings-1.png) | ![云同步配置](docs/shots/sync-config-1.png) |
+
+云同步那块的三步走：打开开关 → 填仓库地址与访问令牌（不知道填什么就留空，只做本机镜像）→ 重启生效。第一次用可以点「第一次用？看看怎么配」看四步说明，或者点「复制「让 DSH 帮我配」」把那段话粘到任意会话里让 DSH 带你做。
 
 
 ## 用法
@@ -40,9 +44,30 @@ npm install @max-null/dsh-memory
 ## 提供的服务与工具
 
 - **服务** `ctx.memory`：`remember` / `list` / `search` / `forget` / `update` / `move` / `setStatus` / `setInjected` / `supersede` / `retract` / `sweep` / `demoteStale` / `verifyAnchors` / `reload` 等
-- **工具**（12 个）：`memory_save`、`memory_list`、`memory_search`、`memory_update`、`memory_confirm`、`memory_forget`、`memory_move`、`memory_sweep`，加提示词模板四件套 `prompt_search`、`prompt_get`、`prompt_list`、`prompt_add`
-- **注入**：`tool:memory` 指引 section（工具用法 + 常驻注入判据）+ `memory:self` 机制自述 + `memory:recall` 召回 context（global 的 `approved + injected` + 当前会话工作区的 `approved + injected`，带 `[memory:<id>:<namespace>]` 来源标记；摘要化 + 预算截断）
+- **工具**（默认 16 个）：`profile_read` / `profile_write` 读写学生档案的年级、课表、作息、偏好四个固定栏目（不进检索、不占注入预算）；另外包括 `memory_save`、`memory_list`、`memory_search`、`memory_update`、`memory_confirm`、`memory_forget`、`memory_move`、`memory_sweep`，提示词模板四件套 `prompt_search`、`prompt_get`、`prompt_list`、`prompt_add`，加日记两件套 `diary_read`、`diary_write`
+- **注入**：`tool:memory` 指引 section（工具用法 + 常驻注入判据）+ `memory:self` 机制自述 + `memory:recall` 召回 context（global 的 `approved + injected` + 当前会话工作区的 `approved + injected`，带 `[memory:<id>:<namespace>]` 来源标记；摘要化 + 预算截断）+ `memory:diary` 指针（只有目录与最近日期，不含正文）
 - **检索**：BM25（CJK 单字 + 2-gram，content 与 keywords 字段分离加权；中文多字查询精度显著优于单字切分）；可选语义融合（见「可选配置」）
+
+## 日记（第二套记忆，2026-10-24）
+
+记忆与日记是**两套东西**，不是同一套的两个视图：
+
+| | 记忆 | 日记 |
+|---|---|---|
+| 写什么 | 从中得出了什么 | 今天发生了什么 |
+| 准入判据 | 有用性 | 无——写就是了 |
+| 怎么被读到 | 检索命中 / 常驻摘要 | 整篇读 |
+| 存储 | `ctx.storage` 里的 JSON 块 | `<DSH_HOME>/diary/YYYY-MM-DD.md` |
+
+**日记正文永远不经过 `ctx.storage`**：那条路的写入模型是 *writer per process and last-write-wins*，而日记不该被另一个实例的「读—改—写」周期吃掉。日记也不进检索、不占常驻注入预算——注入里只有一行指针（目录 + 最近日期）。
+
+- 一天一个文件，按 `## HH:MM` 分段；同日多场对话是**追加**，不覆盖。
+- 工具：`diary_read`（省略 `date` 读最近一篇）、`diary_write`（写一段）。
+- 写进日记的是**经历**：发生了什么（有细节）、我怎么想（可以有情绪、可以没结论）、关于他（他说了什么、我注意到了什么）。**不写任务清单**（那是 git log），**不写结论**（那是 `memory_save`）。
+- 提醒：指针行在距上次写日记超过 6 小时后附带一句提醒，同一次挂载只出现一次。
+- **开关**：插件页的「日记」开关（`diary.enabled`，默认开）。关掉后两个工具都拒绝执行、指针不注入；**已有 md 文件原样保留**，不会被删。
+
+设计依据、取舍与未决项见 [`docs/设计/2026-10-24-日记机制-设计方案.md`](docs/设计/2026-10-24-日记机制-设计方案.md)。
 
 ## 两层存储（global / project）
 
@@ -54,6 +79,18 @@ npm install @max-null/dsh-memory
 | `project` | `<cwd>/.dsh/storages/memory_project_<hash>.json` | 跟随仓库的项目共识，可 git 分享 |
 
 两个根都可用 config 覆盖（`globalRoot` / `projectRoot`）。`memory_list` / `memory_search` 不带 `namespace` 过滤时会同时查两层。旧版双重前缀文件名（`memory_project_memory_project_<hash>.json`）在打开时自动迁移为规范名。
+
+## 主题（topic，0.20.0）
+
+`namespace` 管「在哪生效」，`topic` 管「这条讲什么」，两者正交：
+
+| 字段 | 回答的问题 | 取值 |
+|---|---|---|
+| `namespace` | 换个项目还成立吗 | `global` / `project` |
+| `kind` | 是记忆还是提示词模板 | `fact` / `prompt` |
+| `topic` | 这条记忆讲什么 | 自由字符串：`见闻` / `约定` / `坑` / `偏好` / `事实` / `判据` … |
+
+`memory_save` 传 `topic` 落库，`memory_list` / `memory_search` 传 `topic` 切片。留空或省略即「未分类」。用它把「自己出去逛到的」（`见闻`）和「一起干活时记下的」分开翻，不必再往正文里手写前缀。
 
 ## 跨工作区可见性（0.10.0 / 0.11.0）
 
@@ -85,26 +122,100 @@ DSH 存储层的写入是「读—改—写全量覆盖」，且官方两个后�
 
 **未覆盖**：`workspace.json`（工作区登记）由 DSH 自己的 workspace 服务写，插件层够不着，仍会被双实例互相覆盖；根因处置在上游——[discussion #6882](https://github.com/deepseek-ai/deepseek-harness/discussions/6882)。当前防线是轮转快照备份（SSiD 侧 `shell/scripts/backup-storages.mjs` + 计划任务）。
 
-## 定时备份（2026-10-18）
+## 定时备份（2026-10-18；日记归档 2026-10-25）
 
 **动机**：2026-10-18 的事故——`.dsh` 下的 storages 被外部整目录删除后，本插件的写入路径（读—改—写全量覆盖）在空磁盘上把内存里的 global 记忆覆盖成一条；而当时 `memory.json` **没有任何一份存在于 `.dsh` 之外**，无从恢复。
 
-**机制**：插件启动后每小时（可配）把记忆文件**只读复制**到 `<home>/.dsh-backups/memory/<YYYYMMDD-HHmmss>/`，并写一份 `manifest.json` 记录来源与文件清单。**插件关闭（dispose）时再补一次**——定时器只在运行期间生效，关 DSH 前最后一段变更靠这一次兜住。保留最近 14 份（可配），超期自动清理。
+**机制**：插件启动后每小时（可配）把记忆文件**只读复制**到 `<DSH_HOME 的兄弟目录>/.dsh-backups/memory/<YYYYMMDD-HHmmss>/`，并写一份 `manifest.json` 记录来源与文件清单。**插件关闭（dispose）时再补一次**——定时器只在运行期间生效，关 DSH 前最后一段变更靠这一次兜住。保留最近 14 份（可配，**只作用于记忆快照**），超期自动清理。
 
-**无界面**：这是行为类功能，不新增按钮、面板或设置项——行为效果即上面那段：部署后 `~/.dsh-backups/memory/` 下每小时多一个目录，目录里是当次复制出的 `memory.json`、`memory_project_*.json` 与 `manifest.json`。
+默认根**跟着 `DSH_HOME` 走**：缺省 `DSH_HOME=~/.dsh` 时就是 `~/.dsh-backups/memory`；隔离实例（不同 `DSH_HOME`）各自落在自己的兄弟目录，不会把快照混进同一份。同时它仍在 `DSH_HOME` **之外**——2026-10-18 那次事故是整个 `.dsh` 被删，备份必须活在外面。
+
+**日记另走一条路**：`<DSH_HOME>/diary/*.md` 与记忆同一轮复制，但落在**固定目录** `~/.dsh-backups/memory/diary-archive/`，**只增不删**，不参与上面的轮转。两边的不对称是实的：记忆快照丢一份还有别的份（同一份数据的多个时间点副本），归档里每一篇都是日记的唯一副本，丢了没有任何地方能重建。日记那一侧改过就以日记为准覆盖（人可能在事后改过错字），归档里有而日记里已没有的篇目一律保留——那正是归档的全部价值。归档目录名不匹配轮转正则，因此不需要给清理逻辑开白名单。
+
+**无界面**：这是行为类功能，不新增按钮、面板或设置项——行为效果即上面那段：部署后 `~/.dsh-backups/memory/` 下每小时多一个目录，目录里是当次复制出的 `memory.json`、`memory_project_*.json` 与 `manifest.json`；`diary-archive/` 里则按天累积 `YYYY-MM-DD.md`。
 
 | 项 | 默认值 |
 |---|---|
-| 备份内容 | `memory.json`（global）+ `memory_project_*.json`（project） |
-| 目标目录 | `~/.dsh-backups/memory/<时间戳>/`（**在 `DSH_HOME` 之外**） |
+| 备份内容 | `memory.json`（global）+ 每个打开过的工作区各一份 `memory_project_*.json` + `<DSH_HOME>/diary/*.md` |
+| 目标目录 | 记忆：`<DSH_HOME 的兄弟目录>/.dsh-backups/memory/<时间戳>/`（**在 `DSH_HOME` 之外**；缺省 `DSH_HOME` 下即 `~/.dsh-backups/memory/`）；日记：同一根下的 `diary-archive/` |
 | 间隔 | 60 分钟（首次延迟 1 分钟）；**插件关闭时另补一次** |
-| 保留 | 最近 14 份 |
+| 保留 | 记忆：最近 14 份；日记：全部（只增不删） |
 | 失败行为 | 只写日志，不影响记忆读写与启动 |
 
 **边界**：
 
-- 只备份**当前工作区**的 project 文件（`<cwd>/.dsh/storages/`）；其它工作区的 project 记忆不在备份范围。
+- 备份**本轮运行打开过的所有工作区**的 project 文件：来源是引擎按会话 cwd 记下的那份工作区账，每轮备份时现取。**本轮一次都没打开过的工作区不在范围内**——备份是定时任务，没有「当前工作区」可问，打开过的才留得下痕迹。多个工作区给出同名文件时加递增后缀，绝不覆盖。
 - 只读文件、只复制——**绝不复用引擎的写入路径**。写路径会先 `reload()` 再合并，磁盘缺失时它会把内存覆盖掉，正是这次事故的成因；备份不能走同一条路。
+- 日记按**逐字节内容**判断是否已备份过，不按 mtime：复制与编辑都会动 mtime，内容才是事实。
+
+## 云同步（2026-11-11）· **默认关闭**
+
+把本机记忆镜像到一个 git 仓库，多个环境之间共享同一份记忆。
+
+> **默认不启用，而且是显式开关。** `memory.sync.enabled` 为 `true` 时才注册
+> `memory_sync` 与 `memory_conflicts`——关着时**根本不注册**（模型看不到，也就不会去调），
+> 自述里的工具数停在 14。
+>
+> 判据**不是「配了 remote」**（2026-11-12 改）：填了目标地址不等于打开了功能，那会让一次
+> 配置试验变成意外开机。开关与目标解耦后，还多出一档「只开本地镜像、暂不推送」
+> ——此时 `remote` 留空即可，push 会明确回「未配置远端地址 —— 已完成本地提交」。
+>
+> 开关在插件页「记忆」详情里点（与日记开关同一张卡片）。**打开后卡片里会出现三个输入框**
+> （远端地址 / 镜像目录 / 分支，2026-11-13 加）——不必去改配置文件。值写进 **profile 的
+> `cordis.patch.yml`**（`memory.config.sync.enabled` 等，不是独立的设置文件）：该 profile 开了
+> `patchReload: live` 时即时生效，否则**重启实例后生效**——2026-11-12 在 dev 实例里实测，
+> 关掉热重载时点了开关、工具不会立刻出现。`remote` / `mirrorDir` 那几项决定连接目标，
+> 无论哪种情况都要重启。
+>
+> **访问令牌（PAT）不进配置**：面板里是一个**密码样式的输入框**（不回显明文），值存进
+> `$DSH_HOME/memory-sync-token` 的独立文件；也认环境变量 `DSH_MEMORY_SYNC_TOKEN`（优先）。
+> 令牌不落进 patch 文件——那文件会被复制、分享、提交。
+
+**为什么是「一条记忆一个文件」。** 整份 `memory.json` 放进 git 会撞：2026-11-06 实测，两端各新增一条记忆后 merge，`git` 报 `CONFLICT (content)`——两条记录挤在同一个插入点，按「取一边」解决会**静默丢掉另一端那条**，而 git 仍报「合并成功」。改成一条一个文件后同一场景是 `Merge made by the 'ort' strategy`，0 冲突。
+
+**项目身份用项目名，不用路径。** 本机 `H:\MaxNull\WorkStation` 与另一台机器 `D:\WorkStation` 是同一个项目——目录名（统一小写）决定它在 `records/project/` 下落到哪。用绝对路径哈希的话，换个盘符就成了另一个项目，记忆会静默分裂成两份互不相认的。
+
+```yaml
+memory:
+  sync:
+    enabled: true                    # 总开关；关着两个工具根本不注册
+    mirrorDir: ''                    # 缺省 <DSH_HOME>/memory-sync
+    remote: ''                       # https 远端；留空只做本地提交
+    branch: main
+    envName: ''                      # 本环境短名，冲突留证时用作后缀
+    proxy: ''                        # 访问 GitHub 需要代理时填，如 http://127.0.0.1:7897
+```
+
+**代理**：node 的 HTTP **不读** `HTTPS_PROXY`，所以只配系统代理/系统 git 代理是不够的——插件里要显式给。优先级：面板的「代理」> `HTTPS_PROXY` > `HTTP_PROXY`；都不给就直连。
+
+**测试连接**：面板里填完地址、令牌、代理后，点「测试连接」走一次 `ls-remote`（不写本地仓库、不推不拉），失败会分成「地址不对 / 令牌无效 / 连不上（需要代理）」三类分别报——推不上去时不用猜是哪一环坏的。
+
+token **不写进配置**：从环境变量 `DSH_MEMORY_SYNC_TOKEN` 或既有凭据机制取。
+
+| 工具 | 作用 |
+|---|---|
+| `memory_sync` | `status` 只看状态 / `pull` 拉取并导入 / `push` 镜像并推送 |
+| `memory_conflicts` | 列出**未被自动裁决**的冲突 |
+
+**仓库形态**：
+
+```
+<mirrorDir>/
+  records/global/<uuid>.json            一条记忆一个文件
+  records/project/<项目名>/<uuid>.json
+  tombstones/<uuid>.json                forget 留下的痕迹（不删记录文件）
+  conflicts/<uuid>.<env>.json           两边都改过时，两个版本都留着
+```
+
+**边界**：
+
+- **冲突不自动裁决。** 同一条被两个环境同时修改时，两个版本都写进 `conflicts/`，本地版本保留并标记待处理。记忆是长期资产，被静默覆盖的那份就没了。代价是冲突会堆到有人处理为止。
+- **删除留墓碑，不删文件。** `memory_forget` 是**真删**（`table.delete`），而另一端的「刚加、我还没拉到」在本地看起来完全一样。靠「上次同步的 id 快照」（`.sync-state.json`）区分：曾同步过、现在没了才是删除。**首次同步永远不产生墓碑**——那时没有「曾经有过」这个信息。
+- **本地瞬态字段不进镜像**：`hitCount` / `lastUsedAt` 每次检索命中都会改，带上它们会让仓库在内容毫无变化时持续变脏。隔离记录（`quarantined`）**整条不导出**——隔离区的存在理由就是它可能含凭据类内容。
+- **首次同步必须 clone**。本地 `git init` 出来的仓库与远端没有共同祖先，push 会被拒（`not a simple fast-forward`）。这条是 2026-11-11 第一次连真仓库时撞出来的。
+- 传输层用 `isomorphic-git`（纯 JS，走 HTTPS + PAT），**不依赖系统 git**——移动端装的东西会被运行时更新清掉，不该把同步链的地基押在上面。
+
+**没有调度器。** 目前靠模型显式调用 `memory_sync`；`autoPull` / `autoPush` 尚未实现。
 
 ## 使用流程（写入即生效，人为例外干预）
 
@@ -161,6 +272,9 @@ memory_forget        →  随时删除（删除始终是人的动作）
       keep: 14               # 保留份数
       # targetRoot: 'D:/dsh-backups/memory'   # 自定义备份根
       # enabled: false        # 关掉
+    # 日记开关（2026-10-24；也可在插件设置页里直接改，等价）
+    diary:
+      enabled: true
 ```
 
 `embeddings` 接受 `{ embed(texts): Promise<number[][]>, similarity? }` 对象——由宿主装配层提供嵌入实现（如 DeepSeek 嵌入端点）；配置后 `memory_search` 以 BM25 + 语义 RRF 融合，向量增量生成并持久化，嵌入调用失败自动降级为纯 BM25。

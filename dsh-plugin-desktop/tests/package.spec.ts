@@ -15,10 +15,11 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { runInNewContext } from 'node:vm'
 import sharp from 'sharp'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 const packageRoot = new URL('../', import.meta.url)
 const workspaceRoot = new URL('../', packageRoot)
+const ciWorkflow = readFileSync(new URL('.github/workflows/ci.yml', workspaceRoot), 'utf8')
 const manifest = JSON.parse(readFileSync(new URL('package.json', packageRoot), 'utf8')) as {
   name?: unknown
   version?: unknown
@@ -75,11 +76,19 @@ const workspaceManifest = JSON.parse(readFileSync(new URL('package.json', worksp
   resolutions?: Record<string, unknown>
   scripts?: Record<string, unknown>
 }
-const ciWorkflow = readFileSync(new URL('.github/workflows/ci.yml', workspaceRoot), 'utf8')
 const main = readFileSync(new URL('src/main.ts', packageRoot), 'utf8')
 const runtimeVersion = String(manifest.dependencies?.['@deepseek-ai/dsh'])
 const dshResolution = (name: string): unknown =>
   workspaceManifest.resolutions?.[`${name}@npm:${runtimeVersion}`]
+
+/** Follow the installed carrier's public shim to its versioned CLI implementation. */
+function readDshCliRuntime(manifestPath: string): string {
+  const lib = join(dirname(manifestPath), 'lib')
+  const entry = readFileSync(join(lib, 'bin.js'), 'utf8')
+  const implementation = /await import\("(\.\/bin-[^"/]+\.js)"\)/u.exec(entry)?.[1]
+  if (implementation === undefined) throw new Error('Cannot find the installed DSH CLI implementation')
+  return readFileSync(join(lib, implementation), 'utf8')
+}
 
 describe('published package surface', () => {
   it('keeps desktop build, typecheck and test out of the root command surface', () => {
@@ -254,23 +263,18 @@ describe('published package surface', () => {
     }
   })
 
-  it('gives the Desktop settings section a dedicated display icon', () => {
-    const patchPath = `./patches/dsh-client-ui-settings-general@${runtimeVersion}.patch`
-    expect(dshResolution('@deepseek-ai/dsh-client-ui-settings-general'))
-      .toContain(patchPath)
-    const patch = readFileSync(new URL(patchPath, workspaceRoot), 'utf8')
+  it('gives the Desktop settings section its display icon through the native slot', () => {
+    expect(dshResolution('@deepseek-ai/dsh-client-ui-settings-general')).not.toContain('patch:')
+    const icon = readFileSync(new URL('src/client/desktop-settings-icon.tsx', packageRoot), 'utf8')
+    const settings = readFileSync(new URL('src/client/desktop-settings.ts', packageRoot), 'utf8')
     const installedClient = readFileSync(new URL(
       'node_modules/@deepseek-ai/dsh-client-ui-settings-general/lib/client.js',
       packageRoot,
     ), 'utf8')
-    for (const marker of [
-      'function IconDesktopSettings',
-      'if (id === "desktop")',
-      'M5 14h6M8 11.5V14',
-    ]) {
-      expect(patch).toContain(marker)
-      expect(installedClient).toContain(marker)
-    }
+    expect(installedClient).toContain('settings.section.icon')
+    expect(settings).toContain("registerDesktopSettingsIcon(ctx, 'desktop')")
+    expect(icon).toContain("ctx.slots.register({ name: 'settings.section.icon', id }, IconDesktopSettings)")
+    expect(icon).toContain('M5 14h6M8 11.5V14')
   })
 
   it('keeps wide Markdown table scrollbars visible without hover', () => {
@@ -807,7 +811,7 @@ describe('published package surface', () => {
 
   it('fixes the installed application identity', () => {
     expect(workspaceManifest.version).toBeUndefined()
-    expect(manifest.version).toBe('0.1.0-alpha10')
+    expect(manifest.version).toBe('0.1.0-alpha11')
     expect(manifest.build?.productName).toBe('ensure-ILE')
     expect(manifest.build?.appId).toBe('com.ensurelab.ensureile')
     expect(manifest.build?.asar).toBe(false)
@@ -845,6 +849,7 @@ describe('published package surface', () => {
       '!node_modules/fs-ext/build/**',
       '!node_modules/@deepseek-ai/libreoffice-kit-win32-arm64{,/**}',
       '!node_modules/@deepseek-ai/libreoffice-kit-win32-x64{,/**}',
+      '!node_modules/@deepseek-ai/libreoffice-kit-wasm{,/**}',
       '!node_modules/@img/sharp-win32-arm64{,/**}',
       '!node_modules/@vscode/ripgrep-win32-arm64{,/**}',
       '!node_modules/@koromix/koffi-win32-arm64{,/**}',
@@ -991,12 +996,11 @@ describe('published package surface', () => {
   })
 
   it('carries the primary runtime beside the application like upstream Desktop', () => {
-    // Both CPU payloads ride beside the application as extra resources; Linux ships none.
-    for (const platform of ['mac', 'win'] as const) {
+    // Every packaged platform carries its CPU payloads beside the application as extra resources.
+    for (const platform of ['mac', 'win', 'linux'] as const) {
       expect(manifest.build?.[platform]?.extraResources, platform).toEqual([{ from: '.desktop-build/runtime', to: 'runtime' }])
     }
     expect(manifest.build).not.toHaveProperty('extraResources')
-    expect(manifest.build?.linux).not.toHaveProperty('extraResources')
     // electron-builder must not re-sign the pre-signed payloads, and the universal merge keeps the identical payloads as they are.
     expect(manifest.build?.mac?.signIgnore).toContain('/Contents/Resources/runtime/(?:arm64|x64)/primary-runtime(?:/|$)')
     expect(manifest.build?.mac?.x64ArchFiles).toMatch(/^\{\*\*\/node_modules\/\{.+\},Contents\/Resources\/runtime\/\*\*,Contents\/Resources\/runtime\/\*\*\/\.\*\/\*\*\}$/u)
@@ -1148,20 +1152,22 @@ describe('published package surface', () => {
 
   it('keeps Electron out of production dependencies consumed by electron-builder', () => {
     expect(manifest.dependencies).not.toHaveProperty('electron')
-    // Stable is pinned to 44.0.0, not to the newest 44.x. `node-addon-require-builtin`
-    // 0.1.6 — which rc.1's dsh-app-boot requires for `internalModules()` — gates on an
-    // exact V8 build string compiled into its prebuilt binary, and only ships
-    // 15.0.245.13-electron.0 (Electron 43.0.0/43.1.0), 15.2.124.13-electron.0 (44.0.0) and
+    // Stable is pinned to exactly 44.7.0 (the release upstream's rc.2 desktop ships), not to
+    // the newest 44.x. Electron 44.0.0's asar reader is ~2.4x slower and pushes host boot
+    // past its 60 s timeout (#1420). `node-addon-require-builtin` 0.1.9 — which dsh-app-boot
+    // requires for `internalModules()` — gates on an exact V8 build string compiled into its
+    // prebuilt binaries, and only ships 15.0.245.13-electron.0 (Electron 43.0.0/43.1.0),
+    // 15.2.124.13-electron.0 (44.0.0), 15.2.124.28-electron.0 (44.4.2-44.7.0) and
     // 15.4.80-electron.0 (45.0.0-alpha.6). Every other 43.x/44.x patch release, including
-    // 43.3.0 and 44.4.1, fails closed with "unsupported Electron runtime fingerprint" and
-    // takes every `dsh` CLI entry point down with it. Do not float this to ^44 or bump it
-    // to a newer 44.x until the addon publishes a matching fingerprint.
-    expect(manifest.peerDependencies?.electron).toBe('44.0.0')
-    expect(manifest.devDependencies?.electron).toBe('44.0.0')
-    expect(manifest.dependencies?.pnpm).toBe('11.8.0')
+    // 43.3.0, 44.4.1 and 44.7.1+, fails closed with "unsupported Electron runtime
+    // fingerprint" and takes every `dsh` CLI entry point down with it. Do not float this to
+    // ^44 or bump it to a newer 44.x until the addon publishes a matching fingerprint.
+    expect(manifest.peerDependencies?.electron).toBe('44.7.0')
+    expect(manifest.devDependencies?.electron).toBe('44.7.0')
+    expect(manifest.dependencies?.pnpm).toBe('11.28.5')
   })
 
-  it('keeps the packaged pnpm manifest, lock entry, and installed runtime on 11.8.0', () => {
+  it('keeps the packaged pnpm manifest, lock entry, and installed runtime on 11.28.5', () => {
     const lockfile = readFileSync(new URL('yarn.lock', workspaceRoot), 'utf8')
     const workspaceRequire = createRequire(new URL('package.json', packageRoot))
     const installedPnpm = JSON.parse(readFileSync(
@@ -1169,15 +1175,15 @@ describe('published package surface', () => {
       'utf8',
     )) as { version?: unknown }
 
-    expect(manifest.dependencies?.pnpm).toBe('11.8.0')
-    expect(lockfile).toContain('"pnpm@npm:11.8.0":')
-    expect(lockfile).toContain('resolution: "pnpm@npm:11.8.0"')
-    expect(installedPnpm.version).toBe('11.8.0')
+    expect(manifest.dependencies?.pnpm).toBe('11.28.5')
+    expect(lockfile).toContain('"pnpm@npm:11.28.5":')
+    expect(lockfile).toContain('resolution: "pnpm@npm:11.28.5"')
+    expect(installedPnpm.version).toBe('11.28.5')
   })
 
   it('patches packaged pnpm to disable non-positive and invalid release-age policies', () => {
-    const patchPath = './patches/pnpm@11.8.0.patch'
-    const patchResolution = `patch:pnpm@npm%3A11.8.0#${patchPath}`
+    const patchPath = './patches/pnpm@11.28.5.patch'
+    const patchResolution = `patch:pnpm@npm%3A11.28.5#${patchPath}`
     const lockfile = readFileSync(new URL('yarn.lock', workspaceRoot), 'utf8')
     const patch = readFileSync(new URL(patchPath, workspaceRoot), 'utf8')
     const workspaceRequire = createRequire(new URL('package.json', packageRoot))
@@ -1185,9 +1191,9 @@ describe('published package surface', () => {
     const installedRuntime = readFileSync(join(dirname(pnpmManifest), 'dist/pnpm.mjs'), 'utf8')
 
     expect(workspaceManifest.resolutions).toMatchObject({
-      'pnpm@npm:11.8.0': patchResolution,
+      'pnpm@npm:11.28.5': patchResolution,
     })
-    expect(lockfile).toContain('pnpm@patch:pnpm@npm%3A11.8.0#./patches/pnpm@11.8.0.patch')
+    expect(lockfile).toContain('pnpm@patch:pnpm@npm%3A11.28.5#./patches/pnpm@11.28.5.patch')
     for (const source of [patch, installedRuntime]) {
       expect(source).toContain('const minimumReleaseAge = Number(opts3.minimumReleaseAge);')
       expect(source).toContain('Number.isFinite(minimumReleaseAge) && minimumReleaseAge > 0')
@@ -1197,6 +1203,39 @@ describe('published package surface', () => {
     expect(installedRuntime).not.toContain('const ageCheckActive = Boolean(opts3.minimumReleaseAge);')
   })
 
+  it('uses upstream incremental tool arguments without reparsing every stream delta', async () => {
+    const lockfile = readFileSync(new URL('yarn.lock', workspaceRoot), 'utf8')
+    const piAiRoot = new URL('node_modules/@earendil-works/pi-ai/', packageRoot)
+    const installedPiAi = JSON.parse(readFileSync(new URL('package.json', piAiRoot), 'utf8')) as { version?: unknown }
+    expect(installedPiAi.version).toBe('1.5.2')
+    expect(lockfile).toContain('resolution: "@earendil-works/pi-ai@npm:1.5.2"')
+    expect(lockfile).not.toContain('@earendil-works/pi-ai@patch:')
+    for (const file of [
+      'anthropic-messages.js', 'bedrock-converse-stream.js', 'mistral-conversations.js',
+      'openai-completions.js', 'openai-responses-shared.js', 'pi-messages.js',
+    ]) {
+      const provider = readFileSync(new URL(`dist/api/${file}`, piAiRoot), 'utf8')
+      expect(provider, file).toContain('ToolCallArgumentsStream')
+      expect(provider, file).not.toMatch(/parseStreamingJson\s*\(/u)
+    }
+
+    const { ToolCallArgumentsStream } = await import('@earendil-works/pi-ai/utils/streaming-json')
+    const stream = new ToolCallArgumentsStream()
+    const chunk = 'x'.repeat(1024)
+    const parse = vi.spyOn(JSON, 'parse')
+    try {
+      stream.append('{"body":"')
+      for (let index = 0; index < 64; index += 1) stream.append(chunk)
+      const partial = stream.append('"}')
+      expect(partial).toEqual({ body: chunk.repeat(64) })
+      expect(parse).not.toHaveBeenCalled()
+      expect(stream.finish().arguments).toEqual({ body: chunk.repeat(64) })
+      expect(parse).toHaveBeenCalledTimes(1)
+    } finally {
+      parse.mockRestore()
+    }
+  })
+
   it('packages the native-compiled Koffi Windows runtime', () => {
     const lockfile = readFileSync(new URL('yarn.lock', workspaceRoot), 'utf8')
 
@@ -1204,7 +1243,7 @@ describe('published package surface', () => {
     expect(workspaceManifest.resolutions).toMatchObject({
       'koffi@npm:^3.1.0': '3.1.5',
     })
-    expect(lockfile).toContain('"koffi@npm:3.1.5":')
+    expect(lockfile).toContain('resolution: "koffi@npm:3.1.5"')
     expect(lockfile).toContain('@koromix/koffi-win32-x64@npm:3.1.5')
     expect(lockfile).not.toContain('"koffi@npm:3.1.4":')
     expect(lockfile).not.toContain('@koromix/koffi-win32-x64@npm:3.1.4')
@@ -1306,7 +1345,7 @@ describe('published package surface', () => {
     // dsh 0.2.1-alpha.2 replaced `nodeExecutable` with `launch`; the local default is still this process.
     expect(index).toMatch(/const launch = config \?\? \{\s+kind: "pkg" in process \? "embedded" : "node-script",\s+executable: process\.execPath\s+\};/u)
     expect(index).toContain('confined = policy.mode === "danger-full-access" ? void 0 : await this.ctx.sandbox.confine(')
-    const block = /\t+const env = Object\.fromEntries\(Object\.keys\(process\.env\)[^\n]*\n(?:\t+\/\/[^\n]*\n)*\t+if \(process\.versions\.electron !== void 0\) env\.ELECTRON_RUN_AS_NODE = "1";\n\t+if \(packaged\) \{[\s\S]*?\n\t+\}\n(?=\t+handle = this\.ctx\.subprocess\.spawn\()/u.exec(index)?.[0]
+    const block = /\t+const env = Object\.fromEntries\(Object\.keys\(process\.env\)[^\n]*\n(?:\t+\/\/[^\n]*\n)*\t+if \(process\.versions\.electron !== void 0\) env\.ELECTRON_RUN_AS_NODE = "1";\n\t+if \(packaged\) \{[\s\S]*?\n\t+\}\n(?=\t+const handle = this\.ctx\.subprocess\.spawn\()/u.exec(index)?.[0]
     if (block === undefined) throw new Error('Cannot find the PTC worker environment')
     const evaluate = (electron: string | undefined, parent: Record<string, string>, packaged = true) => runInNewContext(
       `${block}\nenv`,
@@ -1343,7 +1382,7 @@ describe('published package surface', () => {
     const dshPatch = readFileSync(new URL(dshPatchPath, workspaceRoot), 'utf8')
     const workspaceRequire = createRequire(new URL('package.json', packageRoot))
     const dshManifest = workspaceRequire.resolve('@deepseek-ai/dsh/package.json')
-    const dshBin = readFileSync(join(dirname(dshManifest), 'lib/bin.js'), 'utf8')
+    const dshBin = readDshCliRuntime(dshManifest)
 
     expect(dshResolution('@deepseek-ai/dsh')).toContain(dshPatchPath)
     expect(lockfile).toContain(dshPatchPath)
@@ -1359,7 +1398,7 @@ describe('published package surface', () => {
     const lockfile = readFileSync(new URL('yarn.lock', workspaceRoot), 'utf8')
     const workspaceRequire = createRequire(new URL('package.json', packageRoot))
     const dshManifest = workspaceRequire.resolve('@deepseek-ai/dsh/package.json')
-    const dshBin = readFileSync(join(dirname(dshManifest), 'lib/bin.js'), 'utf8')
+    const dshBin = readDshCliRuntime(dshManifest)
     const pluginEntry = /const \{ runPlugin \} = await import\("(\.\/plugin-[^"/]+\.js)"\)/u.exec(dshBin)?.[1]
     expect(pluginEntry).toBeDefined()
     if (pluginEntry === undefined) throw new Error('Cannot find the CLI plugin command entry')

@@ -19,7 +19,7 @@ const readJson = path => JSON.parse(readFileSync(path, 'utf8'))
 // in any of our profiles; the patch waits for that row to come back and must not
 // be deleted (docs/upstream-sync.md, "坑·profile 与打包 6").
 const KNOWN_INERT = new Set([
-  'patches/dsh-experimental-computer-use-cua-driver-native@0.2.1-rc.3.patch',
+  'patches/dsh-experimental-computer-use-cua-driver-native@0.2.2-rc.3.patch',
 ])
 
 const workspace = readJson(join(root, 'package.json'))

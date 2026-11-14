@@ -24,8 +24,8 @@ The settings page switches between the two palettes; light and dark follow the s
 
 <table>
   <tr>
-    <td align="center" width="50%"><img src="./docs/screenshots/claude-home-light.png" alt="Claude brand, Studio home — light" /></td>
-    <td align="center" width="50%"><img src="./docs/screenshots/claude-home-dark.png" alt="Claude brand, Studio home — dark" /></td>
+    <td align="center" width="50%"><img src="./docs/screenshots/claude-home-light.png" alt="Claude brand, Code home — light" /></td>
+    <td align="center" width="50%"><img src="./docs/screenshots/claude-home-dark.png" alt="Claude brand, Code home — dark" /></td>
   </tr>
   <tr>
     <td align="center" width="50%"><img src="./docs/screenshots/claude-conversation-light.png" alt="Claude brand, Markdown conversation — light" /></td>
@@ -33,14 +33,14 @@ The settings page switches between the two palettes; light and dark follow the s
   </tr>
 </table>
 
-> Studio home above, Markdown conversation below; light on the left, dark on the right. White canvas `#FFFFFF` with a `#FAFAFA` sidebar, near-black `#191919` with a `#1F1F1F` sidebar, ember orange `#D97757` for every action, and Claude Code's pixel crab on the composer.
+> Code home above, Markdown conversation below; light on the left, dark on the right. White canvas `#FFFFFF` with a `#FAFAFA` sidebar, near-black `#191919` with a `#1F1F1F` sidebar, ember orange `#D97757` for every action, and Claude Code's pixel crab on the composer.
 
 ### DeepSeek
 
 <table>
   <tr>
-    <td align="center" width="50%"><img src="./docs/screenshots/deepseek-home-light.png" alt="DeepSeek brand, Studio home — light" /></td>
-    <td align="center" width="50%"><img src="./docs/screenshots/deepseek-home-dark.png" alt="DeepSeek brand, Studio home — dark" /></td>
+    <td align="center" width="50%"><img src="./docs/screenshots/deepseek-home-light.png" alt="DeepSeek brand, Code home — light" /></td>
+    <td align="center" width="50%"><img src="./docs/screenshots/deepseek-home-dark.png" alt="DeepSeek brand, Code home — dark" /></td>
   </tr>
   <tr>
     <td align="center" width="50%"><img src="./docs/screenshots/deepseek-conversation-light.png" alt="DeepSeek brand, Markdown conversation — light" /></td>
@@ -48,7 +48,7 @@ The settings page switches between the two palettes; light and dark follow the s
   </tr>
 </table>
 
-> White canvas `#FFFFFF` with a `#FAFAFA` sidebar, blue-black `#13161D`, DeepSeek blue `#4D6BFE`; Deepy the pixel whale stands on the composer, in eight states:
+> Pale blue-white canvas `#FBFCFF` with a `#F7F9FF` sidebar, blue-black `#13161D`, DeepSeek blue `#4D6BFE`; Deepy the pixel whale stands on the composer, in eight states:
 
 <table>
   <tr>
@@ -65,6 +65,8 @@ The settings page switches between the two palettes; light and dark follow the s
   </tr>
 </table>
 
+> In Settings the mascot can also be switched to the pixel crab Clawd or the whale girl. Resting the pointer on the mascot opens a pixel bubble: the DeepSeek account balance, gifted credit included and drawn down live as the conversation spends (checked against the platform at most once a minute), on top, and under it what the current conversation has cost, the same figure the statistics line shows.
+
 > The workspaces, sessions, usage figures and nickname in the screenshots are sample data.
 
 ## Installation
@@ -80,13 +82,23 @@ dsh plugin --profile web add dsh-claude-style                    # npm package (
 dsh plugin --profile web add Nwflower/dsh-claude-style#dist      # GitHub release branch
 ```
 
-Also from the [plugin market](https://github.com/dsh-market/dsh-market) or the Skin Center of the dsh-web-all plugin. Keep one theme enabled at a time; dsh ≥ 0.1.7 is required, and a restart of DeepSeek Harness brings the full feature set.
+Also from the [plugin market](https://github.com/dsh-market/dsh-market) or the Skin Center of the dsh-web-all plugin. Keep one theme enabled at a time; dsh ≥ 0.2.2-rc.1 is required, and a restart of DeepSeek Harness brings the full feature set.
+
+## Manual unread marks
+
+Choose **Mark as unread** or **Clear unread mark** from a session's ellipsis menu. Marks are saved in the current profile, survive reloads, and clear when you leave and later open that session. The host's automatic completion reminders stay independent.
+
+## Retract and edit a message
+
+Hover a message you sent and **Retract** and **Edit** join the clock and copy buttons. Both open a new session and leave the original as it was: retracting drops that message and everything after it and puts the text back in the composer for you to send again, while editing amends the text in place first and sends it in the new session as soon as you confirm. A message carrying images or files gets neither button, since attachments cannot travel with the text into a new session. Both wait while the turn is still running. Disable the feature under **Conversation** in the plugin settings.
 
 ## Fonts
 
 > The Anthropic fonts have no public release; this repository only offers [copies](https://github.com/Nwflower/dsh-claude-style/tree/master/packages/assets/src/fonts/anthropic) for download and study.
 
 To enable them, install the `.ttf` files on your system, or copy them into `$DSH_HOME/dsh-claude-style/fonts/`.
+
+The mascot bubble's pixel text is set in [PoxiaoPixel](https://diaowinner.itch.io/poxiaopixel) by DWNfonts (SIL OFL 1.1); the package carries only the characters the bubble uses.
 
 ## Documentation
 
@@ -108,6 +120,7 @@ The Sodium rendering engine is licensed under the [PolyForm Shield License 1.0.0
 - "Sodium" (钠) is named after Minecraft's [Sodium](https://github.com/CaffeineMC/sodium) rendering mod; this plugin is not affiliated with it.
 - The message navigator follows SherUnlocked-4869's [dsh-plugin-msg-nav](https://github.com/SherUnlocked-4869/dsh-plugin-msg-nav) (MIT).
 - The animation frames of Deepy the pixel whale come from the Deepy whale theme pack drawn by calmly-eating-bugs ([@wp3171216237](https://github.com/wp3171216237)), and ship with the plugin by the author's permission; GIFs of all 20 animations are in [docs/gifs/](docs/gifs/).
+- The whale girl pixel emoji set came with issue #224.
 - The enhanced animations in the chat area are modified from [dsh-chat-ux](https://github.com/alm-allen/dsh-chat-ux) (MIT).
 - Clawd is a character of Anthropic. Its frames are not covered by the MIT license (see [LICENSE](LICENSE)). This plugin is an unofficial fan work, not affiliated with or endorsed by Anthropic.
 

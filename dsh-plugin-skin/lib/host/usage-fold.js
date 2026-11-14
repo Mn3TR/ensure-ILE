@@ -1,6 +1,8 @@
 // packages/host/src/usage-fold.ts
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
+import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { sessionIdFromDirectoryName } from "./session-name.js";
 import { BUCKET_KEYS, addBuckets, emptyBuckets } from "./usage-ledger.js";
 var SESSION_LOG = /^session(?:\.v([1-9][0-9]*))?\.jsonl(?:\.zstd)?$/i;
 function dayKey(time) {
@@ -101,10 +103,10 @@ function foldSession(events) {
   }
   return { days, hours };
 }
-function newestLog(dir) {
+async function newestLog(dir) {
   let entries;
   try {
-    entries = readdirSync(dir, { withFileTypes: true });
+    entries = await readdir(dir, { withFileTypes: true });
   } catch (error) {
     if (error.code === "ENOENT") return null;
     throw error;
@@ -122,27 +124,32 @@ function newestLog(dir) {
   }
   if (best === null) return null;
   const path = join(dir, best.name);
-  const stat = statSync(path, { throwIfNoEntry: false });
-  if (stat === void 0) return null;
-  return { path, size: stat.size, mtimeMs: stat.mtimeMs };
+  try {
+    const info = await stat(path);
+    return { path, size: info.size, mtimeMs: info.mtimeMs };
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
 }
-function listSessionLogs(root) {
+async function listSessionLogs(root) {
   const out = [];
   if (!existsSync(root)) return out;
-  for (const project of readdirSync(root, { withFileTypes: true })) {
+  for (const project of await readdir(root, { withFileTypes: true })) {
     if (!project.isDirectory()) continue;
     let sessions;
     try {
-      sessions = readdirSync(join(root, project.name), { withFileTypes: true });
+      sessions = await readdir(join(root, project.name), { withFileTypes: true });
     } catch (error) {
       if (error.code === "ENOENT") continue;
       throw error;
     }
     for (const session of sessions) {
       if (!session.isDirectory()) continue;
-      const log = newestLog(join(root, project.name, session.name));
+      const log = await newestLog(join(root, project.name, session.name));
       if (log === null) continue;
-      out.push({ id: session.name, ...log });
+      const storedName = session.name;
+      out.push({ id: sessionIdFromDirectoryName(storedName), storedName, ...log });
     }
   }
   return out;

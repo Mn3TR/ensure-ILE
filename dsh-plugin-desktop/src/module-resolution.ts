@@ -176,10 +176,10 @@ function isLexicalProfileBoundary(
   const candidate = filePath(url)
   if (candidate === undefined) return false
   const offset = relative(registration.profileDirectory, candidate)
-  // The native Loader has used the directory URL, package.json, and cordis
-  // config files as its parentURL across supported Node releases. Restrict the
-  // bridge to that directory and its direct files, never another Profile.
-  return offset === '' || (!offset.includes(sep) && offset !== '..' && !isAbsolute(offset))
+  // Cordis 4.1 resolves imports through the Profile's .cordis/resolve.mjs.
+  // Keep the directory and direct-file boundaries for existing callers.
+  return offset === '' || offset === join('.cordis', 'resolve.mjs')
+    || (!offset.includes(sep) && offset !== '..' && !isAbsolute(offset))
 }
 
 function isCanonicalProfileBoundary(
@@ -189,7 +189,8 @@ function isCanonicalProfileBoundary(
   const candidate = filePath(canonicalUrl)
   if (candidate === undefined) return false
   const offset = relative(canonicalPath(registration, registration.profileDirectory), candidate)
-  return offset === '' || (!offset.includes(sep) && offset !== '..' && !isAbsolute(offset))
+  return offset === '' || offset === join('.cordis', 'resolve.mjs')
+    || (!offset.includes(sep) && offset !== '..' && !isAbsolute(offset))
 }
 
 function isSharedFallbackPath(registration: ProfileResolverRegistration, candidate: string): boolean {

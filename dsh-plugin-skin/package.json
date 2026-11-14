@@ -1,30 +1,31 @@
 {
   "name": "dsh-plugin-skin",
   "description": "ensure-ILE's interface skin: fork of dsh-claude-style 0.19.2 (Claude Code Desktop theme for DeepSeek Harness) with our own default brand artwork",
-  "version": "0.19.2-ensure-ile.1",
+  "version": "0.21.0-ensure-ile.1",
   "type": "module",
   "main": "lib/host/index.js",
   "icon": "lib/claude-mark.svg",
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "dev": "node scripts/dev.mjs",
-    "changelog": "node scripts/changelog.mjs",
-    "changelog:check": "node scripts/changelog.mjs --check",
-    "docs:index": "node scripts/decisions-index.mjs",
-    "docs:check": "node scripts/decisions-index.mjs --check",
+    "build": "node scripts/build/build.mjs",
+    "dev": "node scripts/build/dev.mjs",
+    "changelog": "node scripts/release/changelog.mjs",
+    "changelog:check": "node scripts/release/changelog.mjs --check",
+    "docs:index": "node scripts/checks/decisions-index.mjs",
+    "docs:check": "node scripts/checks/decisions-index.mjs --check",
     "checks:numbers": "node packages/testing/check-numbers.mjs",
-    "agents": "node scripts/agents-commands.mjs",
-    "agents:check": "node scripts/agents-commands.mjs --check",
-    "lint": "node scripts/lint.mjs",
+    "agents": "node scripts/checks/agents-commands.mjs",
+    "agents:check": "node scripts/checks/agents-commands.mjs --check",
+    "lint": "node scripts/checks/lint.mjs",
+    "element-collections": "node packages/testing/element-collections.mjs",
     "probe": "node packages/testing/probe.mjs",
-    "smoke": "node packages/testing/smoke.mjs",
+    "stand-in": "node packages/testing/stand-in.mjs",
     "behaviour": "node packages/testing/behaviour.mjs",
     "faults": "node packages/testing/faults.mjs",
     "coverage": "node packages/testing/coverage.mjs",
     "test": "vitest run",
-    "verify": "node scripts/verify.mjs",
-    "work": "node scripts/work.mjs",
-    "tmp": "node scripts/temporary.mjs",
+    "verify": "node scripts/checks/verify.mjs",
+    "work": "node scripts/dev/work.mjs",
+    "tmp": "node scripts/dev/temporary.mjs",
     "prepublishOnly": "npm run build"
   },
   "exports": {
@@ -35,7 +36,7 @@
   },
   "dsh": {
     "engines": {
-      "dsh": ">=0.1.7"
+      "dsh": ">=0.2.2-rc.1"
     },
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -85,14 +86,15 @@
     "url": "https://github.com/Nwflower/dsh-claude-style/issues"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-client-ui-primitives": ">=0.1.5-rc.1",
+    "@deepseek-ai/dsh-client-ui-primitives": ">=0.2.2-rc.1",
     "@deepseek-ai/schemastery": ">=3.18.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-client-ui-primitives": "0.2.1-alpha.1",
-    "@deepseek-ai/schemastery": "3.18.4",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.2.2-rc.3",
+    "@deepseek-ai/dsh-util-workspace-path": "0.2.2-rc.3",
+    "@deepseek-ai/schemastery": "3.19.0",
     "@types/node": "^26.6.4",
     "@types/react": "18.3.31",
     "@types/react-dom": "18.3.7",

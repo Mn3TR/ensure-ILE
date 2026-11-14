@@ -94,20 +94,31 @@ function summarize(days, sessionCount, source, hours, window) {
   };
 }
 function mergeLedgerFold(ledgerDays, sessions) {
+  const foldedDays = mergeSessions(sessions);
+  const dates = new Set(ledgerDays?.keys() ?? []);
+  for (const date of foldedDays.keys()) dates.add(date);
   const days = /* @__PURE__ */ new Map();
   const sessionIds = /* @__PURE__ */ new Set();
-  let lastLedgerDay = null;
-  for (const [date, buckets] of ledgerDays ?? []) {
-    days.set(date, buckets);
-    if (lastLedgerDay === null || date > lastLedgerDay) lastLedgerDay = date;
-    for (const id of buckets.sessionIds ?? []) sessionIds.add(id);
-  }
   let folded = false;
-  for (const [date, buckets] of mergeSessions(sessions)) {
-    if (lastLedgerDay !== null && date <= lastLedgerDay) continue;
-    days.set(date, buckets);
-    folded = true;
-    for (const id of buckets.sessionIds ?? []) sessionIds.add(id);
+  for (const date of dates) {
+    const ledger = ledgerDays?.get(date);
+    const fold = foldedDays.get(date);
+    const fromFold = ledger === void 0 || fold !== void 0 && bucketTotal(fold) > bucketTotal(ledger);
+    const source = fromFold ? fold : ledger;
+    if (source === void 0) continue;
+    if (fromFold) folded = true;
+    const held = emptyBuckets();
+    addBuckets(held, source, 1);
+    if (source.models !== void 0) held.models = source.models;
+    const ids = new Set(ledger?.sessionIds ?? []);
+    for (const id of fold?.sessionIds ?? []) ids.add(id);
+    const behind = [...ids].sort();
+    held.sessionIds = behind;
+    held.sessions = behind.length;
+    for (const id of behind) sessionIds.add(id);
+    const hours = fold?.hours ?? source.hours;
+    if (hours !== void 0) held.hours = hours;
+    days.set(date, held);
   }
   return { days, sessionIds, folded };
 }

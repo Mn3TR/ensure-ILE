@@ -44,7 +44,7 @@ describe('private Host control transport', () => {
   it('rejects pending calls on exit and times out a nonresponsive peer', async () => {
     const [parent, child] = pair(20)
     child.handle('never', () => new Promise(() => {}))
-    await expect(parent.call('never')).rejects.toThrow('timed out')
+    await expect(parent.call('never')).rejects.toThrow('timed out (never)')
     const request = parent.call('pending')
     parent.close('worker exited')
     await expect(request).rejects.toThrow('worker exited')

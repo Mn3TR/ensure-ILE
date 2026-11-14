@@ -96,7 +96,15 @@ export async function launchShell(dataRoot: string, options: LaunchOptions = {})
     cwd: packageRoot,
     env,
   })
-  const page = await app.firstWindow()
+  let stderr = ''
+  app.process().stderr?.on('data', chunk => { stderr = (stderr + String(chunk)).slice(-12_000) })
+  let page: Page
+  try {
+    page = await app.firstWindow()
+  } catch (cause) {
+    await app.close().catch(() => {})
+    throw new Error('fixture: the first window did not open\n' + stderr, { cause })
+  }
   return {
     app,
     page,
@@ -161,7 +169,10 @@ export async function expectVisible(locator: Locator, timeout = 30_000): Promise
   try {
     await locator.first().waitFor({ state: 'visible', timeout })
   } catch (cause) {
-    throw new Error('expected element to be visible: ' + locator + ' — ' + (cause instanceof Error ? cause.message.split('\n')[0] : String(cause)))
+    const body = await locator.page().locator('body').innerText().catch(() => 'page unavailable')
+    throw new Error('expected element to be visible: ' + locator + ' — '
+      + (cause instanceof Error ? cause.message.split('\n')[0] : String(cause))
+      + '\nPage: ' + locator.page().url() + '\n' + body.slice(0, 4000))
   }
 }
 

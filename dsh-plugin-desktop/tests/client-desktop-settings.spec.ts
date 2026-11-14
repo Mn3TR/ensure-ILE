@@ -704,9 +704,13 @@ describe('Desktop settings Slot registration', () => {
 
     expect(get).toHaveBeenNthCalledWith(1, DESKTOP_SHELL_SETTINGS_NAMESPACE)
     expect(get).toHaveBeenNthCalledWith(2, DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE)
+    expect(inject).toHaveBeenCalledWith('settings.section.icon', expect.any(Function))
+    expect(register).toHaveBeenNthCalledWith(1, {
+      name: 'settings.section.icon', id: 'desktop',
+    }, expect.any(Function))
     expect(inject).toHaveBeenCalledWith('settings.section', expect.any(Function))
     expect(inject).toHaveBeenCalledWith('settings.action', expect.any(Function))
-    const [options, component] = register.mock.calls[0] as unknown as [
+    const [options, component] = register.mock.calls[1] as unknown as [
       { id: string; order: number; locale: string; label: () => string; inject: () => Record<string, unknown> },
       unknown,
     ]
@@ -726,7 +730,7 @@ describe('Desktop settings Slot registration', () => {
     })
     expect(component).toBe(DesktopSettingsSection)
 
-    const [actionOptions, actionComponent] = register.mock.calls[1] as unknown as [
+    const [actionOptions, actionComponent] = register.mock.calls[2] as unknown as [
       { id: string; order: number; locale: string; inject: () => Record<string, unknown> },
       unknown,
     ]
@@ -739,7 +743,7 @@ describe('Desktop settings Slot registration', () => {
     expect(actionOptions.inject()).toHaveProperty('api')
     expect(actionComponent).toBe(DesktopTerminalSettingsAction)
     expect(inject).toHaveBeenCalledWith('plugins.bundle.hidden', expect.any(Function))
-    expect(register).toHaveBeenNthCalledWith(3, {
+    expect(register).toHaveBeenNthCalledWith(4, {
       name: 'plugins.bundle.hidden',
       key: 'dshmarket',
     }, expect.any(Function))

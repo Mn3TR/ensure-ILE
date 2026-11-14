@@ -39,9 +39,11 @@ const ALLOWED_LICENSES = new Set([
  * honored. Sharp ships libvips as a separate @img/sharp-libvips-* package on
  * macOS and inside the @img/sharp-win32-* package on Windows. Their license
  * texts ship inside node_modules in the installer. Keep this list minimal and
- * review any addition.
+ * review any addition. lru-cache's Blue Oak license also requires the license
+ * text or its official link; the package ships LICENSE.md with the installer.
  */
 const NOTICE_LICENSES = new Set([
+  'BlueOak-1.0.0',
   'LGPL-3.0-or-later',
   'Apache-2.0 AND LGPL-3.0-or-later',
 ])

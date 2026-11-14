@@ -5,8 +5,8 @@
  * model tools, a stable guidance section, and a recall context.
  */
 
-import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { homedir, hostname } from 'node:os'
+import { join, dirname } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView } from '@deepseek-ai/dsh-tools'
@@ -14,6 +14,8 @@ import type { GenericCallView } from '@deepseek-ai/dsh-tools'
 // system-prompt/assemble event typing this plugin contributes through.
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import { MemoryEngine } from './engine.ts'
+import { conflictFiles, syncPull, syncPush, syncStatus } from './sync-service.ts'
+import type { SyncConfig } from './sync-service.ts'
 import type { MemoryConfig, MemoryHit, MemoryRecord } from './engine.ts'
 import { MemoryGateway } from './remote.ts'
 import { runMemoryBackup } from './backup.ts'
@@ -21,7 +23,12 @@ import { ANCHOR_KINDS } from './anchors.ts'
 import { PROFILE_FILES, isProfileFileName, readProfile, readProfileFile, writeProfileFile } from './profile-files.ts'
 import type { MemoryAnchor } from './anchors.ts'
 import { mountMemoryApi } from './routes.ts'
-import { SELF_DESCRIPTION } from './self.ts'
+import { buildSelfDescription } from './self.ts'
+import { appendEntry, diaryDir, lastWriteAt, pointerLine, readDay, recentDates } from './diary.ts'
+import { readSyncTokenFile } from './sync-token.ts'
+import { resolveProxy } from './sync-http.ts'
+import { sanitizeEnvName } from './sync-tombstone.ts'
+import z from '@deepseek-ai/schemastery'
 import { DEFAULT_INJECTION_BUDGET, DEFAULT_SUMMARY_CHARS, candidateNotice, indexNotice, neighborNotice, neutralizeBraces, omittedNotice, renderInjection, staleNotice } from './injection.ts'
 
 export { MemoryEngine } from './engine.ts'
@@ -40,6 +47,178 @@ export { bm25FieldScores, bm25Scores, cosineSimilarity, rrfFuse, tokenize } from
 
 export const name = 'dsh-memory'
 export const inject = ['storage', 'systemPrompt', 'tools', 'webServer', 'webStartup']
+
+/**
+ * 插件配置 schema（0.19.0）。loader 依它自动构成「插件」页里的配置卡片，namespace 即
+ * entry id（`memory`）；**可写字段必须标 `.volatile()`**，否则 `settings` 会以
+ * `Config field "…" is not volatile` 拒绝写入。
+ *
+ * 除 `diary` 外的字段一律 `z.optional()` 原样透传：它们的取值依赖运行时
+ * （`$DSH_HOME`、各平台路径），schema 给不出有意义的默认值，硬填一个反而会顶掉
+ * `MemoryConfig` 那套 `?? 默认` 的解析。`embeddings` / `backup` 是结构化配置，
+ * 由 engine / backup 各自按领域校验，这一层只负责透传。
+ */
+export const Config = z.object({
+  // schemastery 里字段**默认就是可选的**，`.required()` 才相反，所以这里不写
+  // `.optional()`——那个方法不存在。
+  globalRoot: z.string(),
+  projectRoot: z.string(),
+  injectionBudget: z.number(),
+  summaryChars: z.number(),
+  promptGlobalRoot: z.string(),
+  queryLogPath: z.string(),
+  semanticTopK: z.number(),
+  embeddings: z.any(),
+  backup: z.any(),
+  /**
+   * 云同步配置（2026-11-11；2026-11-12 改成显式开关）。
+   *
+   * **用 `enabled` 开关，而不是「配了 remote 就算开」**：与日记同一个模式。语义清楚得多
+   * ——「我打开了这个功能」和「我碰巧填了一个字段」是两件事；而且开启后可以只配一部分
+   * （比如只做本地镜像、暂不推送）。
+   *
+   * `volatile()` 让 `enabled` 能在运行时改：设置面板把值写进 profile 的
+   * `cordis.patch.yml`，是否即时生效取决于该 profile 的 `patchReload`（`live` 才热重载）。
+   * 其余字段（remote / branch 等）改了要重启——它们决定的是连接目标，不是临时状态。
+   *
+   * 默认 **关闭**：实验性功能不该影响别人的安装。
+   */
+  sync: z.object({
+    enabled: z.boolean().default(false),
+    mirrorDir: z.string().default(''),
+    remote: z.string().default(''),
+    branch: z.string().default('main'),
+    envName: z.string().default(''),
+    /**
+     * 代理地址（2026-11-13）。node 的 HTTP 不读 `HTTPS_PROXY`，在必须走代理才能访问
+     * GitHub 的网络里，push / pull 会一路超时（用户机器实测：系统 git 通、插件超时）。
+     * 留空则回退到环境变量，再没有就直连（见 sync-http.ts）。
+     */
+    proxy: z.string().default(''),
+  }).default({ enabled: false }).volatile(),
+  /**
+   * 日记开关。默认开——这是**功能默认，不是采集默认**。
+   *
+   * 关掉时日记工具拒绝写入、不注入指针、不提醒；已有 md 文件原样保留
+   * （删除是使用者的动作，不该由开关代劳）。
+   */
+  diary: z.object({
+    enabled: z.boolean().default(true),
+  }).default({ enabled: true }).volatile(),
+})
+
+/**
+ * 读日记开关。
+ *
+ * `config.diary` 经 loader 解析后是 `Volatile<{ enabled }>` 包装——`settings/src/schema.ts`
+ * 的解包就是 `isVolatile(value) → value.get()`；而手写配置与测试传的是裸对象。两种都要认。
+ * 解出来不是 `false` 就按开处理：读不到值时的默认行为必须与 schema 的 default 一致。
+ * @param config - 插件配置。
+ * @returns 是否启用日记。
+ */
+/**
+ * 定时备份的默认根：`DSH_HOME` 的**兄弟目录** `.dsh-backups/memory`。
+ *
+ * 为什么是兄弟目录而不是直接 `homedir()`：隔离实例（不同 `DSH_HOME` 并行跑，比如 dev
+ * 与装版）本该各有自己的备份树。写死 `homedir()` 会让它们的快照混进同一份目录——
+ * 2026-11-07 实测：dev 实例把 `globalRoot` 指向 `home-100` 的快照写进了装版的备份根，
+ * 两份 manifest 混在一起，人工恢复时容易拿错。
+ *
+ * 兄弟目录同时保证它**在 `DSH_HOME` 之外**——2026-10-18 那次事故是整个 `.dsh` 被删，
+ * 备份必须活在外面，所以不能退化成 `$DSH_HOME/backups`。
+ */
+function defaultBackupRoot(): string {
+  const dshHome = process.env.DSH_HOME ?? join(homedir(), '.dsh')
+  return join(dirname(dshHome), '.dsh-backups', 'memory')
+}
+
+function diaryOn(config: MemoryConfig | undefined): boolean {
+  const raw = (config as { diary?: unknown } | undefined)?.diary
+  if (raw === undefined || raw === null) return true
+  const unwrapped = typeof (raw as { get?: unknown }).get === 'function'
+    ? (raw as { get: () => unknown }).get()
+    : raw
+  return (unwrapped as { enabled?: unknown } | null)?.enabled !== false
+}
+
+/**
+ * 解包 `config.sync`。
+ *
+ * `config.sync` 经 loader 解析后是 `Volatile<{...}>`（`settings` 侧的解包就是
+ * `isVolatile(v) → v.get()`）——**schema 声明了 `.volatile()`，所以挂载时一定会被包装**，
+ * 直接读字段拿到的是空的。裸对象只在直接调用 `apply` 的场合出现，一并兜住。
+ * 开关与字段读的是同一份解包结果，所以只在这里做一次。
+ * @param config - 插件配置。
+ * @returns 解包后的对象；没配就是空对象（字段全按「缺省」处理）。
+ */
+function syncSettings(config: MemoryConfig | undefined): Record<string, unknown> {
+  const raw = (config as { sync?: unknown } | undefined)?.sync
+  if (raw === undefined || raw === null) return {}
+  const unwrapped = typeof (raw as { get?: unknown }).get === 'function'
+    ? (raw as { get: () => unknown }).get()
+    : raw
+  return (unwrapped ?? {}) as Record<string, unknown>
+}
+
+/**
+ * 读云同步开关。
+ *
+ * 判据是显式 `enabled`，不是「配了 remote」——与日记同一个模式（2026-11-12）。
+ * 与日记相反：**解不出来就是关**（`=== true` 才开）。默认值必须与 schema 的
+ * `default(false)` 一致——实验性功能不能因为读不到开关就自己跑起来。
+ */
+function syncOn(config: MemoryConfig | undefined): boolean {
+  return syncSettings(config).enabled === true
+}
+
+/**
+ * 组装云同步的运行配置。
+ *
+ * 拆成纯函数是为了可测：`apply` 里的闭包拿不到，而这里每条兜底都值得断言
+ * （缺 mirrorDir 回退、空字符串视同没配、token 只从环境变量来）。
+ *
+ * **token 只从环境变量 `DSH_MEMORY_SYNC_TOKEN` 取**：它一旦落进 profile 配置，
+ * 就会跟着 patch 文件被复制、分享、提交，而 README 承诺的是「token 不写进配置」。
+ * 2026-11-13：这条链路此前是断的——`SyncConfig.token` 与 `authFor()` 都在，
+ * 但没人读环境变量，于是私有仓库必然 401。
+ * @param raw - 解包后的 `sync` 设置。
+ * @param env - 环境变量来源（测试注入用，缺省 `process.env`）。
+ */
+export function resolveSyncConfig(
+  raw: Record<string, unknown>,
+  env: NodeJS.ProcessEnv = process.env,
+  fileToken?: string,
+): SyncConfig {
+  const mirrorDir = typeof raw.mirrorDir === 'string' && raw.mirrorDir !== ''
+    ? raw.mirrorDir
+    : join(env.DSH_HOME ?? join(homedir(), '.dsh'), 'memory-sync')
+  // 环境变量优先于面板设的文件 token：前者是调用方显式注入的那一层。
+  const fromEnv = env.DSH_MEMORY_SYNC_TOKEN
+  const token = fromEnv !== undefined && fromEnv !== '' ? fromEnv : fileToken
+  // 代理：`sync.proxy` 配置 > HTTPS_PROXY/HTTP_PROXY 环境变量（见 sync-http.ts）。
+  const proxy = resolveProxy(raw.proxy, env)
+  /**
+   * 端标识（2026-11-14）：缺省时用主机名。
+   *
+   * 它决定 `.sync-state.<env>.json` 的分片文件名——两端都用同一个名字就会共用
+   * 同一份状态，墓碑判定又会拿别端全集当基线（多端互删的根源）。主机名在同一网络里
+   * 天然不同；清洗后为空时退回 `local`。
+   */
+  const envName = typeof raw.envName === 'string' && raw.envName !== ''
+    ? raw.envName
+    : (sanitizeEnvName(hostname()) || 'local')
+  return {
+    mirrorDir,
+    envName,
+    ...typeof raw.remote === 'string' && raw.remote !== '' ? { remote: raw.remote } : {},
+    ...typeof raw.branch === 'string' && raw.branch !== '' ? { branch: raw.branch } : {},
+    ...token === undefined || token === '' ? {} : { token },
+    ...proxy === undefined ? {} : { proxy },
+  }
+}
+
+/** 日记提醒的冷却窗口（毫秒）。6 小时是拍出来的第一个值，实测后再调。 */
+const DIARY_REMIND_MS = 6 * 60 * 60 * 1000
 
 /**
  * 本次挂载实际注册的工具名，按注册顺序。
@@ -67,6 +246,8 @@ interface MemoryToolRecord {
   injected: boolean
   content: string
   keywords: string[]
+  /** 主题（0.20.0）：见闻 / 约定 / 坑 / 偏好 / 事实 / 判据 …；缺省 = 未分类。 */
+  topic?: string
   createdAt: number
   updatedAt: number
   lastUsedAt?: number
@@ -129,6 +310,7 @@ const RECORD_SCHEMA = {
     injected: { type: 'boolean', required: true },
     content: { type: 'string', required: true },
     keywords: { type: 'array', required: true, items: { type: 'string' } },
+    topic: { type: 'string', description: '主题（0.20.0）：见闻 / 约定 / 坑 / 偏好 / 事实 / 判据 …；缺省表示未分类。' },
     createdAt: { type: 'number', required: true },
     updatedAt: { type: 'number', required: true },
     lastUsedAt: { type: 'number' },
@@ -306,6 +488,7 @@ function recordValue(record: MemoryRecord): MemoryToolRecord {
     injected: record.injected,
     content: record.content,
     keywords: record.keywords,
+    ...record.topic === undefined ? {} : { topic: record.topic },
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     ...record.lastUsedAt === undefined ? {} : { lastUsedAt: record.lastUsedAt },
@@ -474,14 +657,48 @@ function present(title: string, kind: 'read' | 'other', rawInput?: unknown): Gen
   return { card: 'generic', title, kind, ...rawInput === undefined ? {} : { rawInput } }
 }
 
+/**
+ * `diary_write` 的返回值（2026-10-24 日记机制）。
+ *
+ * 只回写入位置与归属，不回正文：模型刚写完，再念一遍自己的字是纯浪费上下文。
+ */
+const DIARY_WRITE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    file: { type: 'string', required: true, description: '日记文件的绝对路径。' },
+    date: { type: 'string', required: true, description: '这一段归属的日期（YYYY-MM-DD）。' },
+    created: { type: 'boolean', required: true, description: '这一天是不是本次才创建的。' },
+  },
+} as const
+
+/**
+ * `diary_read` 的返回值。
+ *
+ * `exists` 与 `text` 分开：缺席是正常状态（那天没有日记），不是空内容。
+ */
+const DIARY_READ_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    date: { type: 'string', required: true, description: '读的是哪一天；一天都没有时为空串。' },
+    text: { type: 'string', required: true, description: '当天日记原文；没有这一天时为空串。' },
+    exists: { type: 'boolean', required: true, description: '这一天有没有日记。' },
+  },
+} as const
+
 export async function apply(ctx: Context, config?: MemoryConfig): Promise<void> {
   // 每次挂载都是一次全新的注册——清空上一轮的登记。它是模块级数组（测试要能 import 它），
   // 不清的话同一进程里挂载两次会累积成双份，而消费方（自述覆盖用例）拿到的数量就对不上了。
   registeredToolNames.length = 0
   await ctx.plugin(MemoryEngine, config)
   await ctx.plugin(MemoryGateway)
+  // 云同步的运行时配置：面板的「测试连接」也要用它，所以定义在挂 API 之前。
+  // 缺省不启用：没打开 `memory.sync.enabled` 时那两个工具根本不注册（见下面的
+  // `syncEnabled`）；打开之后配置才可能不全——`remote` 为空就只做本地提交。
+  const syncConfig = (): SyncConfig => resolveSyncConfig(syncSettings(config), process.env, readSyncTokenFile())
   // 0.3.6：自带面板数据通道（HTTP，独立包无需 Typert 构建产物）
-  mountMemoryApi(ctx)
+  mountMemoryApi(ctx, syncConfig)
   const memory = ctx.get('memory')
   if (memory === undefined) throw new Error('memory engine failed to register')
 
@@ -491,12 +708,19 @@ export async function apply(ctx: Context, config?: MemoryConfig): Promise<void> 
     text: GUIDANCE,
   })
 
+  // 云同步**默认关闭**（2026-11-11）：实验性功能不该影响别人的安装。判据是显式开关
+  // `enabled`（2026-11-12，与日记一致）——「我打开了这个功能」与「我碰巧填了一个
+  // remote」是两件事，后者会让一次配置试验变成意外开机。关闭时那两个工具**根本不
+  // 注册**，而不是注册了再报错：模型看不到就不会去调。
+  const syncEnabled = syncOn(config)
+
   // 0.3.2：记忆机制自述——常驻注入（不落用户存储），随发版更新。
   // order 49 < recall(50)：机制说明在具体记忆内容之前。
   ctx.systemPrompt.context({
     name: 'memory:self',
     order: 49,
-    text: SELF_DESCRIPTION,
+    // 自述里的工具清单必须与实际注册的一致：漏一个，模型就按一份不存在的工具面行事。
+    text: buildSelfDescription(syncEnabled),
   })
 
   const injectionBudget = config?.injectionBudget ?? DEFAULT_INJECTION_BUDGET
@@ -510,6 +734,50 @@ export async function apply(ctx: Context, config?: MemoryConfig): Promise<void> 
       return recallText(memory, cwd, injectionBudget, summaryChars)
     },
   })
+
+  // 日记指针（0.19.0）：**只给目录与最近日期，正文不进注入**——注入预算是记忆的，
+  // 日记不占。这一行本身是「失效可察觉性」判据的应用：它不在，我不会意识到自己有
+  // 日记可读，也就永远不会去读。
+  //
+  // 关闭时**整条不注册**而不是注入空块：配置变化会重跑 `apply`（cordis 对 entry config
+  // 的判定），所以开关切换后这条会自然地出现或消失，不需要 assemble 侧再过滤。
+  // 提醒的节流状态挂在这个实例上，不是模块级全局：一次挂载一份，配置重载即重置，
+  // 测试之间也不会互相污染（模块级那份会让第二个用例看到第一个用例留下的冷却）。
+  let lastRemindAt = 0
+
+  /**
+   * 日记指针行，附带**节流后的**一句提醒。
+   *
+   * 提醒搭在指针行上，而不是另起一条消息：这样不需要 `agent/pre-step` 与
+   * `createUserMessage`（那会多三个 peer 依赖），代价是提醒进的是 system prompt
+   * 而不是对话消息——轻一点，也够模型看见。
+   *
+   * **节流取「距上次写日记」与「距上次提醒」的较小者**：只按写日记算的话，一个决定
+   * 永不写的使用者会被每轮催；只按提醒算的话，刚写完还会被催一次。两者取小才对。
+   * 提醒本身只出现一次就够——不重复催，它才像一句话而不像弹窗。
+   * @returns 注入文本（关闭日记时不会走到这里）。
+   */
+  const diaryText = (): string => {
+    const pointer = pointerLine()
+    const now = Date.now()
+    const written = lastWriteAt()
+    const gapWrite = written === undefined ? Number.POSITIVE_INFINITY : now - written
+    const gapRemind = lastRemindAt === 0 ? Number.POSITIVE_INFINITY : now - lastRemindAt
+    if (Math.min(gapWrite, gapRemind) < DIARY_REMIND_MS) return pointer
+    lastRemindAt = now
+    const detail = written === undefined
+      ? '还没写过'
+      : `距上一篇已 ${Math.floor(gapWrite / 3_600_000)} 小时`
+    return `${pointer}\n（日记提醒：${detail}。这一场如果发生过值得留下的东西——发生了什么、你怎么想、注意到他什么——用 diary_write 写一段；没有就跳过，不用凑。）`
+  }
+
+  if (diaryOn(config)) {
+    ctx.systemPrompt.context({
+      name: 'memory:diary',
+      order: 51,
+      text: () => diaryText(),
+    })
+  }
 
   // 上面那条 provider 是**同步**的（`SystemPrompt.context` 的 `text` 类型就是
   // `string | ((context) => string)`），而工作区表是异步打开的：重启后首次组装时
@@ -551,6 +819,7 @@ export async function apply(ctx: Context, config?: MemoryConfig): Promise<void> 
       content: { type: 'string', required: true, description: 'Plaintext memory content.' },
       namespace: { type: 'string', enum: ['global', 'project'], description: 'Where it applies; defaults to global.' },
       keywords: { type: 'array', items: { type: 'string' }, description: 'Explicit searchable anchors for memory_search. Give several angles (synonyms, abbreviations, zh/en) or it will not be found later. 多角度关键词（同义词、缩写、中英），否则将来检索不到它。' },
+      topic: { type: 'string', description: 'What this memory is about, one short word: 见闻 (things noticed while wandering) / 约定 (standing agreement) / 坑 (a pitfall hit) / 偏好 (a preference) / 事实 / 判据. Orthogonal to namespace. 主题：见闻 / 约定 / 坑 / 偏好 / 事实 / 判据；与 namespace 正交，缺省表示未分类。' },
       injected: { type: 'boolean', description: 'Set true to make this memory resident in every turn\'s context, as a deliberate decision that no longer auto-expires. Reserve it for rules, standing agreements and judgement criteria — the kind that must apply even when nobody thinks to search for them. Facts, references and case notes stay search-only (omit it). 设为 true 让这条记忆每轮常驻上下文，且视为有意决定、不再被自动淘汰。只用于规则、长期约定与判据——那些「没人想起来搜也必须生效」的记忆；事实、参考与案例留作按需检索（省略即可）。' },
       anchor: {
         type: 'object',
@@ -573,6 +842,7 @@ export async function apply(ctx: Context, config?: MemoryConfig): Promise<void> 
         content: args.content,
         ...args.namespace === undefined ? {} : { namespace: args.namespace },
         ...args.keywords === undefined ? {} : { keywords: args.keywords },
+        ...args.topic === undefined ? {} : { topic: args.topic },
         ...args.injected === undefined ? {} : { injected: args.injected },
         // 参数已由 tool schema 校验，这里的窄化只为过类型
         ...args.anchor === undefined
@@ -597,6 +867,7 @@ export async function apply(ctx: Context, config?: MemoryConfig): Promise<void> 
       namespace: { type: 'string', enum: ['global', 'project'], description: 'Restrict to one namespace. 限定单个命名空间.' },
       status: { type: 'string', enum: ['suggested', 'approved'], description: 'Restrict to one review status. 限定审核状态（suggested=待审核 / approved=已审核）.' },
       injected: { type: 'boolean', description: 'Restrict by the persistent-injection switch. 按常驻注入开关过滤.' },
+      topic: { type: 'string', description: 'Restrict to one topic (见闻 / 约定 / 坑 / 偏好 / 事实 / 判据 …). 按主题过滤（0.20.0）.' },
       after: { type: 'string', description: 'Only memories updated at/after this time: `YYYY-MM-DD`, or a relative form like `7d` / `30d`. 只返回此后更新过的记忆（`YYYY-MM-DD`，或相对形式 `7d` / `30d`）.' },
       before: { type: 'string', description: 'Only memories updated at/before this time (same forms as `after`). 只返回此前更新过的记忆（写法同 after）.' },
     },
@@ -612,6 +883,7 @@ export async function apply(ctx: Context, config?: MemoryConfig): Promise<void> 
         ...args.namespace === undefined ? {} : { namespace: args.namespace },
         ...args.status === undefined ? {} : { status: args.status },
         ...args.injected === undefined ? {} : { injected: args.injected },
+        ...args.topic === undefined ? {} : { topic: args.topic },
         ...after === undefined ? {} : { after },
         ...before === undefined ? {} : { before },
       }, execProjectCwd(exec)).then(records => records.map(recordValue))
@@ -627,6 +899,7 @@ export async function apply(ctx: Context, config?: MemoryConfig): Promise<void> 
       namespace: { type: 'string', enum: ['global', 'project'], description: 'Restrict to one namespace. 限定单个命名空间.' },
       status: { type: 'string', enum: ['suggested', 'approved'], description: 'Restrict to one review status. 限定审核状态.' },
       kind: { type: 'string', enum: ['fact', 'prompt'], description: 'Restrict by record kind — fact (memories, default) or prompt (templates; use prompt_search instead). 按记录类别过滤：fact=记忆（默认）/ prompt=模板（模板请用 prompt_search）.' },
+      topic: { type: 'string', description: 'Restrict to one topic (见闻 / 约定 / 坑 / 偏好 / 事实 / 判据 …). 按主题过滤（0.20.0）.' },
       limit: { type: 'integer', default: DEFAULT_SEARCH_LIMIT, description: 'Maximum hits to return (default 20; 0 = no limit; negative falls back to 20). 最多返回条数（默认 20；0 = 不限；负数按 20）.' },
     },
     output: {
@@ -642,6 +915,7 @@ export async function apply(ctx: Context, config?: MemoryConfig): Promise<void> 
         ...args.namespace === undefined ? {} : { namespace: args.namespace },
         ...args.status === undefined ? {} : { status: args.status },
         ...args.kind === undefined ? {} : { kind: args.kind },
+        ...args.topic === undefined ? {} : { topic: args.topic },
       }, execProjectCwd(exec)).then(hits => (limit === 0 ? hits : hits.slice(0, limit)).map(hitValue))
     },
     presentCall: args => present('Search memory', 'read', args.query),
@@ -945,30 +1219,158 @@ export async function apply(ctx: Context, config?: MemoryConfig): Promise<void> 
     },
   }))
 
+  // 日记（2026-10-24）：与记忆**共享插件、不共享存储**。正文落在 `<DSH_HOME>/diary` 下的
+  // md 文件里，一次都不走 `ctx.storage`——那条路的 last-write-wins 会把它吃掉
+  // （见 `docs/设计/2026-10-24-日记机制-设计方案.md` §四）。
+  //
+  // 关闭时**工具还在但拒绝执行**：动态注销需要响应式状态，而 DSH 的插件配置改动走 HMR
+  // 重载——为一次开关把注册生命周期改成可变的，代价大于收益。拒绝信息必须说明「已有日记
+  // 不会被删」，否则关开关的人会以为文件也跟着没了。
+  const diaryClosed = '日记功能已在设置里关闭（面板「日记」）。已有日记仍在 <DSH_HOME>/diary，不会被删除；要恢复写入请先在面板里打开。'
+  ctx.tools.register(defineTool({
+    name: registered('diary_write'),
+    description: 'Append one entry to today\'s diary. This is where lived experience goes — what happened (with detail), how it felt (no conclusion required), what you noticed about the human — never task lists or conclusions, which belong to git log and memory_save. 往今天的日记里追加一段。记的是**经历**：今天发生了什么（有细节）、我怎么想（可以有情绪、可以没结论）、关于他（他说了什么、我注意到了什么）。写不满就少写，不要凑；任务清单与结论分别属于 git log 和 memory_save，不写在这里。',
+    parameters: {
+      text: { type: 'string', required: true, description: '这一段正文。' },
+    },
+    output: {
+      schema: DIARY_WRITE_SCHEMA,
+      render: (_args, value) => renderJson(value),
+    },
+    async execute(args) {
+      if (!diaryOn(config)) throw new Error(diaryClosed)
+      return appendEntry(args.text)
+    },
+    presentCall: () => present('Write diary', 'other'),
+  }))
+
+  ctx.tools.register(defineTool({
+    name: registered('diary_read'),
+    description: 'Read the diary back. Omit `date` for the most recent day that has one. 读回日记。省略 date 读最近写过的那一天。',
+    parameters: {
+      date: { type: 'string', description: '`YYYY-MM-DD`；省略则读最近写过的那一天。' },
+    },
+    output: {
+      schema: DIARY_READ_SCHEMA,
+      render: (_args, value) => renderJson(value),
+    },
+    async execute(args) {
+      if (!diaryOn(config)) throw new Error(diaryClosed)
+      const date = args.date ?? recentDates(1)[0]
+      if (date === undefined) return { date: '', text: '', exists: false }
+      const text = readDay(date)
+      return { date, text: text ?? '', exists: text !== undefined }
+    },
+    presentCall: args => present('Read diary', 'read', args.date),
+  }))
+
+  // ── 云同步（2026-11-11）──────────────────────────────────────────────
+  //
+  // **不向模型暴露 git**：模型只说「同步一下 / 看看状态」，具体 add/commit/push 由插件
+  // 决定。把 `git pull --rebase && git add && git commit && git push` 那一串交给模型，
+  // 出错难排查，也容易越权。
+  // 缺省不启用：没打开 `memory.sync.enabled` 时这两个工具根本不注册（见上面的
+  // `syncEnabled`）；打开之后配置才可能不全——`remote` 为空就只做本地提交。
+  if (syncEnabled) {
+  ctx.tools.register(defineTool({
+    name: registered('memory_sync'),
+    description: 'Push this machine\'s memories to the sync repo, pull other machines\' memories back, or inspect sync state. Conflicts are never auto-resolved — both versions are kept under conflicts/ for a human to settle. 把本机记忆推到同步仓库 / 拉回其他机器的记忆 / 查看同步状态。冲突不会自动裁决：两边版本都留在 conflicts/ 里等人处理。',
+    parameters: {
+      action: {
+        type: 'string',
+        required: true,
+        enum: ['status', 'pull', 'push'],
+        description: 'status = 只看状态（不读不写）；pull = 拉取并导入；push = 镜像、提交并推送。',
+      },
+    },
+    output: {
+      schema: { type: 'object', additionalProperties: true, properties: {} },
+      render: (_args, value) => renderJson(value),
+    },
+    async execute(args) {
+      const cfg = syncConfig()
+      const run = args.action === 'push'
+        ? await syncPush(memory, cfg)
+        : args.action === 'pull'
+          ? await syncPull(memory, cfg)
+          : await syncStatus(cfg)
+      // 工具返回值要求 `Record<string, JsonValue>`；这几个结果都是普通可序列化对象，
+      // 结构化类型对不上而已。走一遍 JSON 往返顺便保证它确实可序列化。
+      return JSON.parse(JSON.stringify(run)) as Record<string, never>
+    },
+    presentCall: args => present('Sync memory', 'other'),
+  }))
+
+  ctx.tools.register(defineTool({
+    name: registered('memory_conflicts'),
+    description: 'List memory conflicts left by sync. Sync never auto-resolves them: if two machines changed the same memory, both versions were kept. 列出同步留下的记忆冲突。同步不会自动裁决——两端改过同一条时，两个版本都留着。',
+    parameters: {
+      action: {
+        type: 'string',
+        required: true,
+        enum: ['list'],
+        description: 'list = 列出 conflicts/ 下的冲突文件。',
+      },
+    },
+    output: {
+      schema: { type: 'object', additionalProperties: true, properties: {} },
+      render: (_args, value) => renderJson(value),
+    },
+    async execute() {
+      const cfg = syncConfig()
+      const files = conflictFiles(cfg)
+      return { count: files.length, files } as unknown as Record<string, never>
+    },
+    presentCall: () => present('List memory conflicts', 'other'),
+  }))
+  }
+
   // 定时备份（2026-10-18 事故后新增）：只读复制，绝不走引擎的写入路径。
   // 首次延迟 1 分钟避开启动高峰；此后按 `backup.intervalMinutes` 重复；`unref` 不挡进程退出。
   const backup = config?.backup
   if (backup?.enabled !== false) {
-    const targetRoot = backup?.targetRoot ?? join(homedir(), '.dsh-backups', 'memory')
+    const targetRoot = backup?.targetRoot ?? defaultBackupRoot()
     const intervalMs = Math.max(1, backup?.intervalMinutes ?? 60) * 60_000
     const keep = Math.max(1, backup?.keep ?? 14)
-    const roots = {
-      globalRoot: config?.globalRoot ?? join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'storages'),
-      projectRoot: config?.projectRoot ?? join(process.cwd(), '.dsh', 'storages'),
+    const globalRoot = config?.globalRoot ?? join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'storages')
+    /**
+     * 本次要备份的 project 根。
+     *
+     * **每次备份时现算**，不能像 `globalRoot` 那样在启动时定死：工作区是随会话逐步
+     * 打开的，启动那一刻引擎里一个都没有，那时算出来永远是空的。
+     *
+     * 三档来源：引擎打开过的工作区（由会话 cwd 驱动，最可靠）、显式配置的
+     * `projectRoot`、两者都空时回退 `process.cwd()`。中间那一档要注意：`MemoryConfig`
+     * 把它注释成「project 记忆的根」，但**引擎实现从不读它**——它只在这里影响备份。
+     * 最后一档只是兜底——它是进程启动目录而非工作区，桌面壳里通常指向 profile
+     * 目录，那正是「项目记忆零快照」的成因（2026-11-05 实测：738 KB / 292 条从未
+     * 进过快照，备份一直对着空目录报成功）。
+     */
+    const projectRoots = (): string[] => {
+      const found = new Set<string>(memory.projectStorageRoots())
+      if (config?.projectRoot !== undefined) found.add(config.projectRoot)
+      if (found.size === 0) found.add(join(process.cwd(), '.dsh', 'storages'))
+      return [...found]
+    }
+    const backupOnce = (): void => {
+      runMemoryBackup({
+        globalRoot,
+        projectRoots: projectRoots(),
+        // 日记在 `storages` 之外，得单独给根——漏了这一项就等于「备份记忆、不备份日记」。
+        diaryRoot: diaryDir(),
+        targetRoot,
+        keep,
+      })
     }
     ctx.effect(() => {
-      const first = setTimeout(() => {
-        runMemoryBackup({ ...roots, targetRoot, keep })
-      }, 60_000)
-      const timer = setInterval(() => {
-        runMemoryBackup({ ...roots, targetRoot, keep })
-      }, intervalMs)
+      const first = setTimeout(backupOnce, 60_000)
+      const timer = setInterval(backupOnce, intervalMs)
       timer.unref()
       return () => {
         clearTimeout(first)
         clearInterval(timer)
         // 关闭时补一次：定时器只在运行期间生效，关 DSH 前最后一段变更靠这里兜住。
-        runMemoryBackup({ ...roots, targetRoot, keep })
+        backupOnce()
       }
     })
   }

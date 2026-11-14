@@ -131,9 +131,10 @@ function asCatalog(value) {
   const out = {};
   for (const [id, line] of Object.entries(raw)) {
     if (typeof line !== "string" || id.trim() === "") continue;
-    const parts = line.split(" ").map(Number);
-    if (parts.length !== 3 || !parts.every((candidate) => Number.isFinite(candidate) && candidate >= 0)) continue;
-    out[id.trim().toLowerCase()] = line;
+    const parts = line.trim().split(/\s+/u);
+    const rates = parts.map(Number);
+    if (parts.length !== 3 || !rates.every((candidate) => Number.isFinite(candidate) && candidate >= 0)) continue;
+    out[id.trim().toLowerCase()] = rates.join(" ");
   }
   return out;
 }

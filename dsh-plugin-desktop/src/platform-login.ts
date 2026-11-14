@@ -19,7 +19,7 @@ interface PlatformLoginAttempt {
 
 /** The `watch` face of the Host's `deepseekAccount` service. */
 export interface PlatformLoginAccount {
-  watch(signal: AbortSignal): AsyncIterable<{ readonly attempt: PlatformLoginAttempt | null }>
+  watch(signal: AbortSignal): AsyncIterable<{ readonly state: { readonly attempt: PlatformLoginAttempt | null } }>
 }
 
 /**
@@ -86,7 +86,7 @@ export async function watchPlatformLogin(
   let opened: string | undefined
   let ended: string | undefined
   for await (const view of account.watch(signal)) {
-    const attempt = view.attempt
+    const attempt = view.state.attempt
     if (attempt === null) continue
     if (attempt.phase === 'waiting-browser' && opened !== attempt.id && isPlatformLoginDestination(attempt.authorizeUrl)) {
       opened = attempt.id

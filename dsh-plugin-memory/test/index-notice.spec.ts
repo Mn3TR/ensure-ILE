@@ -18,6 +18,7 @@ import { join } from 'node:path'
 import Storage from '@deepseek-ai/dsh-storage'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRegistry from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { MemoryId } from '../src/engine.ts'
 import type { MemoryRecord } from '../src/engine.ts'
 import { INDEX_NOTICE_TOPICS, indexNotice } from '../src/injection.ts'
@@ -73,11 +74,12 @@ describe('记忆索引行（①）', () => {
     await ctx.plugin(Storage)
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRegistry)
+    await ctx.plugin(NativeToolExecutor)
     ctx.provide('webServer' as never, { register: () => () => {} } as never)
     ctx.provide('webStartup' as never, { trustedHosts: [] } as never)
     const globalRoot = await mkdtemp(join(tmpdir(), 'dsh-memory-index-'))
     const workspace = await mkdtemp(join(tmpdir(), 'dsh-memory-index-ws-'))
-    const fiber = await ctx.plugin(plugin, { globalRoot })
+    const fiber = await ctx.plugin(plugin, { globalRoot, backup: { enabled: false } })
 
     await ctx.memory.remember(
       { content: '常驻的那条', keywords: ['常驻主题'], namespace: 'project', injected: true },

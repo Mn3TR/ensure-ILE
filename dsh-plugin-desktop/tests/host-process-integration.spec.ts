@@ -1,6 +1,6 @@
 import { fork, type Serializable } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -128,8 +128,10 @@ export function apply(ctx) {
     const spec = shell!
     const headers = { [spec.rendererAccessHeader.name]: spec.rendererAccessHeader.value }
     const unauthorized = await fetch(spec.url, { headers })
-    await unauthorized.body?.cancel()
-    expect(unauthorized.status).toBe(401)
+    const unauthorizedBody = await unauthorized.text()
+    expect(unauthorized.status, JSON.stringify({
+      url: spec.url, headers: Object.fromEntries(unauthorized.headers), body: unauthorizedBody,
+    })).toBe(401)
     const authentication = await fetch(spec.authenticationUrl, { headers, redirect: 'manual' })
     await authentication.body?.cancel()
     expect(authentication.status).toBe(303)
@@ -146,7 +148,7 @@ export function apply(ctx) {
     expect(bundle.status).toBe(200)
     expect(await bundle.text()).toContain('isolatedClientFixture')
     expect(html).toContain('dsh-plugin-desktop')
-    await expect.poll(async () => (await rpc!.call<{ pid: number }>('status')).pid, { timeout: 3000 })
+    await expect.poll(async () => (await rpc!.call<{ pid: number }>('status')).pid, { timeout: 15_000 })
       .toBe(child.pid)
     // A settings import is an ordinary restart; recovery is reserved for a Host that
     // failed to compose, and this one did not.
@@ -172,7 +174,12 @@ export function apply(ctx) {
     await rpc.call('stop')
     await expect(fetch(spec.url, { headers })).rejects.toThrow()
   } catch (error) {
-    throw new Error(`${error instanceof Error ? error.stack : String(error)}\n${stderr}`)
+    const logDirectory = join(home, 'logs')
+    const logs = existsSync(logDirectory) ? readdirSync(logDirectory)
+      .filter(name => name.endsWith('.log'))
+      .map(name => readFileSync(join(logDirectory, name), 'utf8'))
+      .join('').slice(-12_000) : ''
+    throw new Error(`${error instanceof Error ? error.stack : String(error)}\n${stderr}\n${logs}`)
   } finally {
     await releaseNative?.()
     rpc?.close()

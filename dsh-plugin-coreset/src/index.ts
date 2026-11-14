@@ -26,13 +26,13 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { composePrompt, readNote } from 'dsh-plugin-teaching-commons'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-system-prompt'
-import type {} from '@deepseek-ai/dsh-session-projection'
+import type { ProjectionHandle } from '@deepseek-ai/dsh-session-projection'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock, ImageBlock } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
 import { boundSummary, carriedImages, handoffContent, replacementRange } from './handoff.ts'
 import { CHAT_MODE, ILE_SECTION } from './types.ts'
-import type { IleModeDefinition, IleModeEvent } from './types.ts'
+import type { IleModeDefinition, IleModeEvent, IleUnitState } from './types.ts'
 import { ileProjectionDefinition } from './mode-state.ts'
 export { ileProjectionDefinition } from './mode-state.ts'
 
@@ -87,7 +87,7 @@ function foldedImages(session: Session, seqs: readonly SessionSeq[]): ImageBlock
  * projection key is shared, so several presets may mount it at once.
  */
 export class IleModes extends Service {
-  static inject = ['systemPrompt', 'tools', 'sessionProjections']
+  static inject = ['systemPrompt', 'tools', 'sessionProjections', 'agents']
 
   static Config: z<CoreSetConfig> = z.object({
     mode: z.string().default(CHAT_MODE),
@@ -99,9 +99,15 @@ export class IleModes extends Service {
   /** Modes this preset can be in, by id. Per instance: a preset owns its persona set. */
   private readonly modes = new Map<string, IleModeDefinition>()
 
+  private projection!: ProjectionHandle<IleUnitState>
+
+  async [Service.init](): Promise<void> {
+    this.projection = await this.ctx.sessionProjections.register(ileProjectionDefinition)
+  }
+
   /** Read replayable intent instead of keeping acknowledged requests in memory. */
   private pendingIntent(session: Session): IleModeEvent | undefined {
-    return this.ctx.sessionProjections.stateOf(session, 'ile')?.pending ?? undefined
+    return this.projection.stateOf(session).pending ?? undefined
   }
 
   constructor(ctx: Context, config: CoreSetConfig = {}) {
@@ -177,8 +183,6 @@ export class IleModes extends Service {
       },
     })), 'coreset.contextSwitch()')
 
-    ctx.sessionProjections.register(ileProjectionDefinition)
-
     // Pre-step runs outside Session.append publication, so the fold below can
     // append inside an open turn without re-entering the session. It runs only
     // at a turn boundary: replacing a step-2 range would leave the tool call of
@@ -223,8 +227,7 @@ export class IleModes extends Service {
 
   /** The mode in force for a session (logged state, else this preset's start mode). */
   loggedMode(session: Session): string {
-    const state = this.ctx.sessionProjections.stateOf(session, 'ile')
-    const mode = state?.mode ?? ''
+    const mode = this.projection.stateOf(session).mode
     return mode === '' ? this.defaultMode : mode
   }
 
@@ -241,8 +244,7 @@ export class IleModes extends Service {
 
   /** Whether this step is the first of its turn, i.e. history has not grown yet. */
   private isTurnStart(session: Session): boolean {
-    const boundary = this.ctx.sessionProjections.stateOf(session, 'turnBoundary')
-    if (boundary === undefined) return false
+    const boundary = this.ctx.agents.turnBoundaryOf(session)
     if (boundary.openTurnStartSeq === null) return true
     const nodes = session.surface.nodes
     const last = nodes[nodes.length - 1]

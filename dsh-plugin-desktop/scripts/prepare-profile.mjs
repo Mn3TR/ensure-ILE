@@ -13,6 +13,7 @@
  * keeps its checkout-relative specs, so development keeps linking the sources.
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -78,6 +79,18 @@ const packagedManifest = JSON.parse(readFileSync(packagedManifestPath, 'utf8'))
 const dependencies = packagedManifest.dependencies ?? {}
 for (const name of LOCAL_PACKAGES) {
   if (dependencies[name] !== undefined) dependencies[name] = 'file:./vendor/' + name
+}
+// Official plugins resolve from the Desktop runtime overlay. Asking pnpm to
+// install them again would require registry metadata on a learner's first boot.
+const require = createRequire(import.meta.url)
+for (const [name, version] of Object.entries(dependencies)) {
+  if (!name.startsWith('@deepseek-ai/')) continue
+  const installed = JSON.parse(readFileSync(require.resolve(name + '/package.json'), 'utf8'))
+  if (installed.version !== version) {
+    throw new Error(`prepare-profile: ${name} needs ${version}, Desktop provides ${installed.version}`)
+  }
+  delete dependencies[name]
+  console.log('prepare-profile: using Desktop runtime for ' + name)
 }
 writeFileSync(packagedManifestPath, JSON.stringify(packagedManifest, null, 2) + '\n')
 console.log('prepare-profile: rewrote local dependencies to ./vendor')

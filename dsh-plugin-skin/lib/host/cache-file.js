@@ -21,14 +21,7 @@ function createCacheFiles(packageName) {
     cachePath(ctx, ...segments) {
       return join2(harnessPath(ctx, "cache", packageName), ...segments);
     },
-    /**
-     * One JSON document from disk.
-     *
-     * @param ctx - host plugin context, for the warning a failure leaves.
-     * @param path - the file to read.
-     * @param label - what the file is, for the warning.
-     * @returns the parsed document, or undefined when it is absent or unreadable.
-     */
+    /** Return parsed JSON, or undefined with a warning when absent or unreadable. */
     readJsonDocument(ctx, path, label) {
       if (!existsSync(path)) return void 0;
       try {
@@ -38,15 +31,7 @@ function createCacheFiles(packageName) {
         return void 0;
       }
     },
-    /**
-     * Replace one cache file through a temporary file.
-     *
-     * @param ctx - host plugin context, for the warning a failure leaves.
-     * @param path - the file to write.
-     * @param label - what the file is, for the warning.
-     * @param document - the value to store.
-     * @returns whether the file now holds the document.
-     */
+    /** Write through a temporary file; report failure and return whether the replace succeeded. */
     writeJsonDocument(ctx, path, label, document) {
       const temporary = `${path}.${process.pid}.tmp`;
       try {

@@ -1,7 +1,8 @@
-import { createServer, type Server } from 'node:http'
+import { createServer, Server } from 'node:http'
 import { connect } from 'node:net'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import type { PeerScope } from '@deepseek-ai/dsh-typert-protocol'
 import {
   createDesktopBrowserAccess,
   type DesktopBrowserAccess,
@@ -14,6 +15,7 @@ const occupied: Server[] = []
 const contexts: Context[] = []
 
 afterEach(async () => {
+  vi.restoreAllMocks()
   await Promise.all(contexts.splice(0).map(context => context.fiber.dispose()))
   await Promise.all(occupied.splice(0).map(server => new Promise<void>(resolve => server.close(() => resolve()))))
 })
@@ -28,6 +30,32 @@ async function occupy(): Promise<{ server: Server; port: number }> {
   const address = server.address()
   if (address === null || typeof address === 'string') throw new Error('test server did not expose an address')
   return { server, port: address.port }
+}
+
+/**
+ * Make `listen` fail like Windows does for a port inside a Hyper-V/WinNAT
+ * excluded range: no process owns it, but the bind reports `EACCES`.
+ */
+function rejectListen(code: string, rejects: (port: number) => boolean): number[] {
+  const attempted: number[] = []
+  const listen = Server.prototype.listen
+  vi.spyOn(Server.prototype, 'listen').mockImplementation(function (this: Server, ...args: unknown[]) {
+    const port = Number(args[0])
+    attempted.push(port)
+    if (!rejects(port)) return Reflect.apply(listen, this, args) as Server
+    process.nextTick(() => {
+      this.emit('error', Object.assign(new Error(`listen ${code} 127.0.0.1:${String(port)}`), { code, syscall: 'listen', port }))
+    })
+    return this
+  })
+  return attempted
+}
+
+async function freePort(): Promise<number> {
+  const { server, port } = await occupy()
+  occupied.splice(occupied.indexOf(server), 1)
+  await new Promise<void>(resolve => server.close(() => resolve()))
+  return port
 }
 
 async function startWebServer(access?: DesktopBrowserAccess): Promise<DesktopWebServer> {
@@ -93,6 +121,45 @@ describe('Desktop WebServer port policy', () => {
     expect(selectedPort).toBeLessThanOrEqual(blocked.port + DESKTOP_WEB_PORT_RETRY_LIMIT)
   })
 
+  it('moves past a Windows-reserved port that reports EACCES', async () => {
+    const base = await freePort()
+    const attempted = rejectListen('EACCES', port => port >= base && port < base + 3)
+    const context = new Context()
+    contexts.push(context)
+
+    await context.plugin(DesktopWebServer, { host: '127.0.0.1', port: base })
+
+    const selectedPort = context.get('webServer')?.port ?? 0
+    expect(attempted.slice(0, 3)).toEqual([base, base + 1, base + 2])
+    expect(selectedPort).toBeGreaterThanOrEqual(base + 3)
+    expect(selectedPort).toBeLessThanOrEqual(base + DESKTOP_WEB_PORT_RETRY_LIMIT)
+  })
+
+  it('falls back to an OS-assigned port when the whole retry window is reserved', async () => {
+    const base = await freePort()
+    const attempted = rejectListen('EACCES', port => port !== 0)
+    const context = new Context()
+    contexts.push(context)
+
+    await context.plugin(DesktopWebServer, { host: '127.0.0.1', port: base })
+
+    expect(attempted).toHaveLength(DESKTOP_WEB_PORT_RETRY_LIMIT + 2)
+    expect(attempted.at(-2)).toBe(base + DESKTOP_WEB_PORT_RETRY_LIMIT)
+    expect(attempted.at(-1)).toBe(0)
+    expect(context.get('webServer')?.port).toBeGreaterThan(0)
+  })
+
+  it('still fails startup on bind errors that do not mean the port is unavailable', async () => {
+    const base = await freePort()
+    const attempted = rejectListen('EADDRNOTAVAIL', () => true)
+    const context = new Context()
+    contexts.push(context)
+
+    await expect(context.plugin(DesktopWebServer, { host: '127.0.0.1', port: base }))
+      .rejects.toMatchObject({ code: 'EADDRNOTAVAIL' })
+    expect(attempted).toEqual([base])
+  })
+
   it('preserves an OS-assigned port when the explicit value is zero', async () => {
     const context = new Context()
     contexts.push(context)
@@ -153,6 +220,51 @@ describe('Desktop WebServer browser gate', () => {
     const forged = await fetch(`${root}/?dsh-desktop-mode=compatibility`)
     expect(forged.status).toBe(403)
     expect(forged.headers.get('cache-control')).toBe('no-store')
+  })
+
+  it('gates named resources and preserves native GET and HEAD responses', async () => {
+    const access = createDesktopBrowserAccess(false, Buffer.alloc(32, 6).toString('base64url'))
+    const server = await startWebServer(access)
+    const resource = vi.fn(async () => new Response('asset', { headers: { 'x-fixture': 'resource' } }))
+    server.register({ kind: 'exact', path: '/asset.txt', resource })
+    const url = `http://127.0.0.1:${String(server.port)}/asset.txt`
+    expect((await fetch(url)).status).toBe(403)
+    expect(resource).not.toHaveBeenCalled()
+    const headers = { [access.rendererHeader.name]: access.rendererHeader.value }
+    const response = await fetch(url, { headers })
+    expect(response.status).toBe(200)
+    expect(response.headers.get('x-fixture')).toBe('resource')
+    expect(await response.text()).toBe('asset')
+    const head = await fetch(url, { headers, method: 'HEAD' })
+    expect(head.status).toBe(200)
+    expect(await head.text()).toBe('')
+  })
+
+  it('gates resource fallbacks and denies forged Desktop markers in browser mode', async () => {
+    const access = createDesktopBrowserAccess(true, Buffer.alloc(32, 7).toString('base64url'))
+    const server = await startWebServer(access)
+    server.registerFallback({ resource: async () => new Response('application') })
+    const root = `http://127.0.0.1:${String(server.port)}`
+    expect(await (await fetch(`${root}/assets/app.js`)).text()).toBe('application')
+    expect((await fetch(`${root}/?dsh-desktop-mode=advanced`)).status).toBe(403)
+    access.setOrdinaryBrowserEnabled(false)
+    expect((await fetch(root)).status).toBe(403)
+    const response = await fetch(root, { headers: { [access.rendererHeader.name]: access.rendererHeader.value } })
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe('application')
+  })
+
+  it('retains resource routing for admitted in-process Peers while browser access is disabled', async () => {
+    const server = await startWebServer(createDesktopBrowserAccess(false))
+    const peer = { principal: { kind: 'owner' } } as PeerScope
+    const resource = vi.fn(async (_request: Request, _reader?: PeerScope) => new Response('internal resource'))
+    server.register({ kind: 'prefix', path: '/assets', resource })
+    server.registerFallback({ resource })
+    for (const path of ['/assets/file', '/?dsh-desktop-mode=advanced']) {
+      const response = await server.readResource(new Request(`http://reader.invalid${path}`), peer)
+      expect(await response.text()).toBe('internal resource')
+      expect(resource).toHaveBeenLastCalledWith(expect.any(Request), peer)
+    }
   })
 
   it('applies the same gate to WebSocket upgrades', async () => {

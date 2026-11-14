@@ -35,7 +35,7 @@ export class HostRpc {
         this.pending.delete(id)
         cleanup()
         try { this.port.send({ kind: 'cancel', id }) } catch { /* channel already gone */ }
-        reject(new Error('DSH Host call cancelled or timed out'))
+        reject(new Error(`DSH Host call cancelled or timed out (${method})`))
       }
       const timer = timeoutMs === 0 ? undefined : setTimeout(abort, timeoutMs)
       const cleanup = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort) }

@@ -307,6 +307,32 @@ describe('installProfilePackageResolver', () => {
     expect(harness.overlay).toHaveBeenCalledWith('@deepseek-ai/dsh-web-app', expect.any(Object))
   })
 
+  it('recognizes the Cordis Profile resolver helper as a Loader boundary', () => {
+    const profileBaseUrl = fixtureUrl('tmp', 'dsh', 'profiles', 'desktop', 'package.json')
+    installProfilePackageResolver(profileBaseUrl)
+    const nextResolve = vi.fn((specifier: string, context: { parentURL?: string }) => ({ specifier, context }))
+
+    expect(harness.resolve?.(
+      '@deepseek-ai/dsh-web-app',
+      { parentURL: fixtureUrl('tmp', 'dsh', 'profiles', 'desktop', '.cordis', 'resolve.mjs') },
+      nextResolve,
+    )).toEqual({
+      specifier: '@deepseek-ai/dsh-web-app',
+      context: { parentURL: profileBaseUrl },
+    })
+    expect(harness.overlay).toHaveBeenCalledWith('@deepseek-ai/dsh-web-app', expect.any(Object))
+  })
+
+  it('keeps unrelated Profile helper files outside the Loader boundary', () => {
+    const profileBaseUrl = fixtureUrl('tmp', 'dsh', 'profiles', 'desktop', 'package.json')
+    installProfilePackageResolver(profileBaseUrl)
+    const nextResolve = vi.fn((specifier: string, context: { parentURL?: string }) => ({ specifier, context }))
+    const context = { parentURL: fixtureUrl('tmp', 'dsh', 'profiles', 'desktop', '.cordis', 'other.mjs') }
+
+    expect(harness.resolve?.('unrelated', context, nextResolve)).toEqual({ specifier: 'unrelated', context })
+    expect(harness.overlay).not.toHaveBeenCalled()
+  })
+
   it('keeps non-package Loader specifiers on ordinary Node resolution', () => {
     installProfilePackageResolver('file:///C:/Users/test/profile/package.json')
     const nextResolve = vi.fn((specifier: string, context: { parentURL?: string }) => ({ specifier, context }))

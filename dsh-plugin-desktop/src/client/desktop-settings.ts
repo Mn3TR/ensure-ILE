@@ -6,6 +6,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import { DesktopSettingsSection, type DesktopNotificationSettings, type DesktopShellSettings } from './DesktopSettingsSection.tsx'
 import { DesktopTerminalSettingsAction } from './DesktopTerminalSettingsAction.tsx'
 import { createDesktopSettingsApi } from './desktop-settings-api.ts'
+import { registerDesktopSettingsIcon } from './desktop-settings-icon.tsx'
 import { en, zh, type DesktopSettingsLocaleKey } from './desktop-settings-locales.ts'
 import { installDesktopSettingsStyles } from './desktop-settings-styles.ts'
 import type { DesktopClientEnvironment } from './environment.ts'
@@ -95,6 +96,7 @@ export function applyDesktopSettings(
     () => installPluginControlsStyles(),
     'dsh-plugin-desktop: plugin controls styles',
   )
+  registerDesktopSettingsIcon(ctx, 'desktop')
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
     id: 'desktop',

@@ -119,7 +119,7 @@ describe.sequential('一轮对话在线上长什么样', () => {
     await page.waitForTimeout(300)
   }
 
-  test('首轮请求带的是做题会话的整套提示词与 30 个工具', async () => {
+  test('首轮请求带的是做题会话的整套提示词与 32 个工具', async () => {
     const started = Date.now()
     fake.script([{ kind: 'text', text: REPLY_FIRST }])
     await ask('我有道数学题不会', REPLY_FIRST)
@@ -145,10 +145,14 @@ describe.sequential('一轮对话在线上长什么样', () => {
     expect(system).toContain('## 切换模式')
 
     const names = toolNames(request)
-    expect(names, '工具数').toHaveLength(30)
+    expect(names, '工具数').toHaveLength(32)
+    expect(names).not.toContain('memory_sync')
+    expect(names).not.toContain('memory_conflicts')
     for (const needed of [
       'read_note',
       'context_switch',
+      'diary_read',
+      'diary_write',
       'bank_add',
       'bank_list',
       'bank_resume',

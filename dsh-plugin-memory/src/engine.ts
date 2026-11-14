@@ -109,6 +109,13 @@ export interface MemoryRecord {
   lastUsedAt?: number
   /** 记录类别（缺省 'fact'）。 */
   kind?: MemoryKind
+  /**
+   * 记忆主题（0.20.0）：见闻 / 约定 / 坑 / 偏好 / 事实 / 判据 …
+   *
+   * 与 `kind` 正交：`kind` 分「记忆还是提示词模板」，`topic` 分「这条记忆讲什么」。
+   * 存自由字符串，方便「只翻我出去逛到的那些」这类切片。
+   */
+  topic?: string
   /** prompt 记录元数据（仅 kind==='prompt'）。 */
   meta?: PromptMetaIndex
   /**
@@ -122,6 +129,8 @@ export interface MemoryWrite {
   content: string
   namespace?: MemoryNamespace
   keywords?: string[]
+  /** 记忆主题（0.20.0）：见闻 / 约定 / 坑 / 偏好 / 事实 / 判据 …；省略表示未分类。 */
+  topic?: string
   /** 写入来源（2026-09-15）；缺省 'agent'（主模型写入）。面板等人工路径传 'human'。 */
   source?: MemorySource
   /**
@@ -145,6 +154,8 @@ export interface MemoryFilter {
   quarantined?: boolean
   /** 记录类别过滤（0.6.0）；缺省不过滤（工具层显式传 kind='fact' 保持旧行为）。 */
   kind?: MemoryKind
+  /** 主题过滤（0.20.0）：只取这个 topic 的记录；缺省不过滤。 */
+  topic?: string
   /**
    * 更新时间下界 / 上界（0.12.0；epoch ms，含端点）。
    *
@@ -363,6 +374,8 @@ interface StoredBlock {
   vector?: number[]
   /** 记录类别（0.6.0 模板库；缺省 fact）。 */
   kind?: MemoryKind
+  /** 记忆主题（0.20.0）：见闻 / 约定 / 坑 / 偏好 / 事实 / 判据 …；缺省 = 未分类。 */
+  topic?: string
   /** prompt 索引元数据（仅 kind==='prompt'）。 */
   meta?: PromptMetaIndex
 }
@@ -438,10 +451,11 @@ function toRecord(id: string, block: StoredBlock): MemoryRecord {
     ...block.stale === undefined ? {} : { stale: block.stale },
     ...block.staleReason === undefined ? {} : { staleReason: block.staleReason },
   }
-  // 0.6.0 模板库字段（缺省 fact；prompt 元数据透传）
+  // 0.6.0 模板库字段（缺省 fact；prompt 元数据透传）；0.20.0 起带主题
   return {
     ...base,
     ...block.kind === undefined ? {} : { kind: block.kind },
+    ...block.topic === undefined ? {} : { topic: block.topic },
     ...block.meta === undefined ? {} : { meta: block.meta },
   }
 }
@@ -496,6 +510,23 @@ export interface MemoryConfig {
    */
   backup?: MemoryBackupConfig
   /**
+   * 云同步配置（2026-11-11；2026-11-12 改成显式开关）：
+   * `{ enabled, mirrorDir, remote?, branch?, envName? }`。
+   *
+   * **开关是 `enabled`，不是「配了 remote 就算开」**——与日记同一个模式。缺省不配 = 不同步。
+   * 设计见 `docs/设计/2026-11-06-记忆云同步-设计方案.md`。
+   */
+  sync?: unknown
+  /**
+   * 日记开关的**部署默认值**（2026-10-24）。运行中的选择在面板里改，值写进
+   * profile 的 `cordis.patch.yml`（**不另设存储文件**，见设计文档 §四）；两边都开才开——否则部署时关掉会被
+   * 使用者那一侧缺省的 `true` 翻回来。
+   *
+   * 关掉时日记工具会拒绝写入、不注入指针、也不提醒；已有的 md 文件原样保留
+   * （删除是使用者的动作，不该由开关代劳）。
+   */
+  diary?: { enabled?: boolean }
+  /**
    * 查询日志文件路径（2026-09-15 §六.6）；默认为全局存储根下的 `query-log.json`
    * ——即与 `memory.json` **同目录**（`$DSH_HOME/storages/query-log.json`），不落子目录。
    */
@@ -515,6 +546,14 @@ export class MemoryEngine extends Service {
   private globalTable?: KvTable<string, StoredBlock>
 /** project 域按工作区 cwd 懒打开 + 缓存（多会话并发各工作区独立）。 */
   private projectTables = new Map<string, KvTable<string, StoredBlock>>()
+  /**
+   * 各 storage backend 的清理函数（摘名 + 关闭）。
+   *
+   * 不挂在独立 effect 上：cordis 的 dispose 后进先出，运行时才注册的那些会比
+   * `memory.domainsClose` 早执行，导致 domain 还握着 unit 时 backend 先关。
+   * 统一由 {@link closeBackends} 在 domain 全部关闭之后按插入顺序执行。
+   */
+  private readonly backendClosers: Array<() => Promise<void>> = []
   /** 子项目发现缓存（④-B 2026-09-19）：key = 工作区路径；值 = 其直接子目录中带记忆的（按条数降序）。 */
   private readonly neighborCache = new Map<string, Array<{ name: string, count: number }>>()
   /** 进行中的子项目发现（key → promise）：预热是 fire-and-forget，之后的显式调用与它合流而非重复扫描。 */
@@ -557,15 +596,54 @@ export class MemoryEngine extends Service {
   }
 
   protected async [Service.init](): Promise<void> {
-    // backend 只注册一次：registry 对重名注册抛 duplicate-backend
-    // （storage/tests/registry.spec 实测），reload 不得重复注册。
+    // backend 注册是**一个 effect**：`dsh-storage` 的 `BackendRegistry.register()` 契约是
+    // 「registration is an effect: the returned disposer removes the name」。丢掉那个 disposer
+    // 会让名字活过 fiber——issue #3 的真实成因：插件市场的更新流程会在同一进程里重新组合
+    // profile 并做一次构建校验，本 entry 第二次激活时 `register('memory-global', …)` 撞上
+    // 自己上次留下的名字，报 `duplicate-backend`；而那句报错被上层包装成「更新前的构建
+    // 未能验证恢复，请检查该 profile」，把用户引向「配置坏了」这个错误方向。
+    //
+    // **摘名与关闭不能各挂一个 effect**：cordis 的 dispose 后进先出，而 project backend 的
+    // effect 是运行时（`openProjectTable`）才注册的，会比这里晚注册、早执行——于是 domain
+    // 还握着 unit 时 backend 先被关掉，留下没释放的 open-slot，下一个实例打开同一目录
+    // 就失败（表现为「表打开了但一条都读不到」）。所以统一收进一个 closers 列表，
+    // 由本 effect 在**所有 domain 关闭之后**依次执行。
+    //
+    // reload 不重新注册 backend（见 `reload()`：它只重开 domain），所以这样改不改变
+    // reload 的语义——这些 closers 只在 dispose 时触发。
     const globalBackend = new JsonStorageBackend(this.config.globalRoot ?? globalRoot())
-    this.ctx.storage.backend.register('memory-global', globalBackend)
+    this.backendClosers.push(this.registerBackend('memory-global', globalBackend))
     await this.openGlobalFacility()
-    this.ctx.effect(() => () => {
-      void this.facility?.closeAll()
-      for (const facility of this.projectFacilities.values()) void facility.closeAll()
+    this.ctx.effect(() => async () => {
+      await this.facility?.closeAll()
+      for (const facility of this.projectFacilities.values()) await facility.closeAll()
+      await this.closeBackends()
     }, 'memory.domainsClose')
+  }
+
+  /**
+   * 注册一个 storage backend 并返回它的清理函数（摘名 + 关闭）。
+   *
+   * 清理函数**不立刻挂到 effect 上**，而是交给 {@link closeBackends} 在 domain 全部关闭
+   * 之后统一执行——理由见 `[Service.init]` 的注释。
+   */
+  private registerBackend(name: string, backend: JsonStorageBackend): () => Promise<void> {
+    const unregister = this.ctx.storage.backend.register(name, backend)
+    return async () => {
+      unregister()
+      await backend.close()
+    }
+  }
+
+  /** 依次摘名并关闭所有已注册的 backend；必须由外部保证 domain 已先关闭。 */
+  private async closeBackends(): Promise<void> {
+    for (const close of this.backendClosers.splice(0)) {
+      try {
+        await close()
+      } catch {
+        // 清理失败不该让 dispose 整体失败——名字可能已被别处摘掉。
+      }
+    }
   }
 
   /** 打开全局存储域（init 与 reload 共用；backend 复用已注册实例）。 */
@@ -596,6 +674,33 @@ export class MemoryEngine extends Service {
   projectOpen(projectCwd?: string): boolean {
     if (projectCwd === undefined || projectCwd === '') return false
     return this.projectTables.has(join(projectCwd))
+  }
+
+  /**
+   * 已经打开过的工作区 project 存储根（`<cwd>/.dsh/storages`），供备份遍历。
+   *
+   * 备份是定时任务、没有会话 cwd，所以「现在在哪个工作区」这个问题它答不出来。
+   * 此前它拿 `process.cwd()` 兜底，而那是**进程启动目录**（桌面壳里通常是 profile
+   * 目录），与真实工作区无关——2026-11-05 实测：292 条项目记忆从未进过快照，备份
+   * 一直对着一个空目录反复报成功。
+   *
+   * 打开过的表由会话 cwd 驱动，见过的工作区都留在 {@link projectTables} 里；这是
+   * 备份唯一可靠的工作区来源。返回空数组表示「这次运行还没打开过任何工作区」，
+   * 由调用方决定回退策略。
+   */
+  projectStorageRoots(): string[] {
+    return [...this.projectTables.keys()].map(cwd => this.projectRootFor(cwd))
+  }
+
+  /**
+   * 已经打开过的工作区 cwd 列表（同步导出用）。
+   *
+   * 与 {@link projectStorageRoots} 的区别：那个给的是存储根（`<cwd>/.dsh/storages`），
+   * 这个给 cwd 本身。导出要按 cwd 调 `list({ namespace: 'project' }, cwd)`，从存储根
+   * 反推 cwd 依赖目录层级，不如直接给。
+   */
+  projectCwds(): string[] {
+    return [...this.projectTables.keys()]
   }
 
   /**
@@ -660,7 +765,10 @@ export class MemoryEngine extends Service {
     }
     if (!this.registeredProjectBackends.has(backendName)) {
       const backend = new JsonStorageBackend(root)
-      this.ctx.storage.backend.register(backendName, backend)
+      // 与 `memory-global` 同样走 closers 列表：`registeredProjectBackends` 只能防**同一
+      // 实例**内的重复注册，换一个实例这个 Set 就是空的，挡不住上一个 fiber 残留的名字
+      // （issue #3 里这一点被 `memory-global` 先撞上，所以看不出来）。
+      this.backendClosers.push(this.registerBackend(backendName, backend))
       this.registeredProjectBackends.add(backendName)
     }
     const facility = new DomainFacility(this.ctx, { backend: backendName, routes: {} })
@@ -1101,6 +1209,8 @@ export class MemoryEngine extends Service {
       ...input.injected === undefined ? {} : { injectedAuto: false },
       // 有效性锚点（可选）：值变了这条记忆会被标 stale，不再被当成仍然正确
       ...input.anchor === undefined ? {} : { anchor: input.anchor },
+      // 主题（0.20.0）：省略即未分类，与 `kind`（fact/prompt）正交
+      ...input.topic === undefined || input.topic.trim() === '' ? {} : { topic: input.topic.trim() },
       ...verdict.quarantined
         ? { quarantined: true, ...verdict.reason === undefined ? {} : { quarantineReason: verdict.reason } }
         : {},
@@ -1122,7 +1232,8 @@ export class MemoryEngine extends Service {
       // 0.12.0：按更新时间筛——与注入排序、注入行的日期标记同一个依据，不制造第二个「新」的定义
       && (filter?.after === undefined || record.updatedAt >= filter.after)
       && (filter?.before === undefined || record.updatedAt <= filter.before)
-      && (filter?.kind === undefined || (record.kind ?? 'fact') === filter.kind))
+      && (filter?.kind === undefined || (record.kind ?? 'fact') === filter.kind)
+      && (filter?.topic === undefined || record.topic === filter.topic))
   }
 
   /**
@@ -1749,6 +1860,17 @@ export class MemoryEngine extends Service {
     }
   }
 
+  /**
+   * 按 id 取一条记录的原始块（2026-11-14，同步层用）。
+   *
+   * 返回 `Record<string, unknown>` 而不是内部 `StoredBlock`：调用方要把它塞进墓碑当快照，
+   * 需要的是可 JSON 序列化的普通对象，不该依赖内部块类型。不触发 `markUsed`——这不是检索。
+   */
+  async findBlock(id: string, projectCwd?: string): Promise<Record<string, unknown> | undefined> {
+    const found = await this.locateRecord(id as MemoryId, projectCwd)
+    return found === undefined ? undefined : { ...found.block }
+  }
+
   async setStatus(id: MemoryId, status: MemoryStatus, projectCwd?: string): Promise<MemoryRecord> {
     return this.writeScope(projectCwd, () => this.setStatusInner(id, status, projectCwd))
   }
@@ -1882,6 +2004,35 @@ export class MemoryEngine extends Service {
    * 起可改 `injected`：**省略则保留原值**（连 `injectedAuto` 一起不动），给值即接管。若新
    * 内容命中危险规则则转为隔离（与写入路径同一判定），并连带撤下注入。
    */
+  /**
+   * 按**指定 id** 写入一条外来记录——同步导入专用。
+   *
+   * 与 {@link remember} 的区别：`remember` 生成新 id 并走内容判定；`adopt` 接收另一端
+   * 记录的 id 与整块内容，原样落进来。**必须保 id**——否则同一件事在五个环境里会变成
+   * 五条互不相干的记忆，而「共享一份记忆」正是同步要达成的事。
+   *
+   * 与 {@link update} 的区别：`update` 只改可编辑字段（content / keywords / injected /
+   * anchor）并把 `updatedAt` 推到当下；`adopt` 连 `createdAt`、`stale`、隔离标记一起搬
+   * ——那是「另一端此刻的完整状态」，不是一次本地编辑。因此也**不重算 `updatedAt`**：
+   * 拿导入时刻覆盖掉原始时间会让冲突判定（按 `updatedAt` 取新）失效。
+   *
+   * 仍然过 `putBlock` 的 schema 校验（门一）：外来数据一样要合规。
+   */
+  async adopt(id: MemoryId, block: StoredBlock, projectCwd?: string): Promise<MemoryRecord> {
+    return this.writeScope(projectCwd, async () => {
+      const table = block.namespace === 'project'
+        ? await this.projectTableFor(projectCwd)
+        : this.requireTable('global')
+      if (table === undefined) {
+        throw new Error('adopt: project memory requires a workspace cwd')
+      }
+      await this.putBlock(table, id, block)
+      const record = toRecord(id, block)
+      this.ctx.emit('memory/changed', { operation: 'remembered', record })
+      return record
+    })
+  }
+
   async update(id: MemoryId, patch: MemoryPatch, projectCwd?: string): Promise<MemoryRecord> {
     return this.writeScope(projectCwd, () => this.updateInner(id, patch, projectCwd))
   }

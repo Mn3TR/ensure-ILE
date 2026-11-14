@@ -103,55 +103,16 @@ function brainIcon(): ReactNode {
   }, BRAIN_PATHS.map((d, index) => createElement('path', { key: index, d })))
 }
 
-// ---- 设置页导航图标替换（照 dsh-plugin-center settings-nav-icon 模式） ----
-// DSH 0.1.x settings.section 无 icon 契约（外部 section 一律默认齿轮）。
-// MutationObserver 按当前本地化 label 标记本插件行，CSS mask 换成大脑。
-const SETTINGS_NAV_MARKER = 'data-dsh-memory-settings-nav'
-const BRAIN_MASK_SVG = `%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z'/%3E%3Cpath d='M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z'/%3E%3C/svg%3E`
-const NAV_ICON_CSS = `
-[data-dsh-memory-settings-nav] > svg:first-child { display: none; }
-[data-dsh-memory-settings-nav]::before {
-  content: '';
-  flex: none;
-  width: 16px;
-  height: 16px;
-  background: currentColor;
-  -webkit-mask: url("data:image/svg+xml,${BRAIN_MASK_SVG}") center / contain no-repeat;
-  mask: url("data:image/svg+xml,${BRAIN_MASK_SVG}") center / contain no-repeat;
-}
-`
-let navCssInjected = false
-function injectNavCss(): void {
-  if (navCssInjected || typeof document === 'undefined') return
-  navCssInjected = true
-  const style = document.createElement('style')
-  style.setAttribute('data-plugin', 'dsh-plugin-memory')
-  style.textContent = NAV_ICON_CSS
-  document.head.append(style)
-}
-
-/** 标记设置对话框里本插件的导航行（照 dsh-plugin-center 同款，HMR-safe）。 */
-function registerSettingsNavIcon(label: () => string): () => void {
-  let disposed = false
-  const sync = (): void => {
-    if (disposed) return
-    const currentLabel = label().trim()
-    const buttons = document.querySelectorAll<HTMLButtonElement>('[role="dialog"] nav button')
-    for (const button of buttons) {
-      const matches = currentLabel.length > 0 && button.textContent?.trim() === currentLabel
-      if (matches) button.setAttribute(SETTINGS_NAV_MARKER, '')
-      else button.removeAttribute(SETTINGS_NAV_MARKER)
-    }
-  }
-  sync()
-  const observer = new MutationObserver(sync)
-  observer.observe(document.body, { childList: true, subtree: true, characterData: true })
-  return () => {
-    disposed = true
-    observer.disconnect()
-    document.querySelectorAll(`[${SETTINGS_NAV_MARKER}]`)
-      .forEach((element) => { element.removeAttribute(SETTINGS_NAV_MARKER) })
-  }
+// ---- 设置页导航图标（宿主 settings.section.icon 插槽，DSH 0.2.2-rc.1 起） ----
+// 0.2.1 及更早没有 icon 契约，只能靠 MutationObserver 标记导航按钮、用 `::before`
+// mask 画图标再隐去宿主默认齿轮。0.2.2-rc.1 把导航图标包进 `span.navIcon`，那条
+// `> svg:first-child` 失配，齿轮重新露出来 → 双图标（2026-11-12 实拍）。
+// 现在直接注册宿主插槽：按 section id 取图，尺寸与选中态都由宿主给。
+function navIcon(size: number): ReactNode {
+  return createElement('svg', {
+    width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
+    stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
+  }, BRAIN_PATHS.map((d, index) => createElement('path', { key: index, d })))
 }
 
 // ---- i18n (DSH zh/en, plugin-center pattern) ----
@@ -1010,6 +971,441 @@ interface LocaleAwareContext {
   effect?: (exec: () => unknown, label?: string) => unknown
 }
 
+/**
+ * 插件配置表单的最小面（`ctx.configForms.get(ns)` 的返回值）。
+ *
+ * 只声明本卡片用到的三件：读快照、订阅变化、按路径写。`set(field, value)` 只接
+ * 单段标量字段（其 JSDoc 写明），嵌套的 `diary.enabled` / `sync.enabled` 走 `mutate`
+ * 的路径操作。
+ */
+interface ConfigFormLike {
+  getSnapshot(): {
+    value?: {
+      diary?: { enabled?: boolean }
+      /** 连接目标：面板里可改，值写进 profile 的 patch。 */
+      sync?: { enabled?: boolean, remote?: string, mirrorDir?: string, branch?: string, proxy?: string }
+    }
+  }
+  subscribe(listener: () => void): unknown
+  mutate(ops: Array<{ op: 'set', path: string[], value: unknown }>): unknown
+}
+
+/** 一行开关：左侧标题与说明，右侧 button[role=switch]。 */
+function SwitchRow(props: {
+  label: string
+  hint: string
+  enabled: boolean
+  ariaLabel: string
+  /** 写入失败必须可见——静默吞掉会表现为「点了没反应」，比报错更坏。 */
+  onToggle: () => void
+  divided: boolean
+}): ReactNode {
+  const { label, hint, enabled, ariaLabel, onToggle, divided } = props
+  return createElement('div', {
+    style: {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+      padding: '12px 0',
+      ...divided ? { borderTop: '1px solid var(--dsw-alias-border-l2, #1e2836)' } : {},
+    },
+  },
+  createElement('div', { style: { minWidth: 0 } },
+    createElement('div', { style: { fontSize: 13, fontWeight: 600, color: 'var(--dsw-alias-label-primary, #d8e0ea)' } }, label),
+    createElement('div', { style: { fontSize: 11.5, color: 'var(--dsw-alias-label-secondary, #67748a)', marginTop: 3, lineHeight: 1.5 } }, hint),
+  ),
+  createElement('button', {
+    type: 'button',
+    role: 'switch',
+    'aria-checked': enabled,
+    'aria-label': ariaLabel,
+    onClick: onToggle,
+    style: {
+      flex: 'none', width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer',
+      position: 'relative', transition: 'background 120ms',
+      background: enabled ? 'var(--dsw-alias-state-business-primary, #4FC3F7)' : 'var(--dsw-alias-border-l2, #1e2836)',
+    },
+  },
+  createElement('span', {
+    style: {
+      position: 'absolute', top: 3, left: enabled ? 21 : 3, width: 16, height: 16, borderRadius: '50%',
+      background: '#fff', transition: 'left 120ms',
+    },
+  })))
+}
+
+/**
+ * 云同步的连接配置：一个文本框，失焦或回车时提交。
+ *
+ * 提交时机选**失焦**而不是每次按键：每次按键都 `mutate` 会连续写 patch 文件，
+ * 而且中途的半截地址（`https://github.co`）不该落盘。
+ *
+ * 这些字段（remote / mirrorDir / branch）决定的是**连接目标**，不属于「临时状态」，
+ * 所以和 `enabled` 不同——改完要重启实例才真正生效（文案里写明了）。
+ */
+function SyncField(props: {
+  label: string
+  hint: string
+  value: string
+  placeholder: string
+  ariaLabel: string
+  onCommit: (value: string) => void
+}): ReactNode {
+  const { label, hint, value, placeholder, ariaLabel, onCommit } = props
+  const [draft, setDraft] = useState(value)
+  // 外部（配置快照）变化时同步回草稿，否则面板刷新后显示的是旧值。
+  useEffect(() => { setDraft(value) }, [value])
+  const commit = (): void => {
+    const next = draft.trim()
+    if (next !== value) onCommit(next)
+  }
+  return createElement('div', { style: { padding: '8px 0 6px' } },
+    createElement('div', {
+      style: { fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-primary, #d8e0ea)' },
+    }, label),
+    createElement('input', {
+      type: 'text',
+      value: draft,
+      placeholder,
+      'aria-label': ariaLabel,
+      onChange: (event: { target: { value: string } }) => { setDraft(event.target.value) },
+      onBlur: commit,
+      onKeyDown: (event: { key: string, currentTarget: { blur: () => void } }) => {
+        if (event.key === 'Enter') event.currentTarget.blur()
+      },
+      style: {
+        width: '100%', marginTop: 4, padding: '6px 10px', fontSize: 12.5, boxSizing: 'border-box',
+        // 半透明中性底色跟随主题：插件页这张卡片在浅色主题下是白底，写死深色兜底会变成黑框
+        // （2026-11-13 用户指出「输入框咋是黑的」）。深色主题下它自然变暗，不需要两套值。
+        background: 'rgba(127, 127, 127, 0.07)',
+        border: '1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.3))', borderRadius: 8,
+        color: 'var(--dsw-alias-label-primary, #d8e0ea)', outline: 'none',
+      },
+    }),
+    createElement('div', {
+      style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary, #67748a)', marginTop: 3, lineHeight: 1.45 },
+    }, hint),
+  )
+}
+
+
+/**
+ * 云同步 token：密码样式的输入框 + 「已设置 / 未设置」状态 + 清除。
+ *
+ * **从不回显明文**：输入框是 `type="password"`，状态只问「是否已设置」。
+ * 令牌存在 `$DSH_HOME/memory-sync-token` 的独立文件里，**不进 profile 配置**——
+ * patch 文件会被复制、分享、提交，令牌进去就等于泄露（这也是它不放进那三个
+ * 文本框的原因）。
+ */
+function SyncTokenField(): ReactNode {
+  const [saved, setSaved] = useState<boolean | undefined>(undefined)
+  const [draft, setDraft] = useState('')
+  const [note, setNote] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    void api('syncToken', { action: 'status' })
+      .then((value) => {
+        if (!alive) return
+        setSaved((value as { set?: boolean } | undefined)?.set === true)
+      })
+      .catch((error: unknown) => {
+        if (alive) setNote(`读取状态失败：${String(error)}`)
+      })
+    return () => { alive = false }
+  }, [])
+
+  const commit = (): void => {
+    const token = draft.trim()
+    if (token === '') return
+    void api('syncToken', { action: 'set', token })
+      .then(() => { setSaved(true); setDraft(''); setNote('已保存') })
+      .catch((error: unknown) => { setNote(`保存失败：${String(error)}`) })
+  }
+
+  const clear = (): void => {
+    void api('syncToken', { action: 'clear' })
+      .then(() => { setSaved(false); setNote('已清除') })
+      .catch((error: unknown) => { setNote(`清除失败：${String(error)}`) })
+  }
+
+  return createElement('div', { style: { padding: '8px 0 6px' } },
+    createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+      createElement('div', {
+        style: { fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-primary, #d8e0ea)' },
+      }, '访问令牌（PAT）'),
+      createElement('span', {
+        style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary, #67748a)' },
+      }, saved === undefined ? '读取中…' : saved ? '已设置' : '未设置'),
+      saved === true
+        ? createElement('button', {
+          type: 'button',
+          'aria-label': '清除云同步访问令牌',
+          onClick: clear,
+          style: {
+            marginLeft: 'auto', padding: 0, border: 'none', background: 'none', cursor: 'pointer',
+            fontSize: 11, color: 'var(--dsw-alias-label-secondary, #67748a)', textDecoration: 'underline',
+          },
+        }, '清除')
+        : null,
+    ),
+    createElement('input', {
+      type: 'password',
+      value: draft,
+      autoComplete: 'off',
+      'aria-label': '云同步访问令牌',
+      placeholder: saved === true ? '已设置，输入新值可覆盖' : 'ghp_... 或 github_pat_...',
+      onChange: (event: { target: { value: string } }) => { setDraft(event.target.value) },
+      onBlur: commit,
+      onKeyDown: (event: { key: string, currentTarget: { blur: () => void } }) => {
+        if (event.key === 'Enter') event.currentTarget.blur()
+      },
+      style: {
+        width: '100%', marginTop: 4, padding: '6px 10px', fontSize: 12.5, boxSizing: 'border-box',
+        // 半透明中性底色跟随主题：插件页这张卡片在浅色主题下是白底，写死深色兜底会变成黑框
+        // （2026-11-13 用户指出「输入框咋是黑的」）。深色主题下它自然变暗，不需要两套值。
+        background: 'rgba(127, 127, 127, 0.07)',
+        border: '1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.3))', borderRadius: 8,
+        color: 'var(--dsw-alias-label-primary, #d8e0ea)', outline: 'none',
+      },
+    }),
+    createElement('div', {
+      style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary, #67748a)', marginTop: 3, lineHeight: 1.45 },
+    }, '令牌只存在你这台电脑上，不会写进插件配置，也不会跟着配置被分享出去。'),
+    note === ''
+      ? null
+      : createElement('div', {
+        style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary, #67748a)', marginTop: 2 },
+      }, note),
+  )
+}
+
+/**
+ * 给使用者的配置引导（2026-11-13）。
+ *
+ * 三个输入框本身不解释「从哪弄仓库、令牌怎么来」——普通人第一次看到会卡住。
+ * 所以这里给两条路：一段就地展开的步骤，和一段可复制的提示词（丢给任意会话，
+ * 让 DSH 带着做）。**提示词里明确不让模型碰令牌明文**：令牌由使用者自己填进
+ * 面板，不进对话记录。
+ */
+const SYNC_GUIDE_PROMPT = '我要用 dsh-memory 的云同步功能，请引导我完成配置：\n'
+  + '1. 在一个代码托管平台（GitHub / Gitee 等）新建一个私有仓库，专门放记忆，不要用公开仓库；\n'
+  + '2. 创建一个访问令牌（PAT），只给它这一个仓库的读写权限；\n'
+  + '3. 帮我确认仓库地址（形如 https://github.com/我/仓库.git）；\n'
+  + '4. 我自己把令牌填进插件设置里的「访问令牌」框——不要让我把令牌贴进对话，也不要读取或打印它；\n'
+  + '5. 重启思灵后帮我验证同步可用（先只跑 status，别急着 push）。\n'
+  + '你能用 gh 命令帮我建仓库的话就建，建不了就告诉我该点哪里。'
+
+/** 一行文字按钮的样式。 */
+const LINK_BUTTON = {
+  padding: 0, border: 'none', background: 'none', cursor: 'pointer',
+  fontSize: 11, color: 'var(--dsw-alias-state-business-primary, #4FC3F7)', textDecoration: 'underline',
+} as const
+
+/** 引导区：展开式步骤 + 复制提示词。 */
+function SyncGuide(): ReactNode {
+  const [open, setOpen] = useState(false)
+  const [note, setNote] = useState('')
+
+  const copy = (): void => {
+    const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard
+    if (clipboard === undefined || typeof clipboard.writeText !== 'function') {
+      setNote('这个环境不让自动复制，请手动选中上面的说明')
+      return
+    }
+    void Promise.resolve(clipboard.writeText(SYNC_GUIDE_PROMPT))
+      .then(() => setNote('已复制，粘贴到任意新会话即可'))
+      .catch(() => setNote('复制失败，请手动选中'))
+  }
+
+  return createElement('div', { style: { padding: '2px 0 8px' } },
+    createElement('div', { style: { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' } },
+      createElement('button', {
+        type: 'button',
+        'aria-label': '展开云同步配置说明',
+        onClick: () => setOpen(value => !value),
+        style: LINK_BUTTON,
+      }, open ? '收起说明' : '第一次用？看看怎么配'),
+      createElement('button', {
+        type: 'button',
+        'aria-label': '复制让 DSH 帮我配的提示词',
+        onClick: copy,
+        style: LINK_BUTTON,
+      }, '复制「让 DSH 帮我配」'),
+      note === ''
+        ? null
+        : createElement('span', {
+          style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary, #67748a)' },
+        }, note),
+    ),
+    open
+      ? createElement('div', {
+        style: {
+          marginTop: 6, padding: '8px 10px', borderRadius: 8, lineHeight: 1.65,
+          fontSize: 11.5, color: 'var(--dsw-alias-label-secondary, #67748a)',
+          background: 'rgba(127, 127, 127, 0.06)',
+        },
+      },
+      createElement('div', null, '1. 在一个代码托管平台（GitHub / Gitee 等）新建一个私有仓库，专门放记忆。'),
+      createElement('div', null, '2. 创建一个访问令牌（PAT），只给它这一个仓库的读写权限。'),
+      createElement('div', null, '3. 仓库地址填进上面的「远端地址」，令牌填进「访问令牌」。'),
+      createElement('div', null, '4. 重启思灵，然后在会话里让我执行 memory_sync 的 push / pull。'),
+      createElement('div', { style: { marginTop: 4 } },
+        '不想自己弄？点「复制「让 DSH 帮我配」」，把那段话粘贴到任意新会话里，我带你一步步做。'),
+      )
+      : null,
+  )
+}
+
+/**
+ * 插件页「记忆」详情里的配置卡片（0.19.0 起是日记开关，2026-11-12 加云同步开关与连接配置）。
+ *
+ * **为什么要有它**：`Config` schema 只负责让 Host 侧认得这些字段，
+ * `@deepseek-ai/dsh-settings` 的 README 写明自动表单 `autoGenerate`「目前没有已发布的
+ * 客户端这样做」——**没有任何 UI 会自己把它画出来**。所以卡片必须插件自己注册，挂在
+ * 插件页详情里的 `plugins.bundle.config`（`node-appearance` / `chat-rail` 同款）。
+ *
+ * 两个开关合成一张卡片而不是各注册一张：`plugins.bundle.config` 以 key 去重，
+ * 同一插件带合成 key 的第二个条目行为未验证——而这张卡片本来就只该有一个入口。
+ */
+function MemorySettingsCard(props: { form: ConfigFormLike }): ReactNode {
+  const { form } = props
+  const [diary, setDiary] = useState(true)
+  const [sync, setSync] = useState(false)
+  const [remote, setRemote] = useState('')
+  const [mirrorDir, setMirrorDir] = useState('')
+  const [branch, setBranch] = useState('')
+  const [proxy, setProxy] = useState('')
+  const [testNote, setTestNote] = useState('')
+  const [testing, setTesting] = useState(false)
+  useEffect(() => {
+    const read = (): void => {
+      const value = form.getSnapshot()?.value
+      setDiary(value?.diary?.enabled ?? true)
+      setSync(value?.sync?.enabled ?? false)
+      setRemote(value?.sync?.remote ?? '')
+      setMirrorDir(value?.sync?.mirrorDir ?? '')
+      setBranch(value?.sync?.branch ?? '')
+      setProxy(value?.sync?.proxy ?? '')
+    }
+    read()
+    const off = form.subscribe(read)
+    return () => {
+      // subscribe 的返回形态随内核版本有过函数/对象两种，都兜住。
+      if (typeof off === 'function') (off as () => void)()
+    }
+  }, [form])
+
+  const write = (path: string[], value: boolean | string, what: string): void => {
+    // 写入失败必须可见：先前直接 `void form.mutate(...)`，失败被静默吞掉，
+    // 界面上表现为「点了没反应」——那是比报错更坏的状态。
+    try {
+      const pending = form.mutate([{ op: 'set', path, value }])
+      void Promise.resolve(pending).catch((error: unknown) => {
+        console.warn(`dsh-memory: ${what}写入失败`, error)
+      })
+    } catch (error) {
+      console.warn(`dsh-memory: ${what}写入抛错`, error)
+    }
+  }
+
+  return createElement('div', null,
+    createElement(SwitchRow, {
+      label: '日记',
+      hint: '本机写日记。关掉后日记工具拒绝执行、不再注入指针；已有日记文件原样保留，不会被删。',
+      enabled: diary,
+      ariaLabel: '日记开关',
+      onToggle: () => write(['diary', 'enabled'], !diary, '日记开关'),
+      divided: false,
+    }),
+    createElement(SwitchRow, {
+      label: '云同步',
+      hint: '把本机记忆备份到你自己的一个 git 仓库，几台电脑之间共用同一份记忆。关着时同步工具根本不会出现。打开后填上仓库地址和访问令牌；访问 GitHub 需要代理的话把代理也填上，然后点「测试连接」确认通了。不知道填什么就留空——那只会在这台电脑上存一份镜像，不会传到任何地方。',
+      enabled: sync,
+      ariaLabel: '云同步开关',
+      onToggle: () => write(['sync', 'enabled'], !sync, '云同步开关'),
+      divided: true,
+    }),
+    // 连接配置只在开关打开时出现：关着的时候填地址没有任何意义，只会让人以为在生效。
+    sync
+      ? createElement('div', { style: { padding: '2px 0 10px' } },
+        createElement(SyncField, {
+          label: '远端地址',
+          hint: '你的仓库地址（https 开头）。留空就是只在本机存一份，不外传。',
+          ariaLabel: '云同步远端地址',
+          value: remote,
+          placeholder: 'https://github.com/<你>/<仓库>.git',
+          onCommit: next => write(['sync', 'remote'], next, '云同步远端地址'),
+        }),
+        createElement(SyncField, {
+          label: '镜像目录',
+          hint: '镜像存在哪。留空就用默认位置。',
+          ariaLabel: '云同步镜像目录',
+          value: mirrorDir,
+          placeholder: '留空 = 默认位置',
+          onCommit: next => write(['sync', 'mirrorDir'], next, '云同步镜像目录'),
+        }),
+        createElement(SyncField, {
+          label: '分支',
+          hint: '一般留空即可。',
+          ariaLabel: '云同步分支',
+          value: branch,
+          placeholder: 'main',
+          onCommit: next => write(['sync', 'branch'], next, '云同步分支'),
+        }),
+        createElement(SyncField, {
+          label: '代理',
+          hint: '如果访问 GitHub 需要代理才填，例如 http://127.0.0.1:7897；不填就是直连。',
+          ariaLabel: '云同步代理',
+          value: proxy,
+          placeholder: 'http://127.0.0.1:7897（可选）',
+          onCommit: next => write(['sync', 'proxy'], next, '云同步代理'),
+        }),
+        createElement(SyncTokenField),
+        createElement('div', { style: { display: 'flex', gap: 12, alignItems: 'center', padding: '2px 0 6px' } },
+          createElement('button', {
+            type: 'button',
+            'aria-label': '测试云同步连接',
+            disabled: testing,
+            onClick: () => {
+              setTesting(true)
+              setTestNote('测试中…')
+              void api('syncTest', {})
+                .then((value) => {
+                  const result = value as { ok?: boolean, error?: string, kind?: string, branches?: string[] }
+                  if (result.ok === true) {
+                    setTestNote(`连上了，远端有 ${result.branches?.length ?? 0} 个分支`)
+                    return
+                  }
+                  const reason = result.kind === 'auth'
+                    ? '认证失败：令牌不对或没有这个仓库的权限'
+                    : result.kind === 'network'
+                      ? '连不上：检查网络，需要代理的话填上面的代理地址'
+                      : '连接失败'
+                  setTestNote(`${reason}${result.error === undefined ? '' : `（${result.error}）`}`)
+                })
+                .catch((error: unknown) => { setTestNote(`测试失败：${String(error)}`) })
+                .finally(() => { setTesting(false) })
+            },
+            style: {
+              padding: '5px 12px', fontSize: 11.5, cursor: testing ? 'default' : 'pointer',
+              borderRadius: 7, border: '1px solid var(--dsw-alias-border-l2, rgba(127,127,127,0.3))',
+              background: testing ? 'transparent' : 'rgba(127, 127, 127, 0.07)',
+              color: 'var(--dsw-alias-label-primary, #d8e0ea)',
+            },
+          }, testing ? '测试中…' : '测试连接'),
+          testNote === ''
+            ? null
+            : createElement('span', {
+              style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary, #67748a)' },
+            }, testNote),
+        ),
+        createElement(SyncGuide),
+        createElement('div', {
+          style: { fontSize: 11, color: 'var(--dsw-alias-label-secondary, #67748a)', lineHeight: 1.5, marginTop: 2 },
+        }, '填好后重启思灵生效。没有仓库地址就留空，只在本机存一份镜像。'),
+      )
+      : null)
+}
+
 // ---- client plugin body ----
 export function apply(ctx: unknown): void {
   const face = ctx as LocaleAwareContext
@@ -1028,7 +1424,6 @@ export function apply(ctx: unknown): void {
   // 兜底入口：设置页「记忆」条目——任何环境（无 better-sidebar 也）可管理记忆。
   // 与侧栏 tab 双入口并存（2026-08-19 用户：没有侧栏就没有管理面板的问题）。
   if (slots?.inject !== undefined) {
-    injectNavCss()
     slots.inject('settings.section', () => slots.register({
       name: 'settings.section',
       id: 'dsh-memory',
@@ -1038,8 +1433,36 @@ export function apply(ctx: unknown): void {
     }, () => createElement(SettingsMemoryView, {
       ctx: ctx as LocaleAwareContext,
     })))
-    // 设置导航图标：大脑（DSH 无 icon 契约，MutationObserver + CSS mask 替换齿轮）
-    face.effect?.(() => registerSettingsNavIcon(() => STRINGS[localeId].tabMemory), 'dsh-memory: settings navigation icon')
+    // 设置导航图标：注册宿主同 id 插槽，宿主用它替代默认齿轮。
+    slots.inject('settings.section.icon', () => slots.register({
+      name: 'settings.section.icon',
+      id: 'dsh-memory',
+      order: 60,
+      label: () => STRINGS[localeId].tabMemory,
+    }, (props: { size?: number }) => navIcon(props?.size ?? 16)))
+  }
+
+  // 插件页「记忆」详情里的配置卡片（0.19.0 日记开关；2026-11-12 加云同步开关）。
+  // key 用**包名**——`plugins.bundle.config` 的 key 是包名（`config-ledger.ts` 的
+  // `keysOf` 直接取 `entry.options.key`），而 `configForms.get` 的参数是 entry id
+  // （`memory`）。两者不是同一个东西，别写混。
+  //
+  // **必须走 `ctx.get('configForms')` 而不是 `ctx.configForms`**：后者是 cordis 的
+  // topology-sensitive 属性代理，本插件没有 inject 声明 `configForms`，属性访问会抛
+  // ——2026-10-24 实测，一个卡片注册失败会让整个 client 半侧 `failed`，连记忆面板一起没了。
+  // 卡片是锦上添花，任何情况下都不该拖垮插件本身，所以整段再包一层 try。
+  try {
+    const configForms = face.get?.('configForms') as { get?(ns: string): unknown } | undefined
+    const settingsForm = configForms?.get?.('memory') as ConfigFormLike | undefined
+    if (slots?.inject !== undefined && settingsForm !== undefined) {
+      slots.inject('plugins.bundle.config', () => slots.register({
+        name: 'plugins.bundle.config',
+        key: '@max-null/dsh-memory',
+        inject: () => ({}),
+      }, () => createElement(MemorySettingsCard, { form: settingsForm })))
+    }
+  } catch (error) {
+    console.warn('dsh-memory: 设置卡片未注册（不影响记忆与日记工具）', error)
   }
 
   // better-sidebar 可选软依赖：有侧栏时挂 tab（无则设置页兜底）。

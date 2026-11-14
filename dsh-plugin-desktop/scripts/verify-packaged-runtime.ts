@@ -94,6 +94,7 @@ export const ALLOWED_SMART_UNPACK_PACKAGE_PREFIXES = [
   'node_modules/@img/sharp-',
   'node_modules/@koromix/koffi-',
   'node_modules/@vscode/ripgrep-',
+  'node_modules/meshcall-router-',
   'node_modules/node-addon-require-builtin-',
 ] as const
 
@@ -853,7 +854,7 @@ export function reportUnpackedRuntime(summary: UnpackedRuntimeSummary): void {
 /**
  * Check the interpreter payloads Electron Builder copied beside the application as extra resources:
  * every CPU this platform ships declares the platform, CPU and product version with Node, pnpm and
- * the Office resources. Linux ships no payload and passes with none.
+ * the Office resources.
  * @param context - Electron Builder's afterPack or afterAllArtifactBuild context.
  * @returns The verified payload CPUs.
  */
